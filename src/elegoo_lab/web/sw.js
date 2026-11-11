@@ -1,7 +1,7 @@
 // Atelier CC2 service worker: the app shell loads instantly and says so clearly when the PC is off.
 // Printer data and the workshop API are never cached: they must always be live.
 const SHELL = 'cc2-shell-v1';
-const STATIC = ['/lab/', '/lab/offline.html', '/lab/vendor/three.module.js', '/lab/icons/icon-192.png', '/lab/manifest.webmanifest'];
+const STATIC = ['/lab/', '/lab/offline.html', '/lab/js/i18n.js', '/lab/i18n/en.json', '/lab/vendor/three.module.js', '/lab/icons/icon-192.png', '/lab/manifest.webmanifest'];
 
 self.addEventListener('install', e => { e.waitUntil(caches.open(SHELL).then(c => c.addAll(STATIC)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => {

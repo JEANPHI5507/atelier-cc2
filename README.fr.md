@@ -1,6 +1,6 @@
 # Atelier CC2
 
-🇬🇧 [English version](README.md)
+🇬🇧 [English version](README.md) · Interface et documentation en français et en anglais (bouton FR / EN en haut).
 
 Un atelier web open source pour l'**Elegoo Centauri Carbon 2** et son **CANVAS** (4 bobines). Il prépare un modèle 3D
 en plusieurs couleurs, le tranche avec OrcaSlicer, l'envoie à l'imprimante, puis suit l'impression couche par couche :

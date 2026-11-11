@@ -81,6 +81,10 @@ class MulticolorIn(BaseModel):
     infill: int | None = None
 
 
+class LangIn(BaseModel):
+    lang: str
+
+
 class PrepareIn(BaseModel):
     mapping: dict[int, int] = {}       # source colour index -> CANVAS slot (1..4)
     filaments: list[str] = ["PLA"]     # filament per slot
@@ -477,6 +481,14 @@ def lab_router(cfg: config.Config) -> APIRouter:
         if src.suffix.lower() != ".gcode":
             raise HTTPException(400, "seulement pour un G-code")
         return await asyncio.to_thread(gcode_preview.extract, src)
+
+    @r.post("/langue")
+    def set_language(body: LangIn) -> dict[str, str]:
+        """The interface language, so what leaves the page (phone notifications) follows it."""
+        if body.lang not in ("fr", "en"):
+            raise HTTPException(422, "fr ou en")
+        config.save("interface", langue=body.lang)
+        return {"langue": body.lang}
 
     @r.get("/couleurs")
     async def colour_plan(request: Request) -> dict[str, Any]:

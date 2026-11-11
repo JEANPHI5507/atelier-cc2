@@ -600,6 +600,26 @@ def test_colours_now_and_next(web):
     assert [(n["tool"], n["bobine"], n["couche"]) for n in d["suivants"]] == [(2, 1, 2), (0, 2, 3)]
 
 
+
+def test_english_dictionary_and_server_translation():
+    import json, re
+    from elegoo_lab import i18n
+    d = json.loads(i18n.DICT.read_text())
+    assert len(d["exact"]) > 1000 and len(d["patterns"]) > 100
+    for fr, en in d["patterns"]:
+        re.compile("^" + re.escape(fr).replace(r"\{\}", "(.*?)") + "$")                # every pattern is valid
+        n = fr.count("{}")
+        assert all(1 <= int(k) <= n for k in re.findall(r"\{(\d+)\}", en)), fr      # numbered slots exist
+        assert en.count("{}") <= n, fr                                                   # never more values than captured
+    assert i18n.tr("Impression terminée", "en") == "Print finished"
+    assert i18n.tr("Impression terminée", "fr") == "Impression terminée"
+    assert i18n.tr("Consigne Buse", "en") == "Target Nozzle"                            # pieces translated too
+    assert i18n.tr("3 fichiers supprimés", "en") == "3 files deleted"
+    assert i18n.tr("1 fichier supprimé", "en") == "1 file deleted"                      # empty plural mark
+    t = "chat.gcode : terminée en 45 min. Pense à vider le bac de purge."
+    assert i18n.tr(t, "en") == "chat.gcode: finished in 45 min. Remember to empty the purge bin."
+
+
 def test_pwa_and_https_for_the_phone(web, monkeypatch, tmp_path):
     import ssl
     from cryptography import x509

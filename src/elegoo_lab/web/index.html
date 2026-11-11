@@ -1,6 +1,8 @@
 <!doctype html>
-<html lang="fr">
+<html lang="fr" translate="no">
 <head>
+<meta name="google" content="notranslate">
+<script src="js/i18n.js"></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Atelier Centauri Carbon 2</title>
@@ -50,6 +52,8 @@
   <button class="btn primary" id="install" hidden title="Installer l'atelier comme une appli"><svg class="i"><use href="#i-download"/></svg><span>Installer l'appli</span></button>
   <a class="btn ghost m-hide" id="board-open" href="tableau.html" title="Tableau de bord plein écran (pour une tablette)"><svg class="i"><use href="#i-camera"/></svg><span>Tableau</span></a>
   <button class="btn ghost" id="phone-open" hidden title="Ouvrir l'atelier sur le téléphone"><svg class="i"><use href="#i-phone"/></svg><span>Téléphone</span></button>
+  <button class="btn ghost" id="lang" data-cap="Langue" title="Langue · Language" translate="no" onclick="I18N.set(I18N.lang === 'en' ? 'fr' : 'en')"><b id="lang-t">EN</b></button>
+<script>document.getElementById('lang-t').textContent = I18N.lang === 'en' ? 'FR' : 'EN';</script>
   <div class="themes" role="radiogroup" aria-label="Thème" data-cap="Thème"><button data-theme-pick="noir" title="Noir" style="background:#000;border-color:#48484a"></button><button data-theme-pick="ardoise" title="Ardoise" style="background:#465060"></button><button data-theme-pick="sauge" title="Sauge" style="background:#4a5751"></button><button data-theme-pick="sable" title="Sable" style="background:#dad0c0"></button></div>
   <span class="pill" id="printer" title="État de l'imprimante"><span class="led"></span><span id="printer-txt">Connexion…</span><span id="printer-temp"></span></span>
 </header>

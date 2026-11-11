@@ -68,8 +68,9 @@ faithful model of the firmware: what is true on the real printer is listed in [W
 
 ## Conventions
 
-- Interface texts in French, informal "tu", concrete (what happens and what to do), no jargon. A translation of the
-  interface is welcome: today the texts are written directly in the HTML and JavaScript.
+- Interface texts are written in French, informal "tu", concrete (what happens and what to do), no jargon. The English
+  interface comes from `web/i18n/en.json`: `web/js/i18n.js` swaps every text shown (exact texts, then patterns where `{}`
+  is a value), and `i18n.py` does the same for the phone notifications. A new French text needs its English line there.
 - Comments say why, not what.
 - pycentauri is pinned to 0.9.1: a reverse-engineered protocol, to upgrade on purpose only.
 - Any action that changes the printer goes through `--control`; any request that changes something is refused if it

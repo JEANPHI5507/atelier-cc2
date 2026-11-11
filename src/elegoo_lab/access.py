@@ -21,7 +21,8 @@ SESSION_DAYS = 30
 COOKIE = "cc2_session"
 MAX_FAILS, FAIL_WINDOW_S = 5, 300
 PUBLIC = ("/lab/login.html", "/lab/api/login", "/lab/vendor/", "/lab/icons/", "/lab/manifest.webmanifest",
-          "/lab/sw.js", "/lab/offline.html", "/lab/tableau.webmanifest", "/lab/ca.crt", "/favicon")
+          "/lab/sw.js", "/lab/offline.html", "/lab/tableau.webmanifest", "/lab/ca.crt", "/favicon",
+          "/lab/js/i18n.js", "/lab/i18n/")   # the login page in English too
 
 
 def _settings() -> dict[str, Any]:

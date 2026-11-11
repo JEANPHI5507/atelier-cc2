@@ -127,17 +127,18 @@ async def send_ntfy(ev: dict[str, Any]) -> bool:
     url = ntfy_url()
     if not url:
         return False
+    from .i18n import tr   # in the language last chosen in the interface
     extra: dict[str, str] = {}
     if (base := app_url()):
         extra["Click"] = base
         if ev.get("bilan"):
-            extra["Actions"] = f"view, Faire le bilan, {base}#bilan={ev['bilan']}, clear=true"
+            extra["Actions"] = f"view, {tr('Faire le bilan')}, {base}#bilan={ev['bilan']}, clear=true"
     import httpx
     try:
         async with httpx.AsyncClient(timeout=10) as c:
             # ntfy reads UTF-8 titles from the "Title" header only RFC 2047-encoded: send it as a query param instead
-            body = _GCODE.sub(lambda m: nice(m.group(0)), ev["detail"] or ev["title"])
-            r = await c.post(url, params={"title": ev["title"] or "CC2"}, content=body.encode(),
+            body = tr(_GCODE.sub(lambda m: nice(m.group(0)), ev["detail"] or ev["title"]))
+            r = await c.post(url, params={"title": tr(ev["title"]) or "CC2"}, content=body.encode(),
                              headers={**extra, "Priority": "high" if ev["level"] == "bad" else "default",
                                       "Tags": {"ok": "white_check_mark", "warn": "warning", "bad": "rotating_light"}[ev["level"]]})
             return r.is_success

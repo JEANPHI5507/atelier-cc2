@@ -23,7 +23,7 @@ is). Every event goes into the log (the bell at the top of the workshop).
 | Spool almost empty / new spool | under 100 g left, another spool detected in the CANVAS |
 | Maintenance due | a task in the maintenance log is due |
 
-(The alerts themselves are in French in the interface.)
+(In the English interface, and on the phone once English is chosen, the alerts are in English.)
 
 ## On an open page
 

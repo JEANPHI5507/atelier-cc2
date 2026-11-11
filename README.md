@@ -1,6 +1,6 @@
 # Atelier CC2
 
-🇫🇷 [Version française](README.fr.md) · **The interface is in French for now** (the documentation is in English and French).
+🇫🇷 [Version française](README.fr.md) · Interface and documentation in **English and French** (EN / FR button at the top).
 
 An open-source web workshop for the **Elegoo Centauri Carbon 2** and its **CANVAS** (4 spools). It prepares a
 multicolour 3D model, slices it with OrcaSlicer, sends it to the printer, then follows the print layer by layer: camera
@@ -82,7 +82,7 @@ Without `--control`, the workshop is read-only: it can't start, stop or heat any
 | [Troubleshooting](guide/en/troubleshooting.md) | common problems and what to do |
 | [Development](guide/en/development.md) | code layout, tests, simulator |
 
-The interface uses French labels; the guides give each label in French with its meaning, so you can find your way.
+The guides were first written for the French interface: they give each button's French name with its meaning.
 
 ## Limits
 
@@ -91,7 +91,6 @@ The interface uses French labels; the guides give each label in French with its 
   the CC2 and its CANVAS.
 - The CC2's local network refuses some commands (homing, moves, calibrations, filament loading): they stay on the
   printer's screen. The workshop says so when it happens.
-- The interface is in French only for now.
 
 ## Licence
 
