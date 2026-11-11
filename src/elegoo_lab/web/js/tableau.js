@@ -8,6 +8,12 @@
   var IDLE = [0, 8, 9, 14];
   var ctx = { control: false }, busy = false, paused = false, lightOn = false, nightByUser = null, wake = null, sound = true;
 
+  // a G-code name to read: the model and the layer height, as in the workshop ("…_canvas_0.20mm_PLA….gcode" -> "… · 0,20 mm")
+  function nice(n) {
+    var g = /^(.*?)(?:_canvas)?_(\d+(?:\.\d+)?)mm_.*\.gcode$/i.exec(n || '');
+    var base = (g ? g[1] : String(n || '').replace(/\.[^.]+$/, '')).replace(/^\d{8}-\d{6}_/, '').replace(/_/g, ' ').trim();
+    return (base || n) + (g ? ' · ' + g[2].replace('.', ',') + ' mm' : '');
+  }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function get(path) {
     return fetch(path, { cache: 'no-store' }).then(function (r) {
@@ -150,7 +156,7 @@
       $('state').textContent = STATE[ps] || ('État ' + ps);
       $('pill').className = 'pill ' + (ps === 14 ? 'bad' : paused ? 'warn' : busy ? 'busy' : '');
       $('pill-t').textContent = ps === 14 ? 'Erreur' : paused ? 'En pause' : busy ? 'En cours' : 'Disponible';
-      $('file').textContent = busy ? (s.filename || '').replace(/\.gcode$/, '') : '';
+      $('file').textContent = busy ? nice((s.filename || '').split('/').pop()) : '';
       $('pct').textContent = busy || ps === 9 ? prog + ' %' : '–';
       $('ring').setAttribute('stroke-dashoffset', String(314.16 * (1 - prog / 100)));
       $('bar').style.width = (busy ? prog : 0) + '%';
