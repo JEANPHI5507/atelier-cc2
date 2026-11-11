@@ -50,9 +50,9 @@
   .browser .bar { height: 34px; display: flex; align-items: center; gap: 7px; padding: 0 14px; background: #121214; border-bottom: 1px solid var(--line); }
   .browser .bar i { width: 11px; height: 11px; border-radius: 50%; background: #3a3a3c; }
   .browser .bar span { margin: 0 auto; font-size: 12px; color: var(--faint); padding-right: 50px; }
-  .phone { position: absolute; z-index: 2; right: -2%; bottom: 0; width: 25%; min-width: 170px; border-radius: 38px; padding: 9px; background: #1c1c1e; border: 1px solid #3a3a3c; box-shadow: 0 30px 80px rgba(0,0,0,.85); }
-  .phone img { border-radius: 30px; }
-  .phone::before { content: ""; position: absolute; top: 18px; left: 50%; width: 30%; height: 18px; margin-left: -15%; border-radius: 10px; background: #000; z-index: 1; }
+  .phone { position: absolute; z-index: 2; right: -3%; bottom: -2%; width: 16%; min-width: 120px; border-radius: 30px; padding: 7px; background: #1c1c1e; border: 1px solid #3a3a3c; box-shadow: 0 30px 80px rgba(0,0,0,.85); }
+  .phone img { border-radius: 24px; }
+  .phone::before { content: ""; position: absolute; top: 13px; left: 50%; width: 30%; height: 12px; margin-left: -15%; border-radius: 8px; background: #000; z-index: 1; }
 
   /* sections */
   section { padding: 140px 0 0; }
@@ -73,7 +73,7 @@
   .duo { display: grid; grid-template-columns: 2.1fr 1fr; gap: 28px; align-items: end; margin-top: 56px; }
   .tablet { border-radius: 26px; padding: 12px; background: #1c1c1e; border: 1px solid #3a3a3c; box-shadow: 0 30px 90px rgba(0,0,0,.7); }
   .tablet img { border-radius: 16px; }
-  .duo .phone { position: relative; right: auto; bottom: auto; width: 100%; min-width: 0; max-width: 300px; justify-self: center; }
+  .duo .phone { position: relative; right: auto; bottom: auto; width: 100%; min-width: 0; max-width: 260px; justify-self: center; border-radius: 34px; padding: 9px; } .duo .phone img { border-radius: 27px; }
   .center { text-align: center; } .center p { margin-left: auto; margin-right: auto; }
   .center .txt p, .lede { color: var(--dim); font-size: 19px; max-width: 640px; margin: 0 auto; }
 
@@ -97,7 +97,7 @@
   @media (max-width: 600px) {
     .wrap { padding: 0 16px; } .top nav { gap: 16px; } .top nav .opt { display: none; }
     .hero { padding-top: 64px; } .stage { margin-top: 48px; padding-bottom: 70px; }
-    .phone { width: 42%; right: -4%; border-radius: 28px; padding: 6px; } .phone img { border-radius: 23px; } .phone::before { top: 12px; height: 12px; }
+    .phone { width: 28%; min-width: 90px; right: -2%; border-radius: 18px; padding: 4px; } .phone img { border-radius: 14px; } .phone::before { top: 7px; height: 7px; }
     .browser .bar { height: 26px; } .browser .bar span { display: none; }
     .btn { width: 100%; justify-content: center; }
     .txt p, .lede { font-size: 17px; }
