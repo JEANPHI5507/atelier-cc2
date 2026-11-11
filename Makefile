@@ -3,7 +3,7 @@ ORCA_SHA256  ?= d12fb8c8eac1aecd2dfb6377acd48f994f8fa439ed5292fa532dd82880f029fd
 ORCA_DIR     := tools/orcaslicer
 ORCA_URL     := https://github.com/OrcaSlicer/OrcaSlicer/releases/download/v$(ORCA_VERSION)/OrcaSlicer_Linux_AppImage_Ubuntu2404_V$(ORCA_VERSION).AppImage
 
-SERVEUR      ?= Serveur-Maison
+SERVEUR      ?=   # make deploy SERVEUR=<hôte ssh> (une entrée de ~/.ssh/config)
 
 .PHONY: install slicer plateau test dash deploy
 install:
@@ -39,6 +39,7 @@ ia:  ## modèle de détection des ratés (Obico, 200 Mo, vérifié)
 # Envoie le code sur le serveur maison (ssh $(SERVEUR), dossier ~/elegoo) et y relance l'atelier.
 # La bibliothèque (models/), config.toml, .certs et tools/ du serveur ne sont pas touchés.
 deploy:
+	@test -n "$(SERVEUR)" || { echo "Indique le serveur : make deploy SERVEUR=<hôte ssh>"; exit 2; }
 	rsync -a --delete --exclude __pycache__ src $(SERVEUR):elegoo/
 	rsync -a pyproject.toml uv.lock README.md Makefile config.example.toml $(SERVEUR):elegoo/
 	ssh $(SERVEUR) 'cd elegoo && ~/.local/bin/uv sync --frozen --no-dev -q && systemctl --user restart cc2-atelier && sleep 6 && systemctl --user is-active cc2-atelier'

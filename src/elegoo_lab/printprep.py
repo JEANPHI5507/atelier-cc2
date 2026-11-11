@@ -18,9 +18,13 @@ from . import colorize, colors, config, cut, mesh, settings, slicer, thumbnail
 SLICEABLE_AS_IS = {".stl", ".obj"}
 
 # multicolour print modes: OrcaSlicer's prime tower is ~90 % of the filament of a small multicolour model
+# A tower of PLA Silk knocked over at layer 84 on the real CC2 (2026-11-11): the nozzle comes back from each purge
+# (at 240 °C, Elegoo's change macro) oozing, the string curls into loops on top of the tower, and with OrcaSlicer's
+# 0.4 mm hop the nozzle catches them on the next pass. A wider brim holds the tower, a 0.8 mm hop clears the loops.
+TOWER = {"overrides": {"prime_tower_brim_width": "8"}, "filament": {"filament_z_hop": ["0.8"]}}
 MODES = {
-    "qualite":   {"smart_flush": False, "overrides": {}},
-    "equilibre": {"smart_flush": True,  "overrides": {}},
+    "qualite":   {"smart_flush": False, "overrides": TOWER["overrides"], "filament": TOWER["filament"]},
+    "equilibre": {"smart_flush": True,  "overrides": TOWER["overrides"], "filament": TOWER["filament"]},
     "economie":  {"smart_flush": True,  "overrides": {"enable_prime_tower": "0"}},
     # no tower and no flush at all: the colour change is only the CANVAS switch (see slicer.without_purge)
     "sans_purge": {"smart_flush": True, "overrides": {"enable_prime_tower": "0"}, "no_purge": True},
@@ -182,7 +186,7 @@ def prepare_and_slice(
                                                       # several parts: the CC2 can drop one that fails and finish the others
                                                       # (its firmware reads EXCLUDE_OBJECT_DEFINE like Klipper); one part: profile as is
                                                       **({"exclude_object": "1"} if copies > 1 else {}), **adv_proc},
-                                 filament_overrides=adv_fil, cli_args=cli)
+                                 filament_overrides={**(MODES[mode].get("filament", {}) if n > 1 else {}), **adv_fil}, cli_args=cli)
     except slicer.SupportNeeded:   # OrcaSlicer found parts that would hang in the air: tree supports, said in the result
         warnings.append("Supports en arbre ajoutés : OrcaSlicer a trouvé des parties qui flotteraient sans support.")
         res = slicer.slice_model(target, out_dir, quality=quality, filament=fil, infill=infill, supports=True,
@@ -190,7 +194,7 @@ def prepare_and_slice(
                                                   # several parts: the CC2 can drop one that fails and finish the others
                                                   # (its firmware reads EXCLUDE_OBJECT_DEFINE like Klipper); one part: profile as is
                                                   **({"exclude_object": "1"} if copies > 1 else {}), **adv_proc},
-                             filament_overrides=adv_fil, cli_args=cli)
+                             filament_overrides={**(MODES[mode].get("filament", {}) if n > 1 else {}), **adv_fil}, cli_args=cli)
     _thumb_model(src, slots, rot, slot_hex, res.gcode, warnings, palette)
     palette = slot_hex or colorize.PALETTE
     per = res.per_filament_m + [0.0] * n
@@ -242,7 +246,7 @@ def _split_and_slice(src: Path, slots: dict[int, int], fil: list[str], *, qualit
         try:
             r = slicer.slice_model(target, out_dir, quality=quality, filament=fil, infill=infill, supports=sup_on,
                                    colours=slot_hex, no_purge=bool(MODES[mode].get("no_purge")) and n > 1, overrides={**(MODES[mode]["overrides"] if n > 1 else {}), **sup_ov, **adv[0]},
-                                   filament_overrides=adv[1])
+                                   filament_overrides={**(MODES[mode].get("filament", {}) if n > 1 else {}), **adv[1]})
         except slicer.SliceError as err:  # one bad piece must not hide the others
             failed.append(f"{p.name} : {str(err)[:160]}")
             continue
@@ -263,7 +267,7 @@ def _split_and_slice(src: Path, slots: dict[int, int], fil: list[str], *, qualit
         colors.write_plate(items, slot_hex, plate_file, smart_flush=MODES[mode]["smart_flush"])
         r = slicer.slice_model(plate_file, out_dir, quality=quality, filament=fil, infill=100 if not small else infill,
                                colours=slot_hex, no_purge=bool(MODES[mode].get("no_purge")) and n > 1, overrides={**(MODES[mode]["overrides"] if n > 1 else {}), **adv[0]},
-                               filament_overrides=adv[1])
+                               filament_overrides={**(MODES[mode].get("filament", {}) if n > 1 else {}), **adv[1]})
         lengths = sorted({2 * d - 1 for d in res.pin_depths})
         allv = np.vstack([it[1] for it in items])
         allf = np.vstack([it[2] + sum(len(x[1]) for x in items[:i]) for i, it in enumerate(items)])

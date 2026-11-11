@@ -59,6 +59,11 @@ ISSUES: dict[str, tuple[str, str, str, Fix]] = {
                 "La buse coule en attendant la couleur suivante et dépose le surplus sur la pièce.",
                 "Les gouttes partent au cutter, pièce froide. La prochaine fois : mode Équilibré, la buse s'essuie sur une tour avant de revenir sur la pièce.",
                 lambda u: {"mode": "equilibre"}),
+    "tour": ("Tour de purge tombée ou décollée",
+             "La buse revient de chaque purge en suintant : le fil fait des boucles sur la tour et la buse finit par les accrocher.",
+             "Ne remets pas la tour : reprends, quelques fils tomberont à sa place. L'atelier imprime déjà la tour avec une bordure "
+             "de 8 mm et lève la buse de 0,8 mm ; nettoie le plateau à cet endroit. Pour une petite pièce, le mode Économie n'a pas de tour.",
+             lambda u: {}),
     "pied": ("Base évasée (pied d'éléphant)",
              "Première couche écrasée par un plateau trop chaud.",
              "Lime légèrement l'arête du bas. La prochaine fois : plateau 5 °C plus froid.",
