@@ -66,7 +66,7 @@ L'atelier doit pouvoir joindre l'adresse de ComfyUI. Deux cas :
 
 ```toml
 [comfyui]
-url = "http://192.168.1.50:8188"
+url = "http://192.168.1.xx:8188"
 ```
 
 ComfyUI n'a pas de mot de passe : ne l'ouvre qu'au réseau de la maison, jamais à Internet. Une autre solution est un
