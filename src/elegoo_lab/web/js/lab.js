@@ -99,7 +99,7 @@ async function preview(f, map = '') {
       if (!o.geometry.attributes.normal) o.geometry.computeVertexNormals(); o.material = overhangAware(new THREE.MeshStandardMaterial({ vertexColors: !!o.geometry.attributes.color, color: o.geometry.attributes.color ? 0xffffff : 0xd7dbe2, roughness: .55 })); o.castShadow = true; } });
     g.scene.rotation.x = Math.PI / 2; g.scene.userData.base = Math.PI / 2;
     if (current) scene.remove(current);
-    show(g.scene); renderRot(); modelLook(); vtoolsShow();
+    show(g.scene); renderRot(); modelLook(); vtoolsShow(); piecesInit(f);
     if (framedFor !== f.name) { frame(g.scene); framedFor = f.name; }
   } catch (e) { previewKey = ''; hint('Aperçu impossible', esc(e.message)); }
 }
@@ -167,6 +167,9 @@ function vtoolsShow() {
   $('vtools').hidden = !on;
   const model = on && !paths?.parts?.some(p => p.lines.parent === current);
   $('vtools').querySelectorAll('[data-vt="over"], [data-vt="dims"], [data-vt="paint"]').forEach(b => b.hidden = !model);
+  const movable = model && mv.ranges.length > 1 && sel?.name === mv.file;
+  $('vtools').querySelector('[data-vt="move"]').hidden = !movable;
+  $('vtools').querySelector('[data-vt="regroup"]').hidden = !movable || !Object.keys(mv.moves).length;
   $('vtools').querySelector('[data-vt="paint"]').hidden = !model || !sel || !['glb', 'gltf', 'obj', 'ply'].includes(sel.ext);   // painted formats only
   if (!model) { OVER.value = 0; setDims(false); $('vtools').querySelector('[data-vt="over"]').classList.remove('on'); }
 }
@@ -192,6 +195,61 @@ $('vtools').querySelector('[data-vt="dims"]').onclick = () => setDims(!dimsBox);
 $('vtools').querySelector('[data-vt="fit"]').onclick = () => camTo('iso');
 $('vtools').querySelector('[data-vt="full"]').onclick = () => {
   if (document.fullscreenElement) document.exitFullscreen(); else stage.requestFullscreen?.().catch(() => {});
+};
+/* move pieces: drag one object of a multi-object model across the plate; the server applies the same moves */
+const mv = { file: '', ranges: [], moves: {}, on: false, drag: null };
+const pieceMesh = () => { let m = null; current?.traverse(o => { if (o.isMesh && !m) m = o; }); return m; };
+async function piecesInit(f) {
+  if (mv.file !== f.name) {
+    Object.assign(mv, { file: f.name, ranges: [], moves: {} }); setMove(false);
+    try { const r = await api(`/models/${encodeURIComponent(f.name)}/pieces`); if (mv.file === f.name) mv.ranges = r; } catch { /* one piece: nothing to move */ }
+  } else for (const [k, d] of Object.entries(mv.moves)) shiftPiece(+k, d);   // palette change reloaded the mesh
+  vtoolsShow();
+}
+// d is in the model's own axes (x, y, z up); the viewer's geometry is Y-up: (x, z, -y)
+function shiftPiece(k, d) {
+  const m = pieceMesh(), r = mv.ranges[k]; if (!m || !r) return;
+  const pos = m.geometry.attributes.position;
+  for (let i = r.first * 3; i < (r.first + r.count) * 3; i++) pos.setXYZ(i, pos.getX(i) + d[0], pos.getY(i) + d[2], pos.getZ(i) - d[1]);
+  pos.needsUpdate = true; m.geometry.computeBoundingBox(); m.geometry.computeBoundingSphere();
+}
+function setMove(on) {
+  mv.on = on && mv.ranges.length > 1; mv.drag = null; if (controls) controls.enabled = true;
+  $('vtools').querySelector('[data-vt="move"]').classList.toggle('on', mv.on);
+  stage.style.cursor = mv.on ? 'grab' : '';
+  if (mv.on) { camTo('top'); toast('Glisse une pièce pour la déplacer sur le plateau. Les autres restent en place.'); }
+}
+const moved = () => sel?.name === mv.file && previewKey !== 'cut' && Object.values(mv.moves).some(d => d.some(Boolean));
+const shiftXY = () => { current.updateMatrixWorld(true); const c = new THREE.Box3().setFromObject(current).getCenter(new THREE.Vector3()); return [c.x, c.y]; };
+if (renderer) {
+  const dom = renderer.domElement, aim = e => { const r = dom.getBoundingClientRect(); ptr.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1); ray.setFromCamera(ptr, cam); };
+  dom.addEventListener('pointerdown', e => {
+    const m = mv.on && e.button === 0 && !stage.classList.contains('painting') ? pieceMesh() : null; if (!m) return;
+    current.updateMatrixWorld(true); aim(e);
+    const hit = ray.intersectObject(m, false)[0]; if (!hit) return;
+    const k = mv.ranges.findIndex(r => hit.faceIndex >= r.first && hit.faceIndex < r.first + r.count); if (k < 0) return;
+    const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -hit.point.z), last = new THREE.Vector3();
+    if (!ray.ray.intersectPlane(plane, last)) return;
+    mv.drag = { k, plane, last }; controls.enabled = false; dom.setPointerCapture(e.pointerId); stage.style.cursor = 'grabbing'; e.stopImmediatePropagation();
+  }, true);
+  dom.addEventListener('pointermove', e => {
+    if (!mv.drag) return;
+    aim(e); const w = new THREE.Vector3(); if (!ray.ray.intersectPlane(mv.drag.plane, w)) return;
+    const dw = w.clone().sub(mv.drag.last); mv.drag.last = w;
+    const m = pieceMesh(), inv = new THREE.Matrix3().setFromMatrix4(m.matrixWorld).invert(), l = dw.applyMatrix3(inv);
+    const d = [l.x, -l.z, l.y], cur = mv.moves[mv.drag.k] || [0, 0, 0];
+    mv.moves[mv.drag.k] = cur.map((v, i) => v + d[i]); shiftPiece(mv.drag.k, d);
+  });
+  const end = () => {
+    if (!mv.drag) return; mv.drag = null; controls.enabled = true; stage.style.cursor = mv.on ? 'grab' : ''; vtoolsShow();
+    const b = new THREE.Box3().setFromObject(current); if (Math.max(Math.abs(b.min.x), Math.abs(b.max.x), Math.abs(b.min.y), Math.abs(b.max.y)) > 123) toast('Une pièce sort du plateau : rapproche-la avant d\'imprimer.');
+  };
+  dom.addEventListener('pointerup', end); dom.addEventListener('pointercancel', end);
+}
+$('vtools').querySelector('[data-vt="move"]').onclick = () => setMove(!mv.on);
+$('vtools').querySelector('[data-vt="regroup"]').onclick = () => {
+  for (const [k, d] of Object.entries(mv.moves)) shiftPiece(+k, d.map(v => -v));
+  mv.moves = {}; vtoolsShow();
 };
 /* colour touch-up: a brush repaints faces with one of the model's own colours; saved beside the model */
 let paint = null;   // { mesh, geo, pos, nor, col, centres, hex, rgb, strokes, dirty, brush, down, busy }
@@ -996,6 +1054,7 @@ function prepBody() {
       slot_colours: Object.keys(trays).length ? Object.fromEntries(Object.entries(trays).map(([k, t]) => [k, t.hex])) : null,
       palette: analysis?.palette || null,
       simplify_colours: $('simplify').value,
+      ...(moved() ? { moves: mv.moves, shift: shiftXY() } : {}),
       pauses_mm: $('pauses').value.trim().split(/[;\s]+|,\s+/).map(v => +v.replace(',', '.')).filter(v => v > 0) };
 }
 let cmpTimer = 0;

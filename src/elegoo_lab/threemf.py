@@ -228,3 +228,78 @@ def write(project: Project, out: Path, *, filaments: int, colours: list[str], of
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
         for name, data in files.items():
             z.writestr(name, data)
+
+
+def plate_count(path: Path) -> int:
+    """Number of plates of a Bambu/Orca project (1 for anything else)."""
+    try:
+        with zipfile.ZipFile(path) as z:
+            cfg = z.read("Metadata/model_settings.config").decode("utf-8", "ignore")
+    except (KeyError, OSError, zipfile.BadZipFile):
+        return 1
+    return max(1, len(re.findall(r"<plate>", cfg)))
+
+
+def split_plates(path: Path, out_dir: Path | None = None) -> list[Path]:
+    """A project with several plates laid side by side (Bambu Studio puts them 1.2 bed-widths apart)
+    loads as one huge scattered scene. Write one 3MF per plate, objects moved back onto a single bed,
+    everything else (painting, settings, meshes) kept byte for byte. Returns [] when there is one plate."""
+    out_dir = out_dir or path.parent
+    with zipfile.ZipFile(path) as z:
+        names = z.namelist()
+        if "Metadata/model_settings.config" not in names or "3D/3dmodel.model" not in names:
+            return []
+        cfg = z.read("Metadata/model_settings.config").decode("utf-8")
+        plates = re.findall(r"<plate>.*?</plate>", cfg, re.S)
+        if len(plates) < 2:
+            return []
+        model = z.read("3D/3dmodel.model").decode("utf-8")
+        try:
+            area = json.loads(z.read("Metadata/project_settings.config")).get("printable_area", [])
+            bed = max(float(p.split("x")[0]) for p in area) or 256.0
+        except (KeyError, ValueError):
+            bed = 256.0
+        step = bed * 1.2
+        cols = int(np.ceil(np.sqrt(len(plates))))
+        items = {m.group(1): m.group(0) for m in re.finditer(r'<item objectid="(\d+)"[^>]*/>', model)}
+        objs = {m.group(1): m.group(0) for m in re.finditer(r'<object id="(\d+)".*?</object>', model, re.S)}
+        cfg_objs = {m.group(1): m.group(0) for m in re.finditer(r'  <object id="(\d+)">.*?</object>', cfg, re.S)}
+        head = model[:model.index("<resources>")]
+        tail_cfg = cfg[cfg.rindex("</plate>") + len("</plate>"):]
+        written = []
+        for i, plate in enumerate(plates):
+            ids = [x for x in re.findall(r'key="object_id" value="(\d+)"', plate) if x in items]
+            if not ids:
+                continue
+            dx, dy = (i % cols) * step, -(i // cols) * step
+            keep, build = set(ids), []
+            for oid in ids:
+                keep |= set(re.findall(r'<component [^>]*objectid="(\d+)"', objs[oid]))
+                v = items[oid]
+                t = re.search(r'transform="([^"]+)"', v)
+                if t:
+                    n = t.group(1).split()
+                    n[9], n[10] = f"{float(n[9]) - dx:.6f}", f"{float(n[10]) - dy:.6f}"
+                    v = v.replace(t.group(0), f'transform="{" ".join(n)}"')
+                build.append("  " + v)
+            n = i + 1
+            sub = re.sub(rf"(?<=_){n}\.png", "1.png", plate)
+            sub = re.sub(r'(key="plater_id" value=)"\d+"', r'\1"1"', sub)
+            new_cfg = ('<?xml version="1.0" encoding="UTF-8"?>\n<config>\n'
+                       + "\n".join(cfg_objs[o] for o in cfg_objs if o in keep) + "\n  " + sub + tail_cfg)
+            new_model = (head + "<resources>\n" + "\n".join(objs[o] for o in objs if o in keep)
+                         + "\n </resources>\n <build>\n" + "\n".join(build) + "\n </build>\n</model>\n")
+            dst = out_dir / f"{path.stem}_plateau{n}.3mf"
+            with zipfile.ZipFile(dst, "w", zipfile.ZIP_DEFLATED) as zo:
+                for name in names:
+                    if name == "3D/3dmodel.model":
+                        zo.writestr(name, new_model)
+                    elif name == "Metadata/model_settings.config":
+                        zo.writestr(name, new_cfg)
+                    else:
+                        m = re.fullmatch(r"(Metadata/(?:plate|plate_no_light|top|pick)_)(\d+)(_small)?\.png", name)
+                        if m and int(m.group(2)) != n:
+                            continue
+                        zo.writestr(m.group(1) + "1" + (m.group(3) or "") + ".png" if m else name, z.read(name))
+            written.append(dst)
+    return written

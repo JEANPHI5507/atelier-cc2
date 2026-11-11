@@ -47,6 +47,21 @@ def _new_model_path(name: str) -> Path:
     return dest
 
 
+def _moves(body: Any) -> dict[int, tuple[float, float, float]] | None:
+    return {int(k): (v + [0, 0, 0])[:3] for k, v in body.moves.items() if any(v)} or None
+
+
+def _split_plates(dest: Path) -> dict[str, list[str]]:
+    """A multi-plate project (Bambu Studio) becomes one model per plate: on one bed the plates overlap."""
+    if dest.suffix.lower() != ".3mf":
+        return {"plates": []}
+    from . import threemf
+    try:
+        return {"plates": [p.name for p in threemf.split_plates(dest)]}
+    except Exception:  # an odd file stays as uploaded
+        return {"plates": []}
+
+
 def _model_path(name: str) -> Path:
     p = (config.MODELS_DIR / Path(name).name)
     if not p.is_file():
@@ -104,6 +119,8 @@ class PrepareIn(BaseModel):
     orient: bool = False
     usage: str = "profil"
     pauses_mm: list[float] = []         # stop at these model heights (magnet, nut, colour swap)
+    moves: dict[int, list[float]] = {}  # object index -> [dx, dy, dz] (pieces dragged apart in the viewer)
+    shift: list[float] | None = None    # where the middle of the arrangement sits, from the plate centre
     simplify_colours: bool | str = "leger"   # non / leger (3 %) / fort (10 %): specks of a layer take its main colour
 
 
@@ -230,14 +247,14 @@ def lab_router(cfg: config.Config) -> APIRouter:
         return FileResponse(_model_path(name))
 
     @r.post("/models")
-    async def upload_model(file: UploadFile = File(...)) -> dict[str, str]:
+    async def upload_model(file: UploadFile = File(...)) -> dict[str, Any]:
         name = Path(file.filename or "model.stl").name
         if Path(name).suffix.lower() not in ALLOWED:
             raise HTTPException(400, f"format non supporté (accepté: {sorted(ALLOWED)})")
         dest = _new_model_path(name)
         with dest.open("wb") as out:
             shutil.copyfileobj(file.file, out)
-        return {"name": dest.name}
+        return {"name": dest.name, **_split_plates(dest)}
 
     # --- print queue: G-codes to print one after the other; the next one starts by hand (the bed must be cleared)
     def _queue() -> list[str]:
@@ -294,6 +311,7 @@ def lab_router(cfg: config.Config) -> APIRouter:
             dest = _new_model_path(name)
             dest.write_bytes(data)
             names.append(dest.name)
+            names += _split_plates(dest)["plates"]
         return {"names": names}
 
     @r.delete("/models/{name}")
@@ -341,6 +359,14 @@ def lab_router(cfg: config.Config) -> APIRouter:
             raise HTTPException(422, str(err)) from err
 
     preview_cache: dict[tuple, bytes] = {}
+
+    @r.get("/models/{name}/pieces")
+    async def model_pieces(name: str) -> list[dict[str, Any]]:
+        """The objects of a model and the face range of each in preview.glb (to move them one by one)."""
+        try:
+            return await asyncio.to_thread(colors.piece_ranges, _model_path(name))
+        except Exception as err:
+            raise HTTPException(422, f"lecture impossible: {err}") from err
 
     @r.get("/models/{name}/preview.glb")
     async def model_preview(name: str, request: Request, map: str | None = None, pal: str | None = None) -> Response:
@@ -725,7 +751,7 @@ def lab_router(cfg: config.Config) -> APIRouter:
                 mode=body.mode, split=body.split, slot_colours=body.slot_colours, plate=body.plate,
                 advanced=body.advanced, rotate=tuple(body.rotate), copies=body.copies, orient=body.orient, usage=body.usage,
                 palette=_pal(body.palette), pauses_mm=[h for h in body.pauses_mm if h > 0] or None,
-                simplify_colours=body.simplify_colours)
+                simplify_colours=body.simplify_colours, moves=_moves(body), shift=tuple(body.shift[:2]) if body.shift else None)
         except (ValueError, slicer.SliceError) as err:
             raise HTTPException(422, str(err)) from err
         # grams and cost per spool, remembered for the check before printing and the count at the end
@@ -864,7 +890,8 @@ def lab_router(cfg: config.Config) -> APIRouter:
         base = dict(mapping=body.mapping, filaments=body.filaments, quality=body.quality, infill=body.infill,
                     supports=body.supports, plate_only=body.plate_only, height_mm=body.height_mm, mode=body.mode,
                     slot_colours=body.slot_colours, plate=body.plate, advanced=body.advanced, rotate=tuple(body.rotate),
-                    copies=body.copies, orient=body.orient, usage=body.usage, palette=_pal(body.palette))
+                    copies=body.copies, orient=body.orient, usage=body.usage, palette=_pal(body.palette),
+                    moves=_moves(body), shift=tuple(body.shift[:2]) if body.shift else None)
 
         def work() -> None:
             try:

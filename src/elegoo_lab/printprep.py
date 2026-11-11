@@ -114,6 +114,8 @@ def prepare_and_slice(
     palette: colors.Palette | None = None,
     pauses_mm: list[float] | None = None,
     simplify_colours: bool | str = "leger",
+    moves: dict[int, tuple[float, float, float]] | None = None,
+    shift: tuple[float, float] | None = None,
 ) -> dict[str, Any]:
     """``mapping``: source colour index -> slot (1..4); colours not listed keep the suggested slot.
     ``palette``: the loaded spools' colours (slot 1 first): the model is repainted with them first.
@@ -158,14 +160,14 @@ def prepare_and_slice(
                                 slot_colours=slot_colours, adv=(adv_proc, adv_fil), rotate=rotate, palette=palette)
 
     target, slot_hex = src, None
-    if n > 1 or src.suffix.lower() not in SLICEABLE_AS_IS or height_mm or rot is not None or copies > 1:
+    if n > 1 or src.suffix.lower() not in SLICEABLE_AS_IS or height_mm or rot is not None or copies > 1 or moves:
         base = src
         if height_mm and src.suffix.lower() == ".stl":
             base = out_dir / f".{src.stem}_scaled.stl"
             mesh.prepare(src, base, height_mm=height_mm)
         target = out_dir / f"{src.stem}_canvas.3mf"
         try:
-            conv = colors.to_canvas(base, target, slots, height_mm=height_mm, rotate=rotate, copies=copies,
+            conv = colors.to_canvas(base, target, slots, height_mm=height_mm, rotate=rotate, copies=copies, moves=moves, shift=shift,
                                     smart_flush=MODES[mode]["smart_flush"], palette=palette,
                                     simplify=colors.SIMPLIFY_LEVELS.get(simplify_colours, colors.SIMPLIFY_SHARE) if isinstance(simplify_colours, str)
                                     else (colors.SIMPLIFY_SHARE if simplify_colours else 0.0),

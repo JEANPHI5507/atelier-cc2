@@ -593,9 +593,13 @@ def grid(footprint: tuple[float, float], copies: int, bed: float = mesh.BED_MM) 
 
 def to_canvas(path: Path, out: Path, mapping: dict[int, int], *, height_mm: float | None = None,
               smart_flush: bool = True, rotate: tuple[float, ...] | None = None,
-              copies: int = 1, palette: Palette | None = None, simplify: float = 0.0, layer_mm: float = 0.2) -> dict[str, Any]:
+              copies: int = 1, palette: Palette | None = None, simplify: float = 0.0, layer_mm: float = 0.2,
+              moves: dict[int, tuple[float, float, float]] | None = None,
+              shift: tuple[float, float] | None = None) -> dict[str, Any]:
     """Write a clean CANVAS 3MF where source colour ``i`` prints from slot ``mapping[i]`` (1..4),
-    centred on the bed, optionally rotated, rescaled to ``height_mm`` and repeated ``copies`` times."""
+    centred on the bed, optionally rotated, rescaled to ``height_mm`` and repeated ``copies`` times.
+    ``moves``: object index -> translation in the model's own axes (pieces dragged apart in the viewer);
+    ``shift``: where the middle of the result sits, from the bed centre (None = centred)."""
     if any(not 1 <= s <= MAX_SLOTS for s in mapping.values()):
         raise ValueError("chaque couleur doit aller dans une bobine de 1 à 4")
     info = analyze(path, palette)
@@ -606,6 +610,10 @@ def to_canvas(path: Path, out: Path, mapping: dict[int, int], *, height_mm: floa
         slot_hex.append(max(members, key=lambda c: c["share"])["hex"] if members else colorize.PALETTE[slot - 1])
 
     pr = _load(path)
+    for k, d in (moves or {}).items():
+        if 0 <= k < len(pr.objects):
+            for p in pr.objects[k].parts:
+                p.vertices = p.vertices + np.asarray(d, float)
     parts = _parts(pr)
     rgb = _rgb_mode(pr)      # asked once: the colours per face are replaced by paint codes below
     if rgb:
@@ -652,8 +660,12 @@ def to_canvas(path: Path, out: Path, mapping: dict[int, int], *, height_mm: floa
                     threemf.Part(p.name, p.vertices + [dx, dy, 0], p.faces, p.extruder, p.paint, p.face_rgb) for p in o.parts]))
         pr = threemf.Project(objects, pr.colours)
         hi = hi + [max(x for x, _ in spots), max(y for _, y in spots), 0]
-    offset = np.array([mesh.BED_MM / 2 - (lo[0] + hi[0]) / 2, mesh.BED_MM / 2 - (lo[1] + hi[1]) / 2, -lo[2]])
-    offset = avoid_exclude(lo, hi, offset)
+    sx, sy = shift or (0.0, 0.0)
+    offset = np.array([mesh.BED_MM / 2 + sx - (lo[0] + hi[0]) / 2, mesh.BED_MM / 2 + sy - (lo[1] + hi[1]) / 2, -lo[2]])
+    if shift is None:
+        offset = avoid_exclude(lo, hi, offset)
+    elif any(lo[:2] + offset[:2] < 0) or any(hi[:2] + offset[:2] > mesh.BED_MM):
+        raise ValueError("une pièce déplacée sort du plateau : rapproche-la")
     threemf.write(pr, out, filaments=n, colours=slot_hex, offset=offset, flush=flush_matrix(slot_hex, smart_flush))
     return {"file": out.name, "filaments": n, "slot_colours": slot_hex, "simplified": simplified}
 
@@ -727,6 +739,16 @@ def preview(path: Path, mapping: dict[int, int] | None = None, palette: Palette 
     v = np.c_[v[:, 0], v[:, 2], -v[:, 1]]  # Z-up -> Y-up
     rgba = np.c_[np.vstack(cols), np.full(sum(len(f) for f in faces), 255)].astype(np.uint8)
     return trimesh.Trimesh(v, np.vstack(faces), face_colors=rgba, process=False)
+
+
+def piece_ranges(path: Path) -> list[dict[str, Any]]:
+    """Per object: its name and the face range it takes in ``preview_glb`` (faces follow object order)."""
+    out, first = [], 0
+    for o in _load(path).objects:
+        n = sum(len(p.faces) for p in o.parts)
+        out.append({"name": o.name, "first": first, "count": n})
+        first += n
+    return out
 
 
 def preview_glb(path: Path, mapping: dict[int, int] | None = None, palette: Palette | None = None) -> trimesh.Trimesh:
