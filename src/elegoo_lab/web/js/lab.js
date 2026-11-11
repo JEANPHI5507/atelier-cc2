@@ -719,7 +719,7 @@ function xform() {
 }
 ['mirror', 'sx', 'sy', 'sz'].forEach(id => $(id).addEventListener('change', () => { renderRot(); sizeNote(); }));
 function sizeNote() {
-  scheduleAdvice(); renderRot();
+  scheduleAdvice(); scheduleEstimate(); renderRot();
   if (!info?.size_mm) return;
   const sz = rotatedSize(info.size_mm), h = +$('height').value, z = sz[2] || 1, k = h ? h / z : 1, dims = sz.map(d => d * k), lim = 246;
   const n = dims.reduce((a, d) => a * Math.max(1, Math.ceil(d / lim)), 1);
@@ -1042,7 +1042,27 @@ function setUsage(u, byUser = false) {
   if (def.quality && cfg.qualities.includes(def.quality)) $('quality').value = def.quality;
   else if (!def.quality) $('quality').value = cfg.default_quality;
   infillTouched = false; $('inf-v').textContent = u === 'profil' ? 'selon le profil' : 'selon l\'usage';
-  if (byUser) scheduleAdvice();
+  if (byUser) { scheduleAdvice(); scheduleEstimate(); }
+}
+/* what the chosen usage costs, under the usage buttons: filament, time, price (one slice of just that choice) */
+let estTimer = 0, estSeq = 0; const estCache = new Map();
+function scheduleEstimate() {
+  clearTimeout(estTimer); const def = (cfg?.usages || []).find(x => x.value === printUsage);
+  if (def) $('usage-hint').textContent = def.hint;
+  if (!sel || sel.ext === 'gcode' || !analysis) return;
+  estTimer = setTimeout(loadEstimate, 500);
+}
+async function loadEstimate() {
+  const f = sel, seq = ++estSeq, body = JSON.stringify(prepBody()), key = f.name + body, def = (cfg?.usages || []).find(x => x.value === printUsage);
+  const show = html => { if (seq === estSeq && sel === f && def) $('usage-hint').innerHTML = esc(def.hint) + html; };
+  if (estCache.has(key)) return show(estCache.get(key));
+  show('<span class="est"><span class="spin"></span> calcul du filament et du temps…</span>');
+  try {
+    const r = await api(`/models/${encodeURIComponent(f.name)}/estimate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+    const html = r.error ? '' : `<span class="est"><b>${fmtG(r.g / r.copies)}</b> · <b>${dur(durSec(r.time) / r.copies)}</b> · ${euro(r.eur / r.copies)}${r.copies > 1 ? ' par pièce' : ''}</span>`;
+    if (estCache.size > 60) estCache.clear();
+    estCache.set(key, html); show(html);
+  } catch { show(''); }
 }
 $('infill').oninput = () => { infillTouched = true; $('inf-v').textContent = $('infill').value + ' %'; };
 function prepBody() {
@@ -1056,39 +1076,6 @@ function prepBody() {
       simplify_colours: $('simplify').value,
       ...(moved() ? { moves: mv.moves, shift: shiftXY() } : {}),
       pauses_mm: $('pauses').value.trim().split(/[;\s]+|,\s+/).map(v => +v.replace(',', '.')).filter(v => v > 0) };
-}
-let cmpTimer = 0;
-$('cmp-go').onclick = async () => {
-  const f = sel; if (!f) return;
-  clearTimeout(cmpTimer); $('cmp-go').disabled = true;
-  $('cmp').innerHTML = '<div class="cmp"><p class="note" style="margin:0"><span class="spin"></span> Tranchage de chaque variante (≈ 10 s chacune)…</p></div>';
-  try {
-    const job = await api(`/models/${encodeURIComponent(f.name)}/compare`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(prepBody()) });
-    const poll = async () => {
-      const j = await api('/compare/' + job.id).catch(() => null); if (!j || sel !== f) { $('cmp-go').disabled = false; return; }
-      renderCompare(j);
-      if (j.state === 'running') cmpTimer = setTimeout(poll, 1500); else $('cmp-go').disabled = false;
-    };
-    poll();
-  } catch (e) { $('cmp').innerHTML = ''; toast(e.message, 'bad'); $('cmp-go').disabled = false; }
-};
-function renderCompare(j) {
-  const rows = j.rows, cur = rows.find(r => r.current && !r.error), ok = rows.filter(r => !r.error);
-  const minG = Math.min(...ok.map(r => r.g / r.copies)), minT = Math.min(...ok.map(r => durSec(r.time) / r.copies));
-  const rel = (v, base) => base ? `<small class="${v < base ? 'ok-t' : v > base ? 'bad-t' : ''}">${v === base ? '' : (v < base ? '−' : '+') + Math.round(Math.abs(100 * (v - base) / base)) + ' %'}</small>` : '';
-  $('cmp').innerHTML = `<div class="cmp"><table><thead><tr><th>Variante</th><th>Filament</th><th>Temps</th></tr></thead><tbody>${rows.map((r, i) => r.error
-    ? `<tr><td>${esc(r.label)}</td><td colspan="2" class="note">${esc(r.error)}</td></tr>`
-    : `<tr class="${r.current ? 'cur' : ''}"><td class="v"><b>${esc(r.label)}</b><small>${esc((r.quality || '').replace(/\s.*$/, ''))}${r.changes ? ' · ' + r.changes + ' chgts' : ''}</small>
-      ${r.current ? '<small>actuel</small>' : `<button class="btn" data-cmp="${i}">Choisir</button>`}</td>
-      <td>${fmtG(r.g / r.copies)}${r.copies > 1 ? '<small>par pièce</small>' : ''} ${cur ? rel(r.g / r.copies, cur.g / cur.copies) : ''}<small>${euro(r.eur / r.copies)}${r.purge_g ? ' · purge ' + fmtG(r.purge_g / r.copies) : ''}</small></td>
-      <td>${dur(durSec(r.time))} ${cur ? rel(durSec(r.time) / r.copies, durSec(cur.time) / cur.copies) : ''}${r.copies > 1 ? `<small>${dur(durSec(r.time) / r.copies)} par pièce</small>` : ''}</td>
-      </tr>`).join('')}</tbody></table>
-    ${j.state === 'running' ? '<p class="note" style="margin:8px 0 0"><span class="spin"></span> variantes suivantes…</p>' : '<p class="note" style="margin:8px 0 0">Même aspect extérieur pour Décoratif ; Solide pour ce qui doit résister ; Détaillé pour les petits détails.</p>'}</div>`;
-  $('cmp').querySelectorAll('[data-cmp]').forEach(b => b.onclick = () => {
-    const r = rows[+b.dataset.cmp];
-    if (r.copies > 1) $('copies').value = r.copies; else if (r.usage) setUsage(r.usage, true);
-    $('cmp').innerHTML = ''; toast(`« ${r.label} » choisi : clique sur Trancher`, 'ok');
-  });
 }
 $('go').onclick = async () => {
   const top = Math.max(...Object.values(mapping)), go = $('go'), f = sel;
@@ -1462,4 +1449,4 @@ $('asm-go').onclick = async () => {
 
 
 
-export { buildPaths, miniViewer, MODE_NOTE, WF_LABEL, advCount, advValues, adviceSeq, adviceTimer, analysis, applyFix, asmSlots, b64, bindSend, cam, cmpTimer, controls, current, drawLayers, drop, files, frame, framedFor, grid, hint, infillTouched, info, jobTimer, lastGcode, launchCtx, launchFile, loadAdvice, loadFiles, makeKey, makeKinds, mapString, mapping, matchSpools, mview, paths, pathsFor, phone, plateMat, pollJobs, prepBody, preview, previewKey, printMode, printUsage, renderAdvanced, renderAsm, renderColours, renderCompare, renderFiles, renderMake, renderMode, renderPieces, renderRot, renderUsages, rotatedSize, rotation, scene, scheduleAdvice, sel, select, sendBlock, setUsage, setView, show, showCut, showPaths, sizeNote, stage, stockLines, trays, upload, wfFields };
+export { buildPaths, miniViewer, MODE_NOTE, WF_LABEL, advCount, advValues, adviceSeq, adviceTimer, analysis, applyFix, asmSlots, b64, bindSend, cam, controls, current, drawLayers, drop, files, frame, framedFor, grid, hint, infillTouched, info, jobTimer, lastGcode, launchCtx, launchFile, loadAdvice, loadFiles, makeKey, makeKinds, mapString, mapping, matchSpools, mview, paths, pathsFor, phone, plateMat, pollJobs, prepBody, preview, previewKey, printMode, printUsage, renderAdvanced, renderAsm, renderColours, renderFiles, renderMake, renderMode, renderPieces, renderRot, renderUsages, rotatedSize, rotation, scene, scheduleAdvice, sel, select, sendBlock, setUsage, setView, show, showCut, showPaths, sizeNote, stage, stockLines, trays, upload, wfFields };

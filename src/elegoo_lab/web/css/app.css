@@ -176,6 +176,7 @@
   .sect-h { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
   .num { width: 22px; height: 22px; border-radius: 50%; background: var(--raised); border: 1px solid var(--line-strong); display: grid; place-items: center; font-size: 12px; font-weight: 650; color: var(--dim); }
   .note { color: var(--faint); font-size: 12.5px; margin: 0 0 10px; }
+  .note .est { display: block; margin-top: 6px; color: var(--txt); font-size: 13.5px; }
   .crow { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
   .sw { width: 22px; height: 22px; border-radius: 6px; border: 1px solid var(--line-strong); flex: none; }
   .crow .pct { color: var(--dim); font-size: 12.5px; width: 46px; }

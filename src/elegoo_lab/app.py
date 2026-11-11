@@ -47,6 +47,15 @@ def _new_model_path(name: str) -> Path:
     return dest
 
 
+def _base_args(body: Any) -> dict[str, Any]:
+    """The slicing choices of a request, as prepare_and_slice takes them (comparisons and estimates)."""
+    return dict(mapping=body.mapping, filaments=body.filaments, quality=body.quality, infill=body.infill,
+                supports=body.supports, plate_only=body.plate_only, height_mm=body.height_mm, mode=body.mode,
+                slot_colours=body.slot_colours, plate=body.plate, advanced=body.advanced, rotate=tuple(body.rotate),
+                copies=body.copies, orient=body.orient, usage=body.usage, palette=_pal(body.palette),
+                moves=_moves(body), shift=tuple(body.shift[:2]) if body.shift else None)
+
+
 def _moves(body: Any) -> dict[int, tuple[float, float, float]] | None:
     return {int(k): (v + [0, 0, 0])[:3] for k, v in body.moves.items() if any(v)} or None
 
@@ -887,11 +896,7 @@ def lab_router(cfg: config.Config) -> APIRouter:
             raise HTTPException(409, "une comparaison est déjà en cours")
         cid = uuid.uuid4().hex[:10]
         job = compares[cid] = {"id": cid, "state": "running", "rows": [], "model": name}
-        base = dict(mapping=body.mapping, filaments=body.filaments, quality=body.quality, infill=body.infill,
-                    supports=body.supports, plate_only=body.plate_only, height_mm=body.height_mm, mode=body.mode,
-                    slot_colours=body.slot_colours, plate=body.plate, advanced=body.advanced, rotate=tuple(body.rotate),
-                    copies=body.copies, orient=body.orient, usage=body.usage, palette=_pal(body.palette),
-                    moves=_moves(body), shift=tuple(body.shift[:2]) if body.shift else None)
+        base = _base_args(body)
 
         def work() -> None:
             try:
@@ -904,6 +909,18 @@ def lab_router(cfg: config.Config) -> APIRouter:
 
         threading.Thread(target=work, daemon=True).start()
         return job
+
+    estimate_lock = asyncio.Lock()   # one slice at a time: a quick succession of clicks queues up
+
+    @r.post("/models/{name}/estimate")
+    async def estimate(name: str, body: PrepareIn) -> dict[str, Any]:
+        """Filament, cost and time of the current choices (the figures shown under the usage buttons)."""
+        src = _model_path(name)
+        if src.suffix.lower() == ".gcode":
+            raise HTTPException(400, "déjà tranché")
+        async with estimate_lock:
+            rows = await asyncio.to_thread(printprep.compare, src, _base_args(body), None, True)
+        return rows[0]
 
     @r.get("/compare/{cid}")
     def compare_get(cid: str) -> dict[str, Any]:

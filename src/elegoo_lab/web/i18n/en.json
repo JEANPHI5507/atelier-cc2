@@ -1,5 +1,6 @@
 {
 "exact": {
+" par pièce": " per piece",
 "% du modèle fait moins de": "% of the model is thinner than",
 "% du modèle) n'a pas de bobine proche : elle sera imprimée en": "% of the model) has no close spool: it will be printed in",
 "% du modèle) n'a pas de bobine proche : elle sortira en": "% of the model) has no close spool: it will come out in",
@@ -980,6 +981,7 @@
 "aucune pièce n'a pu être tranchée :": "no piece could be sliced:",
 "automatique": "automatic",
 "calcul de la découpe…": "computing the cut…",
+"calcul du filament et du temps…": "working out filament and time…",
 "caméra : flux terminé sans image": "camera: stream ended without an image",
 "caméra indisponible": "camera unavailable",
 "caméra indisponible (": "camera unavailable (",

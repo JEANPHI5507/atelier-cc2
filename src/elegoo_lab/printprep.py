@@ -347,7 +347,7 @@ def _thumb_model(src: Path, slots: dict[int, int], rot: np.ndarray | None, slot_
     _thumb(v, np.asarray(m.faces), rgb, gcodes, warnings)
 
 
-def compare(src: Path, base: dict[str, Any], on_row=None) -> list[dict[str, Any]]:
+def compare(src: Path, base: dict[str, Any], on_row=None, only_current: bool = False) -> list[dict[str, Any]]:
     """Slice the same model several ways (in a scratch folder) to show what each choice costs.
 
     ``base`` holds the prepare_and_slice arguments the user picked. Rows: the user's choice, the other
@@ -360,7 +360,9 @@ def compare(src: Path, base: dict[str, Any], on_row=None) -> list[dict[str, Any]
     variants += [(USAGES[u]["label"], {"usage": u, "quality": USAGES[u]["quality"] or slicer.DEFAULT_QUALITY, "infill": None})
                  for u in ("decoratif", "rapide", "detaille", "fonctionnel") if u != current]
     multicolour = len({c["slot"] for c in colors.analyze(src, base.get("palette"))["colours"]}) > 1
-    if multicolour and int(base.get("copies") or 1) == 1:
+    if only_current:     # the estimate shown under the usage buttons: just the user's choice
+        variants = variants[:1]
+    elif multicolour and int(base.get("copies") or 1) == 1:
         # colour changes happen layer by layer for all copies at once, so the purge is shared:
         # measured on a 4-colour 60 mm figurine, 4 copies cost 24 g and 3 h 44 EACH instead of 51 g and 8 h 33
         variants += [("2 exemplaires ensemble", {"copies": 2}), ("4 exemplaires ensemble", {"copies": 4, "_optional": True})]
