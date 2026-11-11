@@ -3,13 +3,30 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Atelier CC2</title>
-<meta name="description" content="Un atelier web open source pour l'Elegoo Centauri Carbon 2 et son CANVAS : préparer un modèle en quatre couleurs, le trancher, le lancer et suivre chaque couche, depuis le PC, le téléphone ou une tablette.">
+<title>Atelier CC2 – atelier web pour Elegoo Centauri Carbon 2 et CANVAS</title>
+<meta name="description" content="Atelier web open source pour l'Elegoo Centauri Carbon 2 et son CANVAS : impression multicolore 4 bobines, tranchage OrcaSlicer, détection des ratés par caméra IA, suivi couche par couche, tablette et alertes sur le téléphone. Gratuit, sans cloud.">
 <meta name="theme-color" content="#000000">
-<link rel="alternate" hreflang="en" href="en.html">
-<meta property="og:title" content="Atelier CC2">
-<meta property="og:description" content="Prépare, imprime et suis chaque couche de ta Centauri Carbon 2.">
-<meta property="og:image" content="suivi.jpg">
+<link rel="canonical" href="https://jeanphi5507.github.io/atelier-cc2/">
+<link rel="alternate" hreflang="fr" href="https://jeanphi5507.github.io/atelier-cc2/">
+<link rel="alternate" hreflang="en" href="https://jeanphi5507.github.io/atelier-cc2/en.html">
+<link rel="alternate" hreflang="x-default" href="https://jeanphi5507.github.io/atelier-cc2/en.html">
+<meta name="robots" content="index, follow">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Atelier CC2">
+<meta property="og:title" content="Atelier CC2 – atelier web pour Elegoo Centauri Carbon 2 et CANVAS">
+<meta property="og:description" content="Prépare, imprime et suis chaque couche de ta Centauri Carbon 2 : multicolore CANVAS, OrcaSlicer, caméra IA, tablette, alertes.">
+<meta property="og:url" content="https://jeanphi5507.github.io/atelier-cc2/">
+<meta property="og:image" content="https://jeanphi5507.github.io/atelier-cc2/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="fr_FR">
+<meta property="og:locale:alternate" content="en_GB">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Atelier CC2 – atelier web pour Elegoo Centauri Carbon 2 et CANVAS">
+<meta name="twitter:description" content="Prépare, imprime et suis chaque couche de ta Centauri Carbon 2 : multicolore CANVAS, OrcaSlicer, caméra IA, tablette, alertes.">
+<meta name="twitter:image" content="https://jeanphi5507.github.io/atelier-cc2/og.jpg">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23ff9f0a'/%3E%3Cpath d='M16 7 7 12l9 5 9-5-9-5Zm-9 9 9 5 9-5M7 20l9 5 9-5' fill='none' stroke='%23fff' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E">
+<script type="application/ld+json">[{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "Atelier CC2", "url": "https://jeanphi5507.github.io/atelier-cc2/", "description": "Atelier web open source pour l'Elegoo Centauri Carbon 2 et son CANVAS : impression multicolore 4 bobines, tranchage OrcaSlicer, détection des ratés par caméra IA, suivi couche par couche, tablette et alertes sur le téléphone. Gratuit, sans cloud.", "applicationCategory": "UtilitiesApplication", "operatingSystem": "Linux", "softwareRequirements": "Python 3.12, OrcaSlicer", "license": "https://opensource.org/licenses/MIT", "codeRepository": "https://github.com/JEANPHI5507/atelier-cc2", "inLanguage": "fr", "image": "https://jeanphi5507.github.io/atelier-cc2/og.jpg", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "EUR"}, "author": {"@type": "Person", "name": "JEANPHI5507", "url": "https://github.com/JEANPHI5507"}}, {"@context": "https://schema.org", "@type": "FAQPage", "inLanguage": "fr", "mainEntity": [{"@type": "Question", "name": "Comment imprimer en plusieurs couleurs avec le CANVAS de la Centauri Carbon 2 ?", "acceptedAnswer": {"@type": "Answer", "text": "Dépose un modèle coloré (3MF, GLB, OBJ) dans l'atelier : chaque couleur est associée à la bobine la plus proche chargée dans le CANVAS, la purge est dosée selon chaque changement de couleur, puis OrcaSlicer tranche avec les profils de la CC2."}}, {"@type": "Question", "name": "Faut-il le cloud d'Elegoo ?", "acceptedAnswer": {"@type": "Answer", "text": "Non. L'atelier parle à l'imprimante en réseau local (mode LAN), et l'IA de la caméra tourne sur ta propre machine : aucune image ne sort de chez toi."}}, {"@type": "Question", "name": "Comment détecter un raté d'impression avec la caméra de la CC2 ?", "acceptedAnswer": {"@type": "Answer", "text": "L'atelier analyse une image toutes les 10 secondes avec le modèle libre d'Obico (The Spaghetti Detective). Il prévient au moindre doute, et peut mettre l'impression en pause s'il est sûr."}}, {"@type": "Question", "name": "Sur quoi ça tourne ?", "acceptedAnswer": {"@type": "Answer", "text": "Sur un PC ou un petit serveur Linux x86-64 de la maison, avec Python 3.12. On l'ouvre depuis un navigateur, un téléphone (appli installable) ou une tablette. Un simulateur permet d'essayer sans imprimante."}}, {"@type": "Question", "name": "C'est gratuit ?", "acceptedAnswer": {"@type": "Answer", "text": "Oui, le code est libre (licence MIT). Ce n'est pas un produit Elegoo : c'est un projet personnel."}}]}]</script>
 <style>
   :root {
     --bg: #000; --surface: #0b0b0c; --raised: #161618; --line: #222224; --line-strong: #3a3a3c;
@@ -86,6 +103,12 @@
   pre { margin: 40px auto 0; max-width: 760px; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 26px 30px; overflow-x: auto; font: 15px/1.8 ui-monospace, "SF Mono", Menlo, Consolas, monospace; color: #e5e5ea; }
   pre .c { color: var(--faint); }
 
+  .faq { max-width: 820px; margin: 40px auto 0; text-align: left; display: grid; gap: 10px; }
+  .faq details { border: 1px solid var(--line); border-radius: 14px; background: var(--surface); padding: 18px 22px; }
+  .faq summary { cursor: pointer; font-weight: 600; font-size: 17px; list-style: none; display: flex; justify-content: space-between; gap: 16px; }
+  .faq summary::after { content: "+"; color: var(--acc); font-size: 20px; line-height: 1; }
+  .faq details[open] summary::after { content: "−"; }
+  .faq details p { color: var(--dim); margin: 12px 0 0; font-size: 16px; }
   footer { margin-top: 140px; border-top: 1px solid var(--line); padding: 30px 0 46px; color: var(--faint); font-size: 13px; line-height: 1.6; }
   footer .wrap { display: grid; grid-template-columns: 1fr auto; gap: 24px; }
 
@@ -214,6 +237,18 @@ uv run cc2 simulateur          <span class="c"># puis http://localhost:8788/lab/
 
 <span class="c"># avec ta CC2 (mode LAN), ouvert au téléphone</span>
 uv run cc2 --control dash --reseau</pre>
+    </div>
+  </section>
+  <section id="faq">
+    <div class="wrap center">
+      <h2>Questions fréquentes</h2>
+      <div class="faq">
+        <details><summary>Comment imprimer en plusieurs couleurs avec le CANVAS de la Centauri Carbon 2 ?</summary><p>Dépose un modèle coloré (3MF, GLB, OBJ) dans l'atelier : chaque couleur est associée à la bobine la plus proche chargée dans le CANVAS, la purge est dosée selon chaque changement de couleur, puis OrcaSlicer tranche avec les profils de la CC2.</p></details>
+        <details><summary>Faut-il le cloud d'Elegoo ?</summary><p>Non. L'atelier parle à l'imprimante en réseau local (mode LAN), et l'IA de la caméra tourne sur ta propre machine : aucune image ne sort de chez toi.</p></details>
+        <details><summary>Comment détecter un raté d'impression avec la caméra de la CC2 ?</summary><p>L'atelier analyse une image toutes les 10 secondes avec le modèle libre d'Obico (The Spaghetti Detective). Il prévient au moindre doute, et peut mettre l'impression en pause s'il est sûr.</p></details>
+        <details><summary>Sur quoi ça tourne ?</summary><p>Sur un PC ou un petit serveur Linux x86-64 de la maison, avec Python 3.12. On l'ouvre depuis un navigateur, un téléphone (appli installable) ou une tablette. Un simulateur permet d'essayer sans imprimante.</p></details>
+        <details><summary>C'est gratuit ?</summary><p>Oui, le code est libre (licence MIT). Ce n'est pas un produit Elegoo : c'est un projet personnel.</p></details>
+      </div>
     </div>
   </section>
 </main>

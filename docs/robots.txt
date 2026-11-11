@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://jeanphi5507.github.io/atelier-cc2/sitemap.xml
