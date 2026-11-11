@@ -65,7 +65,7 @@ The workshop must be able to reach ComfyUI's address. Two cases:
 
 ```toml
 [comfyui]
-url = "http://192.168.1.50:8188"
+url = "http://192.168.1.xx:8188"
 ```
 
 ComfyUI has no password: only open it to your home network, never to the Internet. Another option is an ssh tunnel to
