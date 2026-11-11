@@ -9,7 +9,7 @@ avec bilan). Il tourne sur un PC ou un petit serveur de la maison ; on y accède
 |---|---|---|
 | ![Atelier : préparer un modèle](docs/atelier.jpg) | ![Onglet Imprimante](docs/imprimante.jpg) | ![Tableau de bord tablette](docs/tablette.jpg) |
 
-*Captures prises avec `cc2 simulateur`.*
+*Captures prises avec `cc2 simulateur`.* · Présentation : https://jeanphi5507.github.io/atelier-cc2/
 
 > **Projet personnel, non affilié à Elegoo.** « Elegoo », « Centauri Carbon » et « CANVAS » sont des marques
 > d'Elegoo. Le protocole de l'imprimante n'est pas documenté : il passe par
