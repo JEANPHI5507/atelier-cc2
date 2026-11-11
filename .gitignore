@@ -1,0 +1,18 @@
+config.toml
+.venv/
+__pycache__/
+*.pyc
+.env
+tools/
+result.json
+.certs/
+
+# ta bibliothèque (modèles, G-code, galerie, stock) : personnelle et lourde
+models/*
+!models/.gitkeep
+
+# cc2 simulateur : bibliothèque et réglages de démonstration
+demo/
+
+# plateau Elegoo (AGPL, fourni avec OrcaSlicer) : copié par `make plateau`
+src/elegoo_lab/web/vendor/cc2/

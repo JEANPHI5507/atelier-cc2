@@ -1,0 +1,18 @@
+{
+  "name": "Tableau de bord CC2",
+  "short_name": "Tableau CC2",
+  "description": "Écran de suivi de la Centauri Carbon 2 pour une tablette : caméra, impression, bobines, alertes.",
+  "lang": "fr",
+  "id": "/lab/tableau.html",
+  "start_url": "/lab/tableau.html",
+  "scope": "/",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

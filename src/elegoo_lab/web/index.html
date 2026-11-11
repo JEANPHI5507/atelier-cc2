@@ -1,0 +1,530 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atelier Centauri Carbon 2</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#000000">
+<link rel="icon" type="image/png" href="icons/favicon.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Atelier CC2">
+<script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V4m0 0-4 4m4-4 4 4M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3v4m0 10v4M3 12h4m10 0h4M6 6l2.5 2.5m7 7L18 18M6 18l2.5-2.5m7-7L18 6"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 13 9 5 9-5"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M5 12h14m0 0-6-6m6 6-6 6"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 5v14l12-7L7 5Z"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13"/></symbol>
+  <symbol id="i-puzzle" viewBox="0 0 24 24"><path d="M10 4a2 2 0 1 1 4 0v2h4v4h-2a2 2 0 1 0 0 4h2v4h-4v-2a2 2 0 1 0-4 0v2H6v-4h2a2 2 0 1 0 0-4H6V6h4V4Z"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v12m0 0 4-4m-4 4-4-4M4 20h16"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 17h2"/></symbol>
+  <symbol id="i-cube" viewBox="0 0 24 24"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z"/><path d="m4 7.5 8 4.5 8-4.5M12 12v9"/></symbol>
+  <symbol id="i-fit" viewBox="0 0 24 24"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/><circle cx="12" cy="12" r="2.5"/></symbol>
+  <symbol id="i-full" viewBox="0 0 24 24"><path d="M4 10V4h6M14 4h6v6M20 14v6h-6M10 20H4v-6"/></symbol>
+  <symbol id="i-text" viewBox="0 0 24 24"><path d="M5 6V4h14v2M12 4v16m-3 0h6"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15L6 16Z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></symbol>
+  <symbol id="i-power" viewBox="0 0 24 24"><path d="M12 3v8"/><path d="M6.3 6.8a8 8 0 1 0 11.4 0"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></symbol>
+</svg>
+
+<header>
+  <div class="brand"><div class="logo"><svg class="i"><use href="#i-layers"/></svg></div><span>Centauri Carbon 2</span></div>
+  <div class="seg"><button id="t-lab" class="on">Atelier</button><button id="t-ui">Imprimante</button><button id="t-gal">Galerie</button><button id="t-start" class="m-hide">Démarrage</button></div>
+  <div class="grow"></div>
+  <button class="btn ghost" id="ai-open" data-cap="IA" title="Générer un modèle avec l'IA"><svg class="i"><use href="#i-spark"/></svg><span>Générer avec l'IA</span></button>
+  <button class="btn ghost bell" id="ev-open" data-cap="Alertes" title="Suivi des impressions et alertes" aria-label="Alertes"><svg class="i"><use href="#i-bell"/></svg><b id="ev-badge" hidden></b></button>
+  <button class="btn primary" id="install" hidden title="Installer l'atelier comme une appli"><svg class="i"><use href="#i-download"/></svg><span>Installer l'appli</span></button>
+  <a class="btn ghost m-hide" id="board-open" href="tableau.html" title="Tableau de bord plein écran (pour une tablette)"><svg class="i"><use href="#i-camera"/></svg><span>Tableau</span></a>
+  <button class="btn ghost" id="phone-open" hidden title="Ouvrir l'atelier sur le téléphone"><svg class="i"><use href="#i-phone"/></svg><span>Téléphone</span></button>
+  <div class="themes" role="radiogroup" aria-label="Thème" data-cap="Thème"><button data-theme-pick="noir" title="Noir" style="background:#000;border-color:#48484a"></button><button data-theme-pick="ardoise" title="Ardoise" style="background:#465060"></button><button data-theme-pick="sauge" title="Sauge" style="background:#4a5751"></button><button data-theme-pick="sable" title="Sable" style="background:#dad0c0"></button></div>
+  <span class="pill" id="printer" title="État de l'imprimante"><span class="led"></span><span id="printer-txt">Connexion…</span><span id="printer-temp"></span></span>
+</header>
+
+<main>
+  <section id="lab">
+    <aside class="lib">
+      <div class="lib-head"><h2>Bibliothèque</h2><div style="display:flex;gap:2px"><button class="btn ghost" id="make-open" title="Créer une pièce sur mesure (boîte, étiquette, crochet…)"><svg class="i"><use href="#i-plus"/></svg>Créer</button><button class="btn ghost" id="asm-open" title="Assembler plusieurs pièces, une couleur chacune"><svg class="i"><use href="#i-puzzle"/></svg>Assembler</button></div></div>
+      <div class="lib-add">
+      <label class="drop" id="drop"><svg class="i"><use href="#i-upload"/></svg><br><b class="d-desk">Déposer des fichiers</b><span class="d-desk"> ou cliquer</span><b class="d-touch">Ajouter un fichier</b><br><span class="d-fmt">STL · 3MF · OBJ · GLB · PLY · G-code</span>
+        <input id="up" type="file" accept=".stl,.3mf,.glb,.gltf,.obj,.gcode,.ply" hidden multiple></label>
+      <button class="btn ghost link-open" id="link-open" type="button"><svg class="i"><use href="#i-download"/></svg><span class="d-desk">Importer depuis un lien</span><span class="d-touch">Lien</span></button>
+      </div>
+      <div class="search"><svg class="i"><use href="#i-search"/></svg><input id="q" type="text" placeholder="Rechercher" aria-label="Rechercher un fichier"></div>
+      <div class="lib-tools">
+        <div class="seg" id="lib-view"><button data-view="tout" class="on">Tout</button><button data-view="modeles">Modèles</button><button data-view="prets">Prêts</button></div>
+        <button class="btn ghost" id="lib-more" title="Plus d'actions" aria-haspopup="menu">⋯</button>
+        <div class="lib-menu" id="lib-menu" hidden role="menu">
+          <div class="lib-sort" role="group" aria-label="Trier">Trier : <select id="lib-sort"><option value="date">les plus récents</option><option value="nom">par nom</option><option value="taille">les plus gros</option></select></div>
+          <button data-act="select" role="menuitem">Sélectionner plusieurs fichiers</button>
+          <button data-act="clean" role="menuitem">Faire le ménage…</button>
+          <label><input type="checkbox" id="lib-tech"> Afficher les fichiers techniques <span id="lib-tech-n"></span></label>
+        </div>
+      </div>
+      <div class="files" id="files"></div>
+      <div class="lib-bulk" id="lib-bulk" hidden><span id="bulk-n"></span><button class="btn ghost" id="bulk-all">Tout</button><button class="btn" id="bulk-del"><svg class="i"><use href="#i-trash"/></svg>Supprimer</button><button class="btn ghost" id="bulk-cancel">Annuler</button></div>
+    </aside>
+
+    <div class="stage" id="stage">
+      <button class="btn primary mnext" id="mnext" hidden><svg class="i"><use href="#i-send"/></svg>Préparer l'impression</button>
+      <div class="hint" id="hint"><div><div class="big">Choisis un modèle dans la bibliothèque</div>Glisser pour tourner · molette pour zoomer</div></div>
+      <div class="chips" id="chips"></div>
+      <div class="vtools" id="vtools" hidden role="toolbar" aria-label="Vue 3D">
+        <button data-cam="iso" title="Vue 3D"><svg class="i"><use href="#i-cube"/></svg></button>
+        <button data-cam="face" title="De face">Face</button>
+        <button data-cam="top" title="De dessus">Dessus</button>
+        <button data-cam="side" title="De côté">Côté</button>
+        <button data-cam="plate" title="Tout le plateau">Plateau</button>
+        <span class="vsep"></span>
+        <button data-vt="over" title="Montrer en rouge ce qui aura besoin de supports">Surplombs</button>
+        <button data-vt="dims" title="Afficher les dimensions">Cotes</button>
+        <button data-vt="paint" title="Retoucher les couleurs au pinceau">Pinceau</button>
+        <span class="vsep"></span>
+        <button data-vt="fit" title="Recentrer"><svg class="i"><use href="#i-fit"/></svg></button>
+        <button data-vt="full" title="Plein écran"><svg class="i"><use href="#i-full"/></svg></button>
+      </div>
+      <div class="vdims" id="vdims" hidden></div>
+      <div class="paintbar" id="paintbar" hidden role="toolbar" aria-label="Retouche des couleurs">
+        <div class="pb-sw" id="pb-sw" role="radiogroup" aria-label="Couleur du pinceau"></div>
+        <label class="pb-size">Taille <input type="range" id="pb-size" min="1" max="20" value="5" aria-label="Taille du pinceau"></label>
+        <button class="btn" id="pb-undo" disabled>Annuler</button>
+        <button class="btn primary" id="pb-save" disabled>Enregistrer</button>
+        <button class="btn" id="pb-reset" title="Remet les couleurs d'origine du modèle">Tout effacer</button>
+        <button class="btn" id="pb-close">Fermer</button>
+        <div class="pb-hint"><span class="d-desk">Clic gauche : peindre · clic droit : tourner · molette : zoom</span><span class="d-touch">Un doigt : peindre · deux doigts : tourner et zoomer</span></div>
+      </div>
+      <div class="seg viewtabs" id="viewtabs" hidden><button data-view="model" class="on">Modèle</button><button data-view="paths">Tranchage</button></div>
+      <div class="layerbar" id="layerbar" hidden>
+        <span class="lv" id="lv">Couche –</span>
+        <span class="lsteps"><button class="btn ghost" id="lplay" aria-label="Lire couche par couche" title="Lire couche par couche"><svg class="i"><use href="#i-play"/></svg></button><button class="btn ghost" data-lstep="-1" aria-label="Couche précédente">−</button><button class="btn ghost" data-lstep="1" aria-label="Couche suivante">+</button></span>
+        <input type="range" id="layer" min="1" max="1" value="1" aria-label="Couche affichée">
+        <label><input type="checkbox" id="show-model" checked><i style="background:var(--dim)"></i>Modèle</label>
+        <label><input type="checkbox" id="show-support" checked><i style="background:#F0A040"></i>Supports</label>
+        <label><input type="checkbox" id="show-tower" checked><i style="background:#8a97a8"></i>Tour</label>
+        <label title="Seulement la couche choisie, vue de dessus"><input type="checkbox" id="show-single">Couche seule</label>
+      </div>
+    </div>
+
+    <aside class="panel">
+      <div class="muted-box" id="nosel"><div class="big">Rien de sélectionné</div>Choisis un modèle à gauche ou dépose un fichier : ses couleurs sont détectées automatiquement.</div>
+
+      <div id="prep" hidden>
+        <div class="panel-head"><div><div class="t" id="p-name"></div><div class="s" id="p-sub"></div></div><button class="btn ghost" id="add-text" title="Ajouter un prénom ou un texte"><svg class="i"><use href="#i-text"/></svg></button><button class="btn ghost" data-ren title="Renommer"><svg class="i"><use href="#i-edit"/></svg></button><button class="btn ghost" data-del title="Supprimer"><svg class="i"><use href="#i-trash"/></svg></button></div>
+        <div class="opt">
+          <button class="btn primary block" id="opt-go"><svg class="i"><use href="#i-spark"/></svg>Optimiser pour la CC2</button>
+          <p class="note" id="opt-hint">Répare, met à la bonne taille, choisit la meilleure face, puis supports, bordure et découpe si besoin.</p>
+          <div id="opt-res"></div>
+        </div>
+        <div class="sect">
+          <div class="sect-h"><span class="num">1</span><h3>Couleurs</h3><button class="btn ghost" id="use-spools" style="margin-left:auto;height:30px;font-size:12.5px" title="Associer chaque couleur à la bobine chargée la plus proche dans le CANVAS">Bobines chargées</button></div>
+          <p class="note" id="c-note"></p>
+          <div id="c-match" class="note" hidden style="margin:-4px 0 10px"></div>
+          <div id="c-list"></div>
+          <div id="c-spools"></div>
+        </div>
+        <div class="sect">
+          <div class="sect-h"><span class="num">2</span><h3>Taille et réglages</h3></div>
+          <div class="field"><label>À quoi sert la pièce ?</label><div class="seg wide usage" id="usage"></div>
+            <p class="note" id="usage-hint" style="margin:6px 0 0"></p></div>
+          <div class="field"><label for="height">Hauteur finale (mm) <span id="h-now"></span></label><input id="height" type="number" min="1" max="2000" step="1" placeholder="Garder la taille d'origine"></div>
+          <button class="btn ghost block m-morebtn" id="m-more" type="button">Plus d'options</button>
+          <div class="switch" style="margin:-4px 0 12px"><label for="split">Découper en pièces (avec chevilles) si c'est plus grand que le plateau</label><input id="split" type="checkbox" checked></div>
+          <p class="note" id="split-note" hidden style="margin:-6px 0 12px"></p>
+          <div class="field"><label for="plate">Plateau</label><select id="plate"></select></div>
+          <div class="field"><label>Comment poser la pièce <span id="rot-v">telle quelle</span></label>
+            <div class="orients" id="orients"><p class="note" style="margin:0">Choisis un modèle pour voir les positions.</p></div>
+            <div class="seg wide" id="rot" style="margin-top:8px"><button data-rot="2">↻ Tourner sur le plateau</button><button data-rot="reset">Remettre</button></div>
+            <div class="xform" style="margin-top:8px">
+              <label class="switch-in"><input id="mirror" type="checkbox"> Miroir (gauche ↔ droite)</label>
+              <span class="xs">Échelle %</span>
+              <label>X <input id="sx" type="number" min="1" max="1000" step="1" value="100" aria-label="Échelle X en %"></label>
+              <label>Y <input id="sy" type="number" min="1" max="1000" step="1" value="100" aria-label="Échelle Y en %"></label>
+              <label>Z <input id="sz" type="number" min="1" max="1000" step="1" value="100" aria-label="Échelle Z en %"></label>
+            </div>
+            <div class="switch" style="margin-top:8px"><label for="orient">Orientation automatique (OrcaSlicer choisit la meilleure face)</label><input id="orient" type="checkbox"></div></div>
+          <div class="field"><label for="pauses">Pause à la hauteur (mm) <span>aimant, écrou, changement de couleur</span></label><input id="pauses" type="text" inputmode="decimal" placeholder="ex. 12,5 ou 10 ; 25" autocomplete="off">
+            <p class="note" style="margin:6px 0 0">L'imprimante s'arrête quand la pièce atteint cette hauteur, la buse se gare au-dessus du bac à déchets. Reprends depuis l'écran ou l'onglet Imprimante.</p></div>
+          <div class="field"><label for="copies">Exemplaires sur le plateau</label><input id="copies" type="number" min="1" max="50" value="1"></div>
+          <div class="field"><label for="quality">Qualité</label><select id="quality"></select></div>
+          <div class="field"><label for="infill">Remplissage <span id="inf-v">selon le profil</span></label><input id="infill" type="range" min="0" max="100" step="5" value="15"></div>
+          <div class="field"><label for="supports">Supports</label>
+            <select id="supports">
+              <option value="aucun">Aucun</option>
+              <option value="arbre">Arbre (recommandé) — s'enlève facilement</option>
+              <option value="arbre_fin">Arbre fin — le plus léger</option>
+              <option value="arbre_solide">Arbre solide — pièces lourdes ou hautes</option>
+              <option value="colonnes">Colonnes — surfaces planes en surplomb</option>
+            </select></div>
+          <div class="switch" id="plate-row" hidden><label for="plate-only">Seulement depuis le plateau (rien ne s'appuie sur le modèle)</label><input id="plate-only" type="checkbox"></div>
+          <details id="adv" style="margin-top:14px"><summary style="cursor:pointer;color:var(--dim);font-size:13px">Réglages avancés <span id="adv-n" class="note"></span></summary>
+            <p class="note" style="margin:10px 0">Vide = valeur du profil Centauri Carbon 2 (indiquée en gris).</p>
+            <div id="adv-fields"></div>
+            <button class="btn ghost" id="adv-reset" style="height:30px">Tout remettre par défaut</button>
+          </details>
+          <div class="field" id="mode-box" hidden style="margin:14px 0 0">
+            <label>Multicolore</label>
+            <div class="seg wide" id="mode">
+              <button data-mode="economie" class="on">Économie</button><button data-mode="equilibre">Équilibré</button><button data-mode="qualite">Qualité</button><button data-mode="sans_purge">Sans purge</button>
+            </div>
+            <p class="note" id="mode-note" style="margin:6px 0 0"></p>
+            <div class="field" style="margin:10px 0 0"><label for="simplify">Simplifier les couleurs <span>moins de changements et de purge</span></label>
+              <select id="simplify"><option value="non">Non : toutes les taches de couleur</option><option value="leger" selected>Léger : les taches invisibles (moins de 3 % d'une couche)</option><option value="fort">Fort : les petites zones aussi (moins de 10 % d'une couche)</option></select></div>
+          </div>
+        </div>
+        <div class="sect">
+          <div class="sect-h"><span class="num">3</span><h3>Trancher et imprimer</h3></div>
+          <div class="advice" id="advice" hidden></div>
+          <button class="btn ghost block" id="cmp-go" style="margin-bottom:8px"><svg class="i"><use href="#i-layers"/></svg>Comparer les options (qualité, filament, temps)</button>
+          <div id="cmp"></div>
+          <div id="result"></div>
+        </div>
+        <div class="prep-foot">
+          <button class="btn primary block" id="go"><svg class="i"><use href="#i-layers"/></svg>Trancher</button>
+        </div>
+      </div>
+
+      <div id="ready" hidden>
+        <div class="panel-head"><div><div class="t" id="r-name"></div><div class="s" id="r-sub">Fichier tranché, prêt à imprimer</div></div><button class="btn ghost" data-ren title="Renommer"><svg class="i"><use href="#i-edit"/></svg></button><button class="btn ghost" data-del title="Supprimer"><svg class="i"><use href="#i-trash"/></svg></button></div>
+        <div class="sect" id="r-body"></div>
+      </div>
+    </aside>
+    <nav class="mnav" id="mnav" aria-label="Atelier">
+      <button data-m="lib" class="on"><svg class="i"><use href="#i-search"/></svg>Bibliothèque</button>
+      <button data-m="view" disabled><svg class="i"><use href="#i-layers"/></svg>Aperçu</button>
+      <button data-m="prep" disabled><svg class="i"><use href="#i-play"/></svg>Préparer</button>
+    </nav>
+  </section>
+  <section id="start" hidden>
+    <div class="st">
+      <div><h1>Le jour où l'imprimante arrive</h1><p class="lead">Quatre étapes, dans l'ordre. Compte une heure, impressions de test comprises.</p></div>
+      <div class="card">
+        <div class="step-h" id="s1-h"><span class="num">1</span><h2>Connecter l'imprimante</h2></div>
+        <ol class="howto">
+          <li>Allume-la et termine l'assistant de l'écran (langue, Wi-Fi ou câble, nivellement automatique).</li>
+          <li>Sur l'écran : <b>Paramètres → Réseau</b>. Active <b>« LAN Only »</b> (sans lui, l'accès local est fermé).</li>
+          <li>Note l'<b>adresse IP</b> et le <b>code d'accès</b> affichés, puis saisis-les ici. Ce PC est en <span id="pc-ip">…</span> : l'imprimante doit être sur le même réseau.</li>
+        </ol>
+        <div class="two" style="max-width:560px">
+          <div class="field"><label for="cfg-host">Adresse IP</label><input id="cfg-host" type="text" placeholder="192.168.1.42" inputmode="decimal"></div>
+          <div class="field"><label for="cfg-code">Code d'accès</label><input id="cfg-code" type="text" placeholder="ex. Ab3dEf" autocomplete="off"></div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" id="cfg-test">Tester la connexion</button><button class="btn" id="cfg-save" disabled>Enregistrer</button></div>
+        <div class="checks" id="cfg-checks"></div>
+        <p class="note" id="cfg-after" hidden style="margin-top:12px"></p>
+      </div>
+      <div class="card">
+        <div class="step-h"><span class="num">2</span><h2>Charger le CANVAS</h2></div>
+        <ol class="howto">
+          <li>Place 4 bobines de <b>PLA</b> dans le CANVAS : de préférence 4 couleurs bien différentes (ex. rouge, bleu, vert, jaune) pour lire facilement le test couleur.</li>
+          <li>Engage chaque filament jusqu'à ce que l'écran affiche la bobine comme chargée (1 à 4, de gauche à droite).</li>
+          <li>Vérifie dans l'onglet <b>Imprimante → Bobines CANVAS</b> que les 4 apparaissent avec la bonne matière.</li>
+        </ol>
+      </div>
+      <div class="card">
+        <div class="step-h"><span class="num">3</span><h2>Imprimer les pièces de test</h2></div>
+        <p class="note">Dans l'ordre : chaque test valide quelque chose dont le suivant a besoin. Coche ce que tu constates, l'atelier s'en souvient.</p>
+        <div class="tests" id="tests"></div>
+      </div>
+      <div class="card">
+        <div class="step-h"><span class="num">4</span><h2>Régler l'assemblage des pièces découpées</h2></div>
+        <p class="note">Après le test des chevilles : choisis le jeu du premier trou où la cheville entre à la main, serrée sans forcer. Il sert à toutes les prochaines découpes.</p>
+        <div class="plays" id="plays"></div>
+      </div>
+    </div>
+  </section>
+  <section id="gal" hidden>
+    <div class="gal-wrap">
+      <div class="gal-h"><div><h2>Galerie des impressions</h2><p class="note" id="gal-sum" style="margin:2px 0 0"></p></div></div>
+      <div class="gal" id="gal-list"></div>
+    </div>
+  </section>
+  <section id="pv" hidden>
+    <div class="pv">
+      <div class="banner" id="pv-ro" hidden>Lecture seule : relance avec <code>cc2 --control dash</code> pour piloter l'imprimante.</div>
+      <div class="col c1">
+        <div class="card idle" id="pv-job">
+          <div class="card-h"><h3>Impression</h3><span class="pill" id="pv-pill"><span class="led"></span><span id="pv-pill-t">…</span></span></div>
+          <div class="job-state" id="pv-state">…</div>
+          <div class="job-file" id="pv-file">Aucune impression en cours</div>
+          <div class="prog"><i id="pv-prog" style="width:0"></i></div>
+          <div class="kpis">
+            <div class="kpi"><div class="v" id="pv-pct">0 %</div><div class="k">progression</div></div>
+            <div class="kpi"><div class="v" id="pv-layer">–</div><div class="k">couche</div></div>
+            <div class="kpi"><div class="v" id="pv-left">–</div><div class="k">temps restant</div></div>
+            <div class="kpi"><div class="v" id="pv-end">–</div><div class="k">fin prévue</div></div>
+          </div>
+          <div class="cn" id="pv-cn" hidden></div>
+          <div class="row-btns">
+            <button class="btn" id="pv-pause" data-ctl><svg class="i"><use href="#i-pause"/></svg>Pause</button>
+            <button class="btn primary" id="pv-resume" data-ctl hidden><svg class="i"><use href="#i-play"/></svg>Reprendre</button>
+            <button class="btn danger" id="pv-stop" data-ctl><svg class="i"><use href="#i-stop"/></svg>Arrêter</button>
+          </div>
+          <div class="row-btns idle-only">
+            <button class="btn" id="pv-rest" data-ctl title="Coupe les chauffes, les ventilateurs et la lumière. Pour couper le courant : interrupteur de l'imprimante"><svg class="i"><use href="#i-power"/></svg>Mettre au repos</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-h"><h3>Caméra</h3><div style="display:flex;gap:14px;align-items:center"><div class="switch" style="gap:8px"><label for="pv-light" style="font-size:12.5px;color:var(--dim)">Lumière</label><input id="pv-light" type="checkbox" data-ctl></div><a class="btn ghost" href="/snapshot" target="_blank" rel="noopener"><svg class="i"><use href="#i-camera"/></svg>Photo</a></div></div>
+          <div class="cam" id="pv-cam"><div id="pv-cam-msg">Connexion à la caméra…</div>
+            <button class="btn cam-light" id="pv-cam-light" data-ctl hidden><svg class="i"><use href="#i-spark"/></svg>Lumière éteinte · Allumer</button></div>
+        </div>
+        <div class="card o1 queue-card" id="pv-queue" hidden>
+          <div class="card-h"><h3>File d'attente</h3><span class="note" id="q-n" style="margin:0"></span></div>
+          <p class="note" id="q-hint"></p>
+          <button class="btn primary block" id="q-next" data-ctl><svg class="i"><use href="#i-play"/></svg>Plateau vidé : lancer la suivante</button>
+          <div id="q-list"></div>
+        </div>
+        <div class="card o2 fold-all">
+          <div class="card-h"><h3>Fichiers sur l'imprimante</h3><button class="btn ghost" id="pv-refresh">Actualiser</button></div>
+          <div id="pv-files"></div>
+        </div>
+        <div class="card o2 fold-all">
+          <div class="card-h"><h3>Historique</h3><a class="btn ghost" href="/ui/" target="_blank" rel="noopener" title="Interface d'origine de pycentauri">Interface avancée</a></div>
+          <div id="pv-hist"></div>
+        </div>
+      </div>
+      <div class="side">
+        <div class="col c2">
+          <div class="card o1">
+            <div class="card-h"><h3>Températures</h3></div>
+            <div id="pv-temps"></div>
+            <div class="presets">
+              <button class="btn" data-ctl data-preset="210,60">PLA 210/60</button>
+              <button class="btn" data-ctl data-preset="240,80">PETG 240/80</button>
+              <button class="btn" data-ctl data-preset="260,100">ABS 260/100</button>
+              <button class="btn" data-ctl data-preset="0,0">Refroidir</button>
+            </div>
+          </div>
+          <div class="card o1">
+            <div class="card-h"><h3>Bobines CANVAS</h3><div class="switch" style="gap:10px"><label for="pv-refill" style="font-size:12.5px;color:var(--dim)">Recharge auto</label><input id="pv-refill" type="checkbox" data-ctl></div></div>
+            <div class="trays" id="pv-trays"><div class="empty">…</div></div>
+            <p class="note" id="pv-month" style="margin:10px 0 0"></p>
+          </div>
+          <div class="card" id="pv-layers" hidden>
+            <div class="card-h"><h3>Couche par couche</h3><span class="note" id="pv-lnote" style="margin:0"></span></div>
+            <div class="mini-3d" id="pv-3d"></div>
+            <p class="note">En couleur ce qui est imprimé, en gris ce qui reste. Tourne avec un doigt, zoome en pinçant.</p>
+          </div>
+        </div>
+        <div class="col c3">
+          <div class="card late">
+            <div class="card-h"><h3>Surveillance par caméra</h3><span class="pill" id="sv-pill"><span class="led"></span><span id="sv-pill-t">…</span></span></div>
+            <div id="sv-model" hidden><p class="note">L'IA de détection des ratés (modèle libre d'Obico) n'est pas encore installée : 200 Mo, une seule fois. Elle tourne sur ce PC, aucune image ne sort de la maison.</p>
+              <button class="btn" id="sv-dl"><svg class="i"><use href="#i-download"/></svg>Installer l'IA</button></div>
+            <div class="switch"><label for="sv-ia">IA : repérer les ratés (spaghetti, pièce décollée)</label><input type="checkbox" id="sv-ia"></div>
+            <div class="switch" style="margin-top:10px"><label for="sv-pause">Mettre en pause automatiquement si l'IA est sûre</label><input type="checkbox" id="sv-pause"></div>
+            <div class="field" style="margin-top:12px"><label for="sv-sens">Sensibilité <span id="sv-sens-v"></span></label><input type="range" id="sv-sens" min="0.5" max="2" step="0.1"></div>
+            <div class="switch"><label for="sv-tl">Timelapse (une photo par couche, vidéo dans la Galerie)</label><input type="checkbox" id="sv-tl"></div>
+            <svg class="spark" id="sv-spark" viewBox="0 0 120 24" preserveAspectRatio="none" aria-label="Score de l'IA sur les dernières images"></svg>
+            <p class="note" id="sv-note" style="margin:6px 0 0"></p>
+          </div>
+          <div class="card late">
+            <div class="card-h"><h3>Machine</h3><span class="note" id="mc-fw" style="margin:0"></span></div>
+            <div class="kv" id="mc-info"></div>
+            <p class="note" style="margin:12px 0 6px">Options par défaut au lancement d'une impression</p>
+            <div class="switch"><label for="mc-level">Niveler le plateau avant chaque impression</label><input type="checkbox" id="mc-level" data-ctl></div>
+            <div class="switch" style="margin-top:8px"><label for="mc-check">Vérifications de l'imprimante avant de démarrer</label><input type="checkbox" id="mc-check" data-ctl></div>
+            <div class="switch" style="margin-top:8px"><label for="mc-video">Timelapse de l'imprimante</label><input type="checkbox" id="mc-video" data-ctl></div>
+            <details class="mc-screen"><summary>À régler sur l'écran de la CC2</summary>
+              <p class="note" style="margin:8px 0 6px">En réseau local, la CC2 n'accepte pas ces commandes (le SDK officiel d'Elegoo les désactive) : fais-les sur l'écran tactile.</p>
+              <ul><li><b>Mise en origine, déplacer la tête</b> : avant un nettoyage de buse ou un changement de plateau.</li>
+                <li><b>Décalage Z (première couche)</b> : si le test « Première couche » est trop écrasé ou ne colle pas, par pas de 0,02 mm.</li>
+                <li><b>Calibrations automatiques</b> (nivellement, vibrations) : après le transport et tous les quelques mois.</li>
+                <li><b>Charger / décharger un filament</b> hors CANVAS.</li>
+                <li><b>Reprendre</b> une impression en pause : si le bouton de l'atelier ne répond pas, reprends depuis l'écran.</li>
+                <li><b>Mise à jour du firmware</b> : seulement pour corriger un problème précis. Depuis la 02.00.02.00, le retour à une version antérieure est bloqué ; la 02.01.00.00 (juillet 2026) ajoute la compensation de résonance de l'axe Z. Après une mise à jour, vérifie l'atelier (pycentauri est figé en 0.9.1).</li>
+                <li><b>Mode LAN seulement</b> : nécessaire pour l'atelier ; il coupe l'IA et la vidéo à distance d'Elegoo (l'atelier les remplace).</li></ul>
+            </details>
+          </div>
+          <div class="card late">
+            <div class="card-h"><h3>Entretien</h3><span class="note" id="mt-sum" style="margin:0"></span></div>
+            <div id="mt-list"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<dialog id="ai">
+  <div class="dlg-h">Générer un modèle avec l'IA<button class="btn ghost" data-close aria-label="Fermer"><svg class="i"><use href="#i-x"/></svg></button></div>
+  <div class="dlg-b">
+    <p class="note" id="ai-status">…</p>
+    <div class="field"><label for="wf">Workflow ComfyUI</label><select id="wf"></select></div>
+    <div class="field"><label for="img">Image de départ</label><input id="img" type="file" accept="image/*"></div>
+    <div class="field"><label for="prompt">Description de l'objet (en anglais de préférence)</label><input id="prompt" type="text" placeholder="ex. un dragon stylisé"></div>
+    <div id="jobs"></div>
+  </div>
+  <div class="dlg-f"><button class="btn" data-close>Fermer</button><button class="btn primary" id="gen"><svg class="i"><use href="#i-spark"/></svg>Générer</button></div>
+</dialog>
+
+<dialog id="asm" class="wide-dlg">
+  <div class="dlg-h">Assembler des pièces<button class="btn ghost" data-close aria-label="Fermer"><svg class="i"><use href="#i-x"/></svg></button></div>
+  <div class="dlg-b make-b">
+    <p class="note">Pour un modèle livré en plusieurs fichiers d'une couleur chacun, modélisés dans le même repère. Donne une bobine à chaque pièce à garder.</p>
+    <div class="make-main">
+      <div class="make-view"><div id="asm-3d" class="mini-3d"></div><div class="make-size" id="asm-size">Choisis une bobine pour au moins une pièce</div>
+        <p class="note" id="asm-spools" style="margin:8px 0 0;text-align:center"></p></div>
+      <div>
+        <div class="search" style="margin:0 0 8px"><svg class="i"><use href="#i-search"/></svg><input id="asm-q" type="text" placeholder="Chercher une pièce" aria-label="Chercher une pièce"></div>
+        <div id="asm-list" class="asm-list"></div>
+        <div class="field" style="margin-top:12px"><label for="asm-name">Nom du modèle assemblé</label><input id="asm-name" type="text" value="assemblage"></div>
+      </div>
+    </div>
+  </div>
+  <div class="dlg-f"><button class="btn" data-close>Annuler</button><button class="btn primary" id="asm-go">Assembler</button></div>
+</dialog>
+
+<dialog id="make" class="wide-dlg">
+  <div class="dlg-h">Créer une pièce sur mesure<button class="btn ghost" data-close aria-label="Fermer"><svg class="i"><use href="#i-x"/></svg></button></div>
+  <div class="dlg-b make-b">
+    <div class="make-kinds" id="make-kinds" role="radiogroup" aria-label="Type de pièce"></div>
+    <div class="make-main">
+      <div class="make-view"><div id="make-3d" class="mini-3d"></div><div class="make-size" id="make-size"></div></div>
+      <div class="make-fields" id="make-fields"></div>
+    </div>
+  </div>
+  <div class="dlg-f"><button class="btn" data-close>Annuler</button><button class="btn primary" id="make-go"><svg class="i"><use href="#i-plus"/></svg>Créer la pièce</button></div>
+</dialog>
+
+<dialog id="phone">
+  <div class="dlg-h">Installer l'appli sur le téléphone<button class="btn ghost" data-close aria-label="Fermer"><svg class="i"><use href="#i-x"/></svg></button></div>
+  <div class="dlg-b">
+    <p class="note" style="margin-bottom:12px" id="ph-net">Le téléphone doit être sur le même Wi-Fi que ce PC.</p>
+    <div class="seg wide" id="ph-os" style="margin-bottom:14px"><button data-os="android" class="on">Android</button><button data-os="ios">iPhone</button><button data-os="chromeos">ChromeOS</button></div>
+    <div class="ph-steps">
+      <div class="ph-step" id="ph-ca">
+        <div class="ph-h"><span class="num">1</span><b>Certificat de l'atelier</b><span class="note" style="margin:0">une seule fois</span></div>
+        <div class="ph-row"><div class="qr sm" id="ph-ca-qr"></div><div>
+          <p class="ph-os android">Scanne : le fichier se télécharge. Puis <b>Paramètres → Sécurité → Plus de paramètres → Chiffrement et identifiants → Installer un certificat → Certificat CA</b>, choisis <code>atelier-cc2.crt</code>.</p>
+          <p class="ph-os chromeos" hidden>Ouvre l'adresse ci-dessous dans Chrome : le fichier se télécharge. Puis <b>Paramètres → Confidentialité et sécurité → Sécurité → Gérer les certificats → Autorités → Importer</b> (ou tape <code>chrome://certificate-manager</code>), choisis <code>atelier-cc2.crt</code> et coche <b>« Faire confiance à ce certificat pour identifier des sites Web »</b>.<br><code id="ph-ca-url" style="word-break:break-all"></code></p>
+          <p class="ph-os ios" hidden>Scanne avec l'appareil photo, ouvre dans Safari, <b>Autoriser</b>. Puis <b>Réglages → Profil téléchargé → Installer</b>, et <b>Réglages → Général → Informations → Réglages des certificats</b> : active « Atelier CC2 ».</p>
+          <p class="note">Il sert seulement à prouver au téléphone que c'est bien ton atelier.</p>
+        </div></div>
+      </div>
+      <div class="ph-step">
+        <div class="ph-h"><span class="num" id="ph-n2">2</span><b>Ouvrir et installer l'appli</b></div>
+        <div class="ph-row"><div class="qr sm" id="phone-qr"></div><div>
+          <p>Scanne, saisis le <b>code d'accès</b> (affiché au lancement de <code>cc2 dash --reseau</code>).</p>
+          <p class="ph-os android">Puis le bouton <b>Installer l'appli</b> en haut, ou menu <b>⋮ → Installer l'application</b>.</p>
+          <p class="ph-os ios" hidden>Puis <b>Partager → Sur l'écran d'accueil</b>.</p>
+          <p class="ph-os chromeos" hidden>Pour le <b>tableau de bord</b>, ouvre l'adresse du tableau (plus bas) puis l'icône d'installation dans la barre d'adresse, ou menu <b>⋮ → Installer</b>. Dans <b>Paramètres → Appareil → Alimentation</b>, garde l'écran allumé quand la tablette est en charge ; si ta version le propose, active « lancer à la connexion » dans les réglages de l'appli.</p>
+          <p class="note" style="word-break:break-all"><code id="phone-url"></code></p>
+          <p class="note"><b>Tablette en tableau de bord</b> : même adresse puis bouton <b>Tableau</b>, ou directement <code id="board-url"></code> ; installe-la aussi comme appli.</p>
+        </div></div>
+      </div>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="bilan">
+  <div class="dlg-h"><span>Bilan · <b id="bl-t"></b></span><button class="btn ghost" data-close aria-label="Fermer"><svg class="i"><use href="#i-x"/></svg></button></div>
+  <div class="dlg-b">
+    <h4 class="ln-h">Maintenant</h4>
+    <ul class="bl-tips" id="bl-tips"></ul>
+    <h4 class="ln-h">Comment c'est sorti ?</h4>
+    <p class="note">Coche ce que tu vois : l'atelier explique pourquoi et garde la correction pour la prochaine impression de ce modèle.</p>
+    <div class="bl-issues" id="bl-issues"></div>
+    <div id="bl-why"></div>
+    <div class="field" style="margin-top:12px"><label for="bl-note">Note pour toi (facultatif)</label><input id="bl-note" type="text" maxlength="300" placeholder="ex. couleurs à revoir, sinon très bien"></div>
+  </div>
+  <div class="dlg-f"><button class="btn" data-close>Fermer</button><button class="btn primary" id="bl-go">Garder pour la prochaine fois</button></div>
+</dialog>
+
+<dialog id="link">
+  <div class="dlg-h">Importer depuis un lien<button class="btn ghost" data-close aria-label="Fermer"><svg class="i"><use href="#i-x"/></svg></button></div>
+  <form class="dlg-b" id="link-form" method="dialog">
+    <div class="field"><label for="link-url">Lien du fichier ou de la page</label><input id="link-url" type="text" inputmode="url" placeholder="https://…/modele.stl" autocomplete="off" required></div>
+    <p class="note">Marche avec un lien direct vers un STL, 3MF, OBJ, GLB ou un zip, et avec les pages qui donnent ce lien.
+      MakerWorld et Thingiverse demandent d'être connecté : télécharge le fichier puis dépose-le.</p>
+    <div class="row-btns" style="justify-content:flex-end"><button class="btn" type="button" data-close>Annuler</button><button class="btn primary" id="link-go" type="submit">Importer</button></div>
+  </form>
+</dialog>
+
+<dialog id="ev">
+  <div class="dlg-h">Suivi des impressions<button class="btn ghost" data-close aria-label="Fermer"><svg class="i"><use href="#i-x"/></svg></button></div>
+  <div class="dlg-b">
+    <p class="note">L'atelier surveille l'imprimante en continu, même sans page ouverte : début, pause, plus de filament, fin (avec une photo), arrêt et erreur.</p>
+    <div class="ev-opts"><button class="btn" id="ev-notif" hidden>Activer les notifications</button><label class="ev-sound"><input type="checkbox" id="ev-sound" checked> Son et vibration</label></div>
+    <div class="ev-phone" id="ev-phone"></div>
+    <div id="ev-list"></div>
+  </div>
+</dialog>
+
+<dialog id="txt">
+  <div class="dlg-h">Ajouter un texte<button class="btn ghost" data-close aria-label="Fermer"><svg class="i"><use href="#i-x"/></svg></button></div>
+  <div class="dlg-b">
+    <p class="note">Pour un modèle plat (dessin au trait, plaque). Le texte se place tout seul dans l'espace libre et reste relié au modèle (d'un trait à l'autre, ou par une fine barre) ; il s'imprime avec une deuxième bobine. Un nouveau fichier est créé, l'original reste intact.</p>
+    <div class="field"><label for="txt-v">Texte</label><input id="txt-v" type="text" maxlength="40" placeholder="ex. Noël"></div>
+    <div class="field"><label for="txt-font">Écriture</label><select id="txt-font"><option value="trait">D'un seul trait, comme le dessin</option><option value="manuscrite">Manuscrite, sur une barre</option><option value="droite">Lettres droites, sur une barre</option></select></div>
+    <div class="field"><label for="txt-angle">Inclinaison</label><select id="txt-angle"><option value="0">Droit</option><option value="30">Diagonale montante ↗</option><option value="-30">Diagonale descendante ↘</option></select></div>
+    <div class="field"><label for="txt-size">Hauteur des majuscules (mm)</label><input id="txt-size" type="number" min="3" max="60" step="0.5" placeholder="automatique"></div>
+  </div>
+  <div class="dlg-f"><button class="btn" data-close>Annuler</button><button class="btn primary" id="txt-go">Ajouter</button></div>
+</dialog>
+
+<dialog id="tray-dlg">
+  <div class="dlg-h"><span id="tray-t">Bobine</span><button class="btn ghost" data-close aria-label="Fermer"><svg class="i"><use href="#i-x"/></svg></button></div>
+  <div class="dlg-b">
+    <p class="note">L'atelier retire le filament de chaque impression terminée. Corrige ici si tu as pesé la bobine (sans le support vide, environ 250 g pour une bobine plastique).</p>
+    <div class="two"><div class="field"><label for="tray-left">Restant (g)</label><input id="tray-left" type="number" min="0" step="10"></div>
+    <div class="field"><label for="tray-full">Bobine pleine (g)</label><input id="tray-full" type="number" min="50" step="50"></div></div>
+    <div class="field"><label for="tray-price">Prix (€ / kg)</label><input id="tray-price" type="number" min="0" step="0.5"></div>
+    <button class="btn" id="tray-new">Je viens de mettre une bobine neuve</button>
+  </div>
+  <div class="dlg-f"><button class="btn" data-close>Annuler</button><button class="btn primary" id="tray-save">Enregistrer</button></div>
+</dialog>
+
+<dialog id="vid" class="wide-dlg">
+  <div class="dlg-h"><span id="vid-t">Timelapse</span><button class="btn ghost" data-close aria-label="Fermer"><svg class="i"><use href="#i-x"/></svg></button></div>
+  <div class="dlg-b" style="padding:0;max-height:none"><video id="vid-v" controls autoplay loop playsinline style="display:block;width:100%;background:#000"></video><div id="vid-img"></div></div>
+</dialog>
+
+<dialog id="launch">
+  <div class="dlg-h"><span>Lancer <b id="ln-t"></b></span><button class="btn ghost" data-close aria-label="Fermer"><svg class="i"><use href="#i-x"/></svg></button></div>
+  <div class="dlg-b">
+    <div class="ln-busy" id="ln-busy" hidden><b>L'imprimante imprime déjà.</b> Elle ne peut pas commencer celle-ci maintenant.
+      <button class="btn" id="ln-queue"><svg class="i"><use href="#i-plus"/></svg>Ajouter à la file d'attente</button></div>
+    <div class="ln-plate" id="ln-plate" hidden></div>
+    <p class="note" style="margin-bottom:10px">Avant de lancer : <b>plateau vide et propre</b>, bonnes bobines dans le CANVAS.</p>
+    <h4 class="ln-h">Quelle bobine pour chaque couleur</h4>
+    <div id="ln-map"></div>
+    <div id="ln-stock" style="margin-top:8px"></div>
+    <div id="ln-warn" style="margin-top:6px"></div>
+    <h4 class="ln-h">Options de l'imprimante</h4>
+    <div class="switch"><label for="ln-level">Nivellement complet du plateau <small class="note">(la CC2 nivelle déjà la zone de la pièce ; ≈ 2 min de plus, utile après un changement de plateau)</small></label><input type="checkbox" id="ln-level"></div>
+    <details class="ln-more" id="ln-more"><summary>Autres options <span class="note" id="ln-sum"></span></summary>
+    <div class="switch" style="margin-top:10px"><label for="ln-check">Vérifications de l'imprimante avant de démarrer</label><input type="checkbox" id="ln-check"></div>
+    <div class="switch" style="margin-top:10px"><label for="ln-video">Timelapse de l'imprimante <small class="note">(en plus de celui de l'atelier)</small></label><input type="checkbox" id="ln-video"></div>
+    <div class="field" style="margin-top:12px"><label>Disposition du plateau <small class="note">(laisse A sauf si l'écran de la CC2 indique B)</small></label>
+      <div class="seg wide" id="ln-layout"><button data-layout="A">A</button><button data-layout="B">B</button></div></div>
+    <div class="switch" style="margin-top:6px"><label for="ln-remember">Garder ces options pour les prochaines fois</label><input type="checkbox" id="ln-remember"></div>
+    </details>
+  </div>
+  <div class="dlg-f"><button class="btn" data-close>Annuler</button><button class="btn primary" id="ln-go"><svg class="i"><use href="#i-play"/></svg>Lancer l'impression</button></div>
+</dialog>
+
+<dialog id="clean">
+  <div class="dlg-h">Faire le ménage<button class="btn ghost" data-close aria-label="Fermer"><svg class="i"><use href="#i-x"/></svg></button></div>
+  <div class="dlg-b"><p class="note">Fichiers que l'atelier peut supprimer sans perdre tes modèles. Décoche ce que tu veux garder.</p><div id="clean-list"></div></div>
+  <div class="dlg-f"><span class="note" id="clean-sum" style="margin:0 auto 0 0"></span><button class="btn" data-close>Annuler</button><button class="btn primary" id="clean-go"><svg class="i"><use href="#i-trash"/></svg>Supprimer</button></div>
+</dialog>
+
+<div class="toasts" id="toasts" role="status"></div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

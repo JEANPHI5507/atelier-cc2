@@ -1,0 +1,15 @@
+{
+ "image": [
+  "q1",
+  "image"
+ ],
+ "prompt": [
+  "q9",
+  "prompt"
+ ],
+ "seed": [
+  "q14",
+  "seed"
+ ],
+ "next": "trellis_image_vers_3d"
+}

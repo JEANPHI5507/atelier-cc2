@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="fr" data-theme="noir">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tableau de bord CC2</title>
+<link rel="manifest" href="tableau.webmanifest">
+<meta name="theme-color" content="#000000">
+<link rel="icon" type="image/png" href="icons/favicon.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tableau CC2">
+<style>
+  /* same themes as the workshop */
+  :root[data-theme="noir"] {
+    --bg: #000000; --surface: #0a0a0b; --raised: #161618; --line: #232325; --txt: #ffffff; --dim: #aeaeb2; --faint: #8e8e93;
+    --acc: #ff9f0a; --ok: #30d158; --warn: #ffd60a; --bad: #ff453a; --stage: #000000;
+  }
+  :root, :root[data-theme="ardoise"] {
+    --bg: #3b4452; --surface: #465060; --raised: #535e6f; --line: #5e6a7c; --txt: #f2f4f7; --dim: #c9d0da; --faint: #9aa5b5;
+    --acc: #ff8a3d; --ok: #7fe3b0; --warn: #ffd98a; --bad: #ff8f8a; --stage: #323a46;
+  }
+  :root[data-theme="sauge"] {
+    --bg: #3f4a45; --surface: #4a5751; --raised: #56645d; --line: #627169; --txt: #f1f5f2; --dim: #cbd6cf; --faint: #a5b2aa;
+    --acc: #f2a54b; --ok: #7fe3b0; --warn: #ffd98a; --bad: #ff8f8a; --stage: #36403b;
+  }
+  :root[data-theme="sable"] {
+    --bg: #cdc2b0; --surface: #dad0c0; --raised: #e4dccf; --line: #bfb29e; --txt: #2b251f; --dim: #574e44; --faint: #7a6f61;
+    --acc: #c4531a; --ok: #1d7a50; --warn: #9a6512; --bad: #b3322f; --stage: #b9ad99;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bg); color: var(--txt); font: 16px/1.4 Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+         -webkit-font-smoothing: antialiased; overflow: hidden; user-select: none; -webkit-user-select: none; transition: filter .6s; }
+  body.nuit { filter: brightness(.45) saturate(.8); }
+  .wrap { height: 100%; display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(300px, 1fr); gap: 14px;
+          padding: max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); }
+  .cam { position: relative; background: var(--stage); border-radius: 18px; overflow: hidden; min-height: 0; }
+  .cam img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+  .cam .msg { position: absolute; inset: 0; display: grid; place-items: center; color: var(--faint); text-align: center; padding: 20px; }
+  .cam .top { position: absolute; left: 0; right: 0; top: 0; padding: 14px 18px; display: flex; gap: 12px; align-items: center;
+              background: linear-gradient(rgba(30,34,42,.65), transparent); color: #f2f4f7; }
+  .cam .top .file { font-weight: 650; font-size: 19px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  .cam .bar { position: absolute; left: 0; right: 0; bottom: 0; height: 8px; background: rgba(30,34,42,.5); }
+  .cam .bar i { display: block; height: 100%; width: 0; background: var(--acc); transition: width 1s; }
+  .back { display: inline-flex; align-items: center; gap: 4px; height: 40px; padding: 0 14px 0 8px; border-radius: 99px; border: 0;
+          background: rgba(30,34,42,.55); color: #f2f4f7; font-weight: 600; font-size: 15px; cursor: pointer; touch-action: manipulation; }
+  .back svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+  .pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 99px; background: rgba(30,34,42,.55);
+          font-size: 14px; font-weight: 600; white-space: nowrap; color: #f2f4f7; }
+  .pill i { width: 9px; height: 9px; border-radius: 50%; background: var(--ok); }
+  .pill.busy i { background: var(--acc); } .pill.warn i { background: var(--warn); } .pill.bad i { background: var(--bad); }
+  .side { display: flex; flex-direction: column; gap: 14px; min-height: 0; overflow: auto; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 16px 18px; }
+  .card h3 { margin: 0 0 10px; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); font-weight: 600; display: flex; justify-content: space-between; }
+  .job { display: grid; grid-template-columns: 120px 1fr; gap: 16px; align-items: center; }
+  .ring { width: 120px; height: 120px; position: relative; }
+  .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .ring circle { fill: none; stroke-width: 10; } .ring .bg { stroke: var(--raised); } .ring .fg { stroke: var(--acc); stroke-linecap: round; transition: stroke-dashoffset 1s; }
+  .ring .pct { position: absolute; inset: 0; display: grid; place-items: center; font-size: 30px; font-weight: 700; }
+  .state { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; font-size: 15px; } .kv span:nth-child(odd) { color: var(--faint); }
+  .kv b { font-weight: 650; }
+  .temps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; text-align: center; }
+  .temps .v { font-size: 26px; font-weight: 700; } .temps .l { font-size: 12.5px; color: var(--faint); } .temps .g { font-size: 12.5px; color: var(--dim); }
+  .spools { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .sp { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 10px 6px; text-align: center; min-width: 0; }
+  .sp.on { border-color: var(--acc); box-shadow: 0 0 0 2px var(--acc) inset; }
+  .sp .c { width: 30px; height: 30px; border-radius: 50%; margin: 0 auto 6px; border: 2px solid var(--line); }
+  .sp .n { font-weight: 650; font-size: 13.5px; } .sp .g { font-size: 12.5px; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gauge { height: 5px; border-radius: 3px; background: var(--raised); margin: 6px 4px 2px; overflow: hidden; } .gauge i { display: block; height: 100%; background: var(--ok); }
+  .gauge.low i { background: var(--bad); }
+  .ev { display: grid; grid-template-columns: 10px 1fr auto; gap: 10px; padding: 7px 0; border-top: 1px solid var(--line); font-size: 14px; }
+  .ev:first-child { border-top: 0; } .ev .d { width: 10px; height: 10px; border-radius: 50%; margin-top: 5px; background: var(--faint); }
+  .ev.ok .d { background: var(--ok); } .ev.warn .d { background: var(--warn); } .ev.bad .d { background: var(--bad); }
+  .ev small { display: block; color: var(--dim); font-size: 12.5px; } .ev time { color: var(--faint); font-size: 12.5px; }
+  .last { display: grid; grid-template-columns: 110px 1fr; gap: 12px; align-items: center; }
+  .last img { width: 110px; height: 80px; object-fit: cover; border-radius: 10px; background: var(--stage); }
+  .ctl { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  button { font: inherit; color: inherit; }
+  .btn { height: 54px; border-radius: 14px; border: 1px solid var(--line); background: var(--raised); font-weight: 600; font-size: 14px;
+         display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; touch-action: manipulation; }
+  .btn svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .btn.on { background: var(--acc); color: #2a1404; border-color: var(--acc); }
+  .btn.stop { position: relative; overflow: hidden; } .btn.stop .fill { position: absolute; left: 0; bottom: 0; top: 0; width: 0; background: var(--bad); opacity: .45; }
+  .btn:disabled { opacity: .4; }
+  .toast { position: fixed; left: 50%; top: 24px; transform: translateX(-50%); max-width: min(720px, 92vw); background: var(--surface);
+           border: 2px solid var(--acc); border-radius: 16px; padding: 14px 20px; font-size: 18px; box-shadow: 0 16px 50px rgba(20,24,30,.45); z-index: 9; }
+  .toast.bad { border-color: var(--bad); } .toast.ok { border-color: var(--ok); } .toast.warn { border-color: var(--warn); }
+  .toast b { display: block; } .toast small { color: var(--dim); font-size: 15px; }
+  .note { color: var(--faint); font-size: 13px; margin: 0; }
+  .cn { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .cn-now { display: flex; align-items: center; gap: 12px; font-size: 18px; }
+  .cn-dot { display: inline-block; width: 38px; height: 38px; border-radius: 50%; flex: none; border: 2px solid var(--line); }
+  .cn small { display: block; color: var(--dim); font-size: 13px; }
+  .cn-next { display: flex; gap: 8px; margin-top: 10px; }
+  .cn-next > div { flex: 1; min-width: 0; display: flex; gap: 8px; align-items: center; padding: 8px; border-radius: 12px; background: var(--raised); font-size: 14px; }
+  .cn-next .cn-dot { width: 22px; height: 22px; border-width: 1px; }
+  .cp { display: flex; gap: 12px; } .cp > div { flex: 1; min-width: 0; }
+  .cp canvas { display: block; width: 100%; height: 190px; background: var(--stage); border-radius: 12px; margin-bottom: 6px; }
+  .start { position: fixed; inset: 0; display: grid; place-items: center; background: var(--bg); z-index: 10; text-align: center; padding: 20px; }
+  .start .btn { height: 64px; padding: 0 28px; font-size: 18px; flex-direction: row; gap: 10px; background: var(--acc); color: #2a1404; border-color: var(--acc); margin: 20px auto 10px; }
+  @media (orientation: portrait), (max-width: 860px) {
+    body { overflow: auto; } .wrap { height: auto; grid-template-columns: 1fr; } .cam { aspect-ratio: 16 / 10; }
+  }
+</style>
+</head>
+<body>
+<div class="start" id="start">
+  <div>
+    <div style="font-size:24px;font-weight:700">Tableau de bord de la Centauri Carbon 2</div>
+    <p class="note" style="font-size:15px;margin-top:8px">Touche pour démarrer : plein écran, écran qui reste allumé, son des alertes.</p>
+    <button class="btn" id="go"><svg viewBox="0 0 24 24"><path d="M7 5v14l12-7L7 5Z"/></svg>Démarrer</button>
+    <p class="note">Branche la tablette sur le secteur. Pour la garder allumée sans toucher : réglages de la tablette → écran → ne jamais éteindre (en charge).</p>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="cam" id="cam">
+    <div class="msg" id="cam-msg">Connexion à la caméra…</div>
+    <div class="top"><button class="back" id="back" title="Revenir à l'atelier"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>Atelier</button><span class="pill" id="pill"><i></i><span id="pill-t">…</span></span><span class="file" id="file"></span><span class="pill" id="ia" hidden><i></i><span id="ia-t"></span></span></div>
+    <div class="bar"><i id="bar"></i></div>
+  </div>
+  <div class="side">
+    <div class="card">
+      <div class="job">
+        <div class="ring"><svg viewBox="0 0 120 120"><circle class="bg" cx="60" cy="60" r="50"/><circle class="fg" id="ring" cx="60" cy="60" r="50" stroke-dasharray="314.16" stroke-dashoffset="314.16"/></svg><div class="pct" id="pct">–</div></div>
+        <div><div class="state" id="state">…</div>
+          <div class="kv" id="kv"></div></div>
+      </div>
+      <div class="cn" id="cn" hidden></div>
+    </div>
+    <div class="card" id="ctl-card">
+      <div class="ctl">
+        <button class="btn" id="b-light"><svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5V16h8v-2.5A6 6 0 0 0 12 3Z"/></svg>Lumière</button>
+        <button class="btn" id="b-pause"><svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg><span>Pause</span></button>
+        <button class="btn stop" id="b-stop"><span class="fill" id="stop-fill"></span><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg><span>Arrêter</span></button>
+        <button class="btn" id="b-night"><svg viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"/></svg>Nuit</button>
+      </div>
+      <p class="note" id="ctl-note" style="margin-top:8px">Arrêter : garde le doigt appuyé 2 secondes.</p>
+    </div>
+    <div class="card" id="coupe" hidden>
+      <h3>Coupe <span id="cp-t"></span></h3>
+      <div class="cp"><div><canvas id="cp-front"></canvas><p class="note">De face : en couleur ce qui est imprimé</p></div>
+        <div><canvas id="cp-top"></canvas><p class="note">Couche en cours, vue du dessus</p></div></div>
+    </div>
+    <div class="card" id="idle" hidden>
+      <h3>Dernière impression <span id="month"></span></h3>
+      <div class="last" id="last"></div>
+      <p class="note" id="maint" style="margin-top:10px"></p>
+    </div>
+    <div class="card"><h3>Températures</h3><div class="temps" id="temps"></div></div>
+    <div class="card"><h3>Bobines <span id="refill"></span></h3><div class="spools" id="spools"></div></div>
+    <div class="card"><h3>Alertes</h3><div id="events"><p class="note">Rien pour l'instant.</p></div></div>
+  </div>
+</div>
+<script src="js/tableau.js"></script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#465060">
+<title>Atelier Centauri Carbon 2</title>
+<style>
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 16px; box-sizing: border-box; background: #3b4452; color: #f2f4f7;
+         font: 16px/1.5 Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; text-align: center; }
+  .card { max-width: 360px; background: #465060; border: 1px solid #5e6a7c; border-radius: 16px; padding: 28px 24px; }
+  img { width: 56px; height: 56px; border-radius: 14px; }
+  h1 { font-size: 19px; margin: 14px 0 6px; } p, li { color: #c9d0da; font-size: 14px; } ul { text-align: left; padding-left: 20px; }
+  button { font: inherit; width: 100%; height: 48px; margin-top: 10px; border: 0; border-radius: 12px; background: #ff8a3d; color: #2a1404; font-weight: 650; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <img src="/lab/icons/icon-192.png" alt="">
+    <h1>L'atelier ne répond pas</h1>
+    <p>L'application a besoin du PC où tourne l'atelier.</p>
+    <ul><li>Le PC est-il allumé, avec <code>cc2 dash --reseau</code> lancé ?</li><li>Le téléphone est-il sur le Wi-Fi de la maison ?</li></ul>
+    <button onclick="location.href='/lab/'">Réessayer</button>
+  </div>
+</body>
+</html>

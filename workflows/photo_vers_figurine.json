@@ -1,0 +1,188 @@
+{
+ "q1": {
+  "class_type": "LoadImage",
+  "inputs": {
+   "image": "exemple.png"
+  }
+ },
+ "q2": {
+  "class_type": "FluxKontextImageScale",
+  "inputs": {
+   "image": [
+    "q1",
+    0
+   ]
+  }
+ },
+ "q3": {
+  "class_type": "UNETLoader",
+  "inputs": {
+   "unet_name": "qwen_image_edit_2511_fp8mixed.safetensors",
+   "weight_dtype": "default"
+  }
+ },
+ "q4": {
+  "class_type": "LoraLoaderModelOnly",
+  "inputs": {
+   "model": [
+    "q3",
+    0
+   ],
+   "lora_name": "Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors",
+   "strength_model": 1.0
+  }
+ },
+ "q5": {
+  "class_type": "ModelSamplingAuraFlow",
+  "inputs": {
+   "model": [
+    "q4",
+    0
+   ],
+   "shift": 3.1
+  }
+ },
+ "q6": {
+  "class_type": "CFGNorm",
+  "inputs": {
+   "model": [
+    "q5",
+    0
+   ],
+   "strength": 1.0
+  }
+ },
+ "q7": {
+  "class_type": "CLIPLoader",
+  "inputs": {
+   "clip_name": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+   "type": "qwen_image",
+   "device": "default"
+  }
+ },
+ "q8": {
+  "class_type": "VAELoader",
+  "inputs": {
+   "vae_name": "qwen_image_vae.safetensors"
+  }
+ },
+ "q9": {
+  "class_type": "TextEncodeQwenImageEditPlus",
+  "inputs": {
+   "clip": [
+    "q7",
+    0
+   ],
+   "vae": [
+    "q8",
+    0
+   ],
+   "image1": [
+    "q2",
+    0
+   ],
+   "prompt": "Turn this photo into one collectible figurine group: keep every person (or object) of the photo, each shown full body from head to feet, standing side by side together on one shared round base. Keep each one's hairstyle, clothes, caps and their colors. Stylized smooth sculpted shapes, large areas of flat solid colors, clean plain light grey background, soft studio lighting, the whole group visible and centered, no text, no logo"
+  }
+ },
+ "q10": {
+  "class_type": "TextEncodeQwenImageEditPlus",
+  "inputs": {
+   "clip": [
+    "q7",
+    0
+   ],
+   "vae": [
+    "q8",
+    0
+   ],
+   "image1": [
+    "q2",
+    0
+   ],
+   "prompt": ""
+  }
+ },
+ "q11": {
+  "class_type": "FluxKontextMultiReferenceLatentMethod",
+  "inputs": {
+   "conditioning": [
+    "q9",
+    0
+   ],
+   "reference_latents_method": "index_timestep_zero"
+  }
+ },
+ "q12": {
+  "class_type": "FluxKontextMultiReferenceLatentMethod",
+  "inputs": {
+   "conditioning": [
+    "q10",
+    0
+   ],
+   "reference_latents_method": "index_timestep_zero"
+  }
+ },
+ "q13": {
+  "class_type": "VAEEncode",
+  "inputs": {
+   "pixels": [
+    "q2",
+    0
+   ],
+   "vae": [
+    "q8",
+    0
+   ]
+  }
+ },
+ "q14": {
+  "class_type": "KSampler",
+  "inputs": {
+   "model": [
+    "q6",
+    0
+   ],
+   "positive": [
+    "q11",
+    0
+   ],
+   "negative": [
+    "q12",
+    0
+   ],
+   "latent_image": [
+    "q13",
+    0
+   ],
+   "seed": 1,
+   "steps": 4,
+   "cfg": 1.0,
+   "sampler_name": "euler",
+   "scheduler": "simple",
+   "denoise": 1.0
+  }
+ },
+ "q15": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "q14",
+    0
+   ],
+   "vae": [
+    "q8",
+    0
+   ]
+  }
+ },
+ "q16": {
+  "class_type": "SaveImage",
+  "inputs": {
+   "images": [
+    "q15",
+    0
+   ],
+   "filename_prefix": "3d/atelier_figurine"
+  }
+ }
+}

@@ -1,0 +1,18 @@
+# Copie ce fichier en config.toml (ignoré par git) et remplis-le.
+
+[printer]
+host = ""          # IP de l'imprimante (fixe-la dans ta box: bail DHCP statique)
+access_code = ""   # code d'accès affiché sur l'écran de l'imprimante (Réseau)
+# serial = ""      # optionnel: numéro de série, évite l'appel HTTP :80 au démarrage
+
+[comfyui]
+url = "http://127.0.0.1:8188"   # ComfyUI sur la machine GPU, ex. "http://192.168.1.50:8188"
+
+[dashboard]
+port = 8787
+
+[slicer]
+# path = ""        # par défaut: tools/orcaslicer/squashfs-root/AppRun (installé par `make slicer`)
+
+[tranchage]
+# niveler = false  # retire le nivellement du G-code : déconseillé, la CC2 nivelle alors tout le plateau elle-même
