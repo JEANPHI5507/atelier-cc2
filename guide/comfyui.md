@@ -1,6 +1,6 @@
 # Génération IA avec ComfyUI
 
-[← Retour au README](../README.md)
+[← Retour au README](../README.fr.md) · 🇬🇧 [English](en/comfyui.md)
 
 Facultatif. L'atelier peut transformer **une photo ou une phrase en modèle 3D en couleurs**, prêt à passer par le
 CANVAS. Le calcul ne se fait pas dans l'atelier : il demande à un **[ComfyUI](https://github.com/comfyanonymous/ComfyUI)**,

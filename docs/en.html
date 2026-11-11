@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atelier CC2</title>
+<meta name="description" content="An open-source web workshop for the Elegoo Centauri Carbon 2 and its CANVAS: prepare a four-colour model, slice it, start it and follow every layer, from your PC, phone or a tablet.">
+<meta name="theme-color" content="#000000">
+<link rel="alternate" hreflang="fr" href="index.html">
+<meta property="og:title" content="Atelier CC2">
+<meta property="og:description" content="Prepare, print and follow every layer of your Centauri Carbon 2.">
+<meta property="og:image" content="suivi.jpg">
+<style>
+  :root {
+    --bg: #000; --surface: #0b0b0c; --raised: #161618; --line: #222224; --line-strong: #3a3a3c;
+    --txt: #f5f5f7; --dim: #a1a1a6; --faint: #6e6e73; --acc: #ff9f0a; --acc-ink: #1f1300;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--txt); font: 17px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+  img { display: block; max-width: 100%; }
+  a { color: var(--acc); text-decoration: none; } a:hover { text-decoration: underline; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 28px; }
+
+  /* top bar */
+  .top { position: sticky; top: 0; z-index: 10; background: rgba(0,0,0,.72); backdrop-filter: saturate(180%) blur(18px); border-bottom: 1px solid rgba(255,255,255,.06); }
+  .top .wrap { display: flex; align-items: center; height: 52px; gap: 10px; }
+  .logo { width: 26px; height: 26px; border-radius: 7px; background: linear-gradient(135deg, var(--acc), #ff4d2f); display: grid; place-items: center; }
+  .logo svg { width: 15px; height: 15px; fill: none; stroke: #fff; stroke-width: 2.2; stroke-linejoin: round; }
+  .top b { font-size: 14px; font-weight: 600; }
+  .top nav { margin-left: auto; display: flex; gap: 26px; font-size: 13px; }
+  .top nav a { color: var(--dim); } .top nav a:hover { color: var(--txt); text-decoration: none; }
+  .top nav a.lang { color: var(--txt); border: 1px solid var(--line-strong); border-radius: 999px; padding: 2px 10px; }
+
+  /* hero */
+  .hero { text-align: center; padding: 96px 0 0; }
+  .eyebrow { color: var(--acc); font-size: 15px; font-weight: 600; letter-spacing: .01em; margin: 0 0 14px; }
+  h1 { font-size: clamp(44px, 7.6vw, 92px); line-height: 1.02; letter-spacing: -.035em; font-weight: 700; margin: 0 auto; max-width: 980px; }
+  h1 em { font-style: normal; color: var(--faint); }
+  .lead { color: var(--dim); font-size: clamp(18px, 2.2vw, 22px); line-height: 1.45; max-width: 700px; margin: 24px auto 34px; }
+  .ctas { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; height: 46px; padding: 0 24px; border-radius: 999px; font-size: 16px; font-weight: 600; color: var(--txt); border: 1px solid var(--line-strong); }
+  .btn:hover { text-decoration: none; border-color: var(--faint); }
+  .btn.primary { background: var(--acc); color: var(--acc-ink); border-color: var(--acc); }
+  .btn.primary:hover { filter: brightness(1.07); }
+  .btn svg { width: 18px; height: 18px; fill: currentColor; }
+
+  /* devices */
+  .stage { position: relative; margin: 72px auto 0; max-width: 1080px; padding-bottom: 40px; }
+  .stage::before { content: ""; position: absolute; inset: 12% 8% 0; background: radial-gradient(closest-side, rgba(255,159,10,.20), transparent); filter: blur(40px); z-index: 0; }
+  .browser { position: relative; z-index: 1; border-radius: 14px; overflow: hidden; border: 1px solid var(--line-strong); background: var(--surface); box-shadow: 0 40px 120px rgba(0,0,0,.8); }
+  .browser .bar { height: 34px; display: flex; align-items: center; gap: 7px; padding: 0 14px; background: #121214; border-bottom: 1px solid var(--line); }
+  .browser .bar i { width: 11px; height: 11px; border-radius: 50%; background: #3a3a3c; }
+  .browser .bar span { margin: 0 auto; font-size: 12px; color: var(--faint); padding-right: 50px; }
+  .phone { position: absolute; z-index: 2; right: -3%; bottom: -2%; width: 16%; min-width: 120px; border-radius: 30px; padding: 7px; background: #1c1c1e; border: 1px solid #3a3a3c; box-shadow: 0 30px 80px rgba(0,0,0,.85); }
+  .phone img { border-radius: 24px; }
+  .phone::before { content: ""; position: absolute; top: 13px; left: 50%; width: 30%; height: 12px; margin-left: -15%; border-radius: 8px; background: #000; z-index: 1; }
+
+  /* sections */
+  section { padding: 140px 0 0; }
+  .row { display: grid; grid-template-columns: 1fr 1.25fr; gap: 72px; align-items: center; }
+  .row.flip { grid-template-columns: 1.25fr 1fr; } .row.flip .txt { order: 2; }
+  h2 { font-size: clamp(34px, 4.6vw, 56px); line-height: 1.06; letter-spacing: -.03em; margin: 0 0 20px; font-weight: 700; }
+  .txt p { color: var(--dim); font-size: 19px; margin: 0 0 24px; max-width: 520px; }
+  .txt p.eyebrow, .center p.eyebrow { color: var(--acc); font-size: 15px; margin: 0 0 14px; }
+  .ticks { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
+  .ticks li { display: flex; gap: 12px; align-items: baseline; color: var(--txt); font-size: 16px; }
+  .ticks li::before { content: ""; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--acc); transform: translateY(-2px); }
+  .shot { border-radius: 14px; overflow: hidden; border: 1px solid var(--line-strong); box-shadow: 0 30px 90px rgba(0,0,0,.7); }
+  .cap { margin-top: 12px; font-size: 13px; color: var(--faint); }
+  .live { position: relative; }
+  .live .tag { position: absolute; top: 14px; left: 14px; display: inline-flex; align-items: center; gap: 7px; padding: 5px 10px; border-radius: 999px; background: rgba(0,0,0,.65); backdrop-filter: blur(6px); font-size: 12px; font-weight: 600; }
+  .live .tag i { width: 7px; height: 7px; border-radius: 50%; background: #ff453a; box-shadow: 0 0 0 3px rgba(255,69,58,.25); }
+
+  .duo { display: grid; grid-template-columns: 2.1fr 1fr; gap: 28px; align-items: end; margin-top: 56px; }
+  .tablet { border-radius: 26px; padding: 12px; background: #1c1c1e; border: 1px solid #3a3a3c; box-shadow: 0 30px 90px rgba(0,0,0,.7); }
+  .tablet img { border-radius: 16px; }
+  .duo .phone { position: relative; right: auto; bottom: auto; width: 100%; min-width: 0; max-width: 260px; justify-self: center; border-radius: 34px; padding: 9px; } .duo .phone img { border-radius: 27px; }
+  .center { text-align: center; } .center p { margin-left: auto; margin-right: auto; }
+  .center .txt p, .lede { color: var(--dim); font-size: 19px; max-width: 640px; margin: 0 auto; }
+
+  .honest { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 44px; }
+  .honest > div { border: 1px solid var(--line); border-radius: 18px; padding: 28px 30px; background: var(--surface); text-align: left; }
+  .honest h3 { margin: 0 0 14px; font-size: 18px; } .honest ul { margin: 0; padding-left: 18px; color: var(--dim); display: grid; gap: 8px; font-size: 16px; }
+
+  pre { margin: 40px auto 0; max-width: 760px; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 26px 30px; overflow-x: auto; font: 15px/1.8 ui-monospace, "SF Mono", Menlo, Consolas, monospace; color: #e5e5ea; }
+  pre .c { color: var(--faint); }
+
+  footer { margin-top: 140px; border-top: 1px solid var(--line); padding: 30px 0 46px; color: var(--faint); font-size: 13px; line-height: 1.6; }
+  footer .wrap { display: grid; grid-template-columns: 1fr auto; gap: 24px; }
+
+  @media (max-width: 900px) {
+    .row, .row.flip { grid-template-columns: 1fr; gap: 36px; } .row.flip .txt { order: 0; }
+    section { padding-top: 100px; }
+    .honest { grid-template-columns: 1fr; }
+    .duo { grid-template-columns: 1fr; } .duo .phone { max-width: 260px; }
+    footer .wrap { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 600px) {
+    .wrap { padding: 0 16px; } .top nav { gap: 16px; } .top nav .opt { display: none; }
+    .hero { padding-top: 64px; } .stage { margin-top: 48px; padding-bottom: 70px; }
+    .phone { width: 28%; min-width: 90px; right: -2%; border-radius: 18px; padding: 4px; } .phone img { border-radius: 14px; } .phone::before { top: 7px; height: 7px; }
+    .browser .bar { height: 26px; } .browser .bar span { display: none; }
+    .btn { width: 100%; justify-content: center; }
+    .txt p, .lede { font-size: 17px; }
+    pre { font-size: 13px; padding: 20px; }
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <span class="logo"><svg viewBox="0 0 24 24"><path d="M12 3 3 8l9 5 9-5-9-5Zm-9 9 9 5 9-5M3 16l9 5 9-5"/></svg></span>
+    <b>Atelier CC2</b>
+    <nav><a class="opt" href="#preparer">Prepare</a><a class="opt" href="#suivre">Monitor</a><a href="#essayer">Try it</a><a href="https://github.com/JEANPHI5507/atelier-cc2">GitHub</a><a class="lang" href="index.html" hreflang="fr" lang="fr">FR</a></nav>
+  </div>
+</header>
+
+<main>
+  <div class="wrap hero">
+    <p class="eyebrow">For the Elegoo Centauri Carbon 2 and its CANVAS</p>
+    <h1>Prepare. Print.<br><em>Follow every layer.</em></h1>
+    <p class="lead">An open-source workshop that runs at home: from a four-colour model to the part on the plate,
+      from your PC, your phone or a tablet on the wall. <span style="color:var(--faint)">Interface in French for now.</span></p>
+    <div class="ctas">
+      <a class="btn primary" href="#essayer">Try it without a printer</a>
+      <a class="btn" href="https://github.com/JEANPHI5507/atelier-cc2"><svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>Source code</a>
+    </div>
+    <div class="stage">
+      <div class="browser"><div class="bar"><i></i><i></i><i></i><span>atelier · Printer tab</span></div>
+        <img src="suivi.jpg" alt="The Printer tab during a real four-colour print: progress, current and upcoming colour, camera, CANVAS spools, layer-by-layer view" width="1092" height="1070"></div>
+      <div class="phone"><img src="telephone.jpg" alt="The same monitoring on a phone: camera, progress and current colour" width="412" height="658"></div>
+    </div>
+  </div>
+
+  <section id="preparer">
+    <div class="wrap row">
+      <div class="txt">
+        <p class="eyebrow">Prepare</p>
+        <h2>Your model, in your spools' colours.</h2>
+        <p>Drop an STL, a 3MF or an AI-generated model. The workshop maps each colour to a CANVAS spool,
+          sizes it and picks the best face to lay it on.</p>
+        <ul class="ticks">
+          <li>"Optimise for the CC2": repair, size, position, supports</li>
+          <li>Purge sized for each colour change, no marbling</li>
+          <li>Sliced by OrcaSlicer with the CC2 profiles</li>
+        </ul>
+      </div>
+      <div><div class="shot"><img src="preparer.jpg" alt="A four-colour Santa on the CC2 build plate, each colour mapped to a Silk spool" width="822" height="1050"></div></div>
+    </div>
+  </section>
+
+  <section id="suivre">
+    <div class="wrap row flip">
+      <div class="txt">
+        <p class="eyebrow">Monitor</p>
+        <h2>Every layer, every colour.</h2>
+        <p>The live camera, the part growing in 3D, the current colour and the next ones with their delay.
+          An AI watches the camera and pauses if it sees spaghetti.</p>
+        <ul class="ticks">
+          <li>Notified at the end, then when the plate is cold</li>
+          <li>Timelapse and photo of every print in the gallery</li>
+          <li>A review afterwards: the fix is offered next time</li>
+        </ul>
+      </div>
+      <div class="live"><div class="shot"><img src="piece-pere-noel.jpg" alt="The Santa being printed, seen by the CC2 camera" width="800" height="450"></div>
+        <span class="tag"><i></i>Workshop camera</span>
+        <p class="cap">The Santa from the screenshot, layer 81 of 300, in green, red, white and gold Silk.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap center">
+      <p class="eyebrow">Anywhere</p>
+      <h2>In your pocket. Or on the wall.</h2>
+      <p class="lede">An app to install on your phone, over HTTPS and protected by a code. A dashboard for an old
+        tablet, with a cross-section view of the print. Away from home, through Tailscale: no open port.</p>
+      <div class="duo">
+        <div class="tablet"><img src="tablette.jpg" alt="The dashboard on a tablet: large camera, progress, colours and cross-section view" width="1002" height="750"></div>
+        <div class="phone"><img src="telephone.jpg" alt="The workshop on a phone" width="412" height="658"></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap center">
+      <h2>What it does. What it doesn't.</h2>
+      <div class="honest">
+        <div><h3>It does</h3><ul>
+          <li>The whole path for a CC2 with CANVAS, tested on a real machine</li>
+          <li>Run on a PC or small home server, no cloud</li>
+          <li>Keep your library, spools, costs and reviews</li>
+          <li>Create parts without CAD: Gridfinity, screws, ornaments with a name…</li>
+        </ul></div>
+        <div><h3>It doesn't</h3><ul>
+          <li>Replace the firmware: it talks to the CC2 the way LAN mode allows</li>
+          <li>Guarantee the future: a firmware update may break a command</li>
+          <li>Run on Windows or macOS: Linux x86-64 for now</li>
+          <li>Come from Elegoo: it's a personal project</li>
+        </ul></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="essayer">
+    <div class="wrap center">
+      <p class="eyebrow">Try it</p>
+      <h2>Two minutes, no printer needed.</h2>
+      <p class="lede">The simulator starts a virtual CC2 with the workshop: camera, a CANVAS with four spools, prints in fast motion.</p>
+      <pre><span class="c"># Linux, Python 3.12 and uv</span>
+git clone https://github.com/JEANPHI5507/atelier-cc2 && cd atelier-cc2
+uv sync && make slicer
+uv run cc2 simulateur          <span class="c"># then http://localhost:8788/lab/</span>
+
+<span class="c"># with your CC2 (LAN mode), open to your phone</span>
+uv run cc2 --control dash --reseau</pre>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Personal project, not affiliated with Elegoo. "Elegoo", "Centauri Carbon" and "CANVAS" are trademarks of Elegoo.
+      The protocol goes through <a href="https://github.com/bjan/pycentauri">pycentauri</a> (reverse engineering). Code under the MIT licence.</span>
+    <a href="https://github.com/JEANPHI5507/atelier-cc2">github.com/JEANPHI5507/atelier-cc2</a>
+  </div>
+</footer>
+</body>
+</html>

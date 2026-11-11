@@ -1,6 +1,6 @@
 # Installation
 
-[← Retour au README](../README.md)
+[← Retour au README](../README.fr.md) · 🇬🇧 [English](en/installation.md)
 
 L'atelier est un serveur web écrit en Python. Il tourne sur une machine **Linux x86-64** de la maison, reliée au même
 réseau que l'imprimante, et on l'ouvre dans un navigateur : sur cette machine, sur un téléphone ou sur une tablette.

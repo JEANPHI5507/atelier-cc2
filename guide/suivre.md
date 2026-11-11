@@ -1,6 +1,6 @@
 # Suivre une impression
 
-[← Retour au README](../README.md)
+[← Retour au README](../README.fr.md) · 🇬🇧 [English](en/monitoring.md)
 
 ## L'onglet Imprimante
 

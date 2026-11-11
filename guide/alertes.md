@@ -1,6 +1,6 @@
 # Alertes
 
-[← Retour au README](../README.md)
+[← Retour au README](../README.fr.md) · 🇬🇧 [English](en/alerts.md)
 
 L'atelier surveille l'imprimante **même quand aucune page n'est ouverte** : il suffit qu'il tourne (en service, c'est
 le cas en permanence). Chaque événement est noté dans le journal (la cloche en haut de l'atelier).

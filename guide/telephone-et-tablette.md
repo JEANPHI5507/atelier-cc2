@@ -1,6 +1,6 @@
 # Téléphone, tablette, hors de la maison
 
-[← Retour au README](../README.md)
+[← Retour au README](../README.fr.md) · 🇬🇧 [English](en/phone-and-tablet.md)
 
 ## Ouvrir l'atelier au réseau de la maison
 

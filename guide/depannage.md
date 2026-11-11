@@ -1,6 +1,6 @@
 # Dépannage
 
-[← Retour au README](../README.md)
+[← Retour au README](../README.fr.md) · 🇬🇧 [English](en/troubleshooting.md)
 
 Premier réflexe : `uv run cc2 doctor`, puis le journal de l'atelier (`uv run cc2 service journal`, ou la console si tu
 l'as lancé à la main).

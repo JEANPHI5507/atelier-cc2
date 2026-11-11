@@ -1,97 +1,101 @@
 # Atelier CC2
 
-Un atelier web open source pour l'**Elegoo Centauri Carbon 2** et son **CANVAS** (4 bobines). Il prépare un modèle 3D
-en plusieurs couleurs, le tranche avec OrcaSlicer, l'envoie à l'imprimante, puis suit l'impression couche par couche :
-caméra avec une IA anti-ratés, couleur en cours et à venir, alertes sur le téléphone, tableau de bord pour une
-tablette, galerie avec bilan. Il tourne chez toi, sur un PC ou un petit serveur Linux, et s'ouvre depuis n'importe quel
-appareil de la maison.
+🇫🇷 [Version française](README.fr.md) · **The interface is in French for now** (the documentation is in English and French).
 
-| Préparer | Suivre | Tablette murale |
+An open-source web workshop for the **Elegoo Centauri Carbon 2** and its **CANVAS** (4 spools). It prepares a
+multicolour 3D model, slices it with OrcaSlicer, sends it to the printer, then follows the print layer by layer: camera
+with failed-print detection, current and upcoming colour, phone alerts, a wall-tablet dashboard, a gallery with a
+post-print review. It runs at home, on a Linux PC or small server, and opens from any device on your network.
+
+| Prepare | Monitor | Wall tablet |
 |---|---|---|
-| ![Atelier : préparer un modèle](docs/preparer.jpg) | ![Onglet Imprimante](docs/suivi.jpg) | ![Tableau de bord tablette](docs/tablette.jpg) |
+| ![Workshop: preparing a model](docs/preparer.jpg) | ![Printer tab](docs/suivi.jpg) | ![Tablet dashboard](docs/tablette.jpg) |
 
-*Captures pendant une vraie impression en quatre couleurs.* Présentation : https://jeanphi5507.github.io/atelier-cc2/
+*Screenshots taken during a real four-colour print.* Overview: https://jeanphi5507.github.io/atelier-cc2/en.html
 
-> **Projet personnel, non affilié à Elegoo.** « Elegoo », « Centauri Carbon » et « CANVAS » sont des marques d'Elegoo.
-> Le protocole réseau de l'imprimante n'est pas documenté : l'atelier passe par
-> [pycentauri](https://github.com/bjan/pycentauri), issu de la rétro-ingénierie. Une mise à jour du firmware peut
-> casser une commande. Testé sur une CC2 avec CANVAS, firmware 02.01.01.13.
+> **Personal project, not affiliated with Elegoo.** "Elegoo", "Centauri Carbon" and "CANVAS" are trademarks of Elegoo.
+> The printer's network protocol is undocumented: the workshop goes through
+> [pycentauri](https://github.com/bjan/pycentauri), which comes from reverse engineering. A firmware update may break a
+> command. Tested on a CC2 with CANVAS, firmware 02.01.01.13.
 
-## Ce qu'il fait
+## What it does
 
-- **Préparer** : importer un STL, 3MF, OBJ, GLB, PLY ou un lien vers un fichier (ou une page qui en propose un) ; associer chaque couleur à
-  une bobine du CANVAS ; « Optimiser pour la CC2 » (réparation, taille, meilleure face au plateau, supports, bordure) ;
-  découper une pièce trop grande avec des chevilles ; créer des pièces sans CAO (Gridfinity, visserie, engrenage,
-  porte-clés et décoration au prénom, lithophanie…).
-- **Trancher** : OrcaSlicer en ligne de commande, avec les profils Elegoo de la CC2. Temps, grammes, coût et nombre
-  de changements de couleur avant de lancer, comparaison de variantes, purge dosée, modes multicolores.
-- **Imprimer** : envoi à la CC2 avec la bonne bobine pour chaque couleur, vérification à la caméra que le plateau est
-  vide, file d'attente, pause à une hauteur donnée.
-- **Suivre** : caméra en direct, IA qui repère les « spaghettis » (modèle d'Obico, calculé chez toi), la pièce qui
-  monte en 3D, vue en coupe, couleur en cours et prochains changements, timelapse.
-- **Être prévenu** : fin d'impression, plus de filament, erreur, puis « plateau froid : tu peux retirer la pièce »,
-  sur la page ouverte ou sur le téléphone même appli fermée (ntfy).
-- **Garder une trace** : galerie de chaque impression (photo, vidéo, durée, coût), bilan des défauts avec la correction
-  proposée la fois suivante, stock et coût des bobines, carnet d'entretien.
-- **Générer par IA** (facultatif) : une photo ou une phrase devient un modèle 3D en couleurs, via un
-  [ComfyUI](https://github.com/comfyanonymous/ComfyUI) sur une machine avec carte graphique.
+- **Prepare**: import an STL, 3MF, OBJ, GLB, PLY or a link to a file (or to a page that offers one); map each colour to
+  a CANVAS spool; "Optimise for the CC2" (repair, size, best face on the plate, supports, brim); cut an oversized part
+  into pieces with dowels; create parts without CAD (Gridfinity, screws and nuts, gears, name keychains and Christmas
+  ornaments, lithophanes…).
+- **Slice**: OrcaSlicer from the command line, with Elegoo's CC2 profiles. Time, grams, cost and number of colour
+  changes before starting, side-by-side comparison of variants, purge sized per colour change, multicolour modes.
+- **Print**: sent to the CC2 with the right spool for each colour, a camera check that the plate is empty, a print
+  queue, pause at a given height.
+- **Monitor**: live camera, an AI that spots "spaghetti" (Obico's model, run on your own machine), the part growing in
+  3D, a cross-section view, current colour and upcoming changes, timelapse.
+- **Get notified**: print finished, out of filament, error, then "plate cold: you can take the part off", on the open
+  page or on your phone even with the app closed (ntfy).
+- **Keep track**: a gallery of every print (photo, video, duration, cost), a review of defects with the fix offered next
+  time, spool stock and cost, a maintenance log.
+- **Generate with AI** (optional): a photo or a sentence becomes a coloured 3D model, through a
+  [ComfyUI](https://github.com/comfyanonymous/ComfyUI) running on a machine with a graphics card.
 
-## Démarrage rapide
+## Quick start
 
-Il faut un **Linux x86-64** (PC, mini-PC ou serveur), **Python 3.12** et [uv](https://docs.astral.sh/uv/).
+You need **Linux x86-64** (PC, mini-PC or server), **Python 3.12** and [uv](https://docs.astral.sh/uv/).
 
 ```bash
 git clone https://github.com/JEANPHI5507/atelier-cc2 && cd atelier-cc2
-uv sync                       # dépendances Python
-make slicer                   # OrcaSlicer 2.4.2 (≈ 138 Mo, empreinte vérifiée) et le plateau de la CC2
-make ia                       # facultatif : le modèle anti-ratés d'Obico (≈ 200 Mo)
+uv sync                       # Python dependencies
+make slicer                   # OrcaSlicer 2.4.2 (≈ 138 MB, checksum verified) and the CC2 build plate
+make ia                       # optional: Obico's failed-print detection model (≈ 200 MB)
 ```
 
-**Sans imprimante**, pour essayer :
+**Without a printer**, to try it out:
 
 ```bash
-uv run cc2 simulateur         # puis http://localhost:8788/lab/
+uv run cc2 simulateur         # then http://localhost:8788/lab/
 ```
 
-Une CC2 simulée démarre avec l'atelier : caméra dessinée, CANVAS de quatre bobines, impressions en accéléré. Tout se
-passe dans `demo/` : rien d'autre n'est touché.
+A simulated CC2 starts with the workshop: drawn camera, a CANVAS with four spools, prints in fast motion. Everything
+happens in `demo/`: nothing else is touched.
 
-**Avec ta CC2** : active le mode réseau local sur l'écran de l'imprimante, puis :
+**With your CC2**: enable local network mode on the printer's screen, then:
 
 ```bash
-uv run cc2 --control dash     # http://localhost:8787/lab/ : l'onglet Démarrage demande l'IP et le code d'accès
+uv run cc2 --control dash     # http://localhost:8787/lab/ : the "Démarrage" (setup) tab asks for the IP and access code
 ```
 
-Sans `--control`, l'atelier est en lecture seule : il ne peut ni lancer, ni arrêter, ni chauffer.
+Without `--control`, the workshop is read-only: it can't start, stop or heat anything.
 
-## Les guides
+## Guides
 
-| Guide | Pour |
+| Guide | For |
 |---|---|
-| [Installation](guide/installation.md) | PC ou serveur sans écran, démarrage automatique, mise à jour |
-| [Première connexion à la CC2](guide/premiere-connexion.md) | mode LAN, code d'accès, pièces de test |
-| [Téléphone, tablette, hors de la maison](guide/telephone-et-tablette.md) | HTTPS, appli installable, tablette murale, Tailscale |
-| [Alertes](guide/alertes.md) | notifications, ntfy, plateau froid |
-| [Préparer et imprimer](guide/preparer-et-imprimer.md) | couleurs et bobines, optimiser, multicolore, découpe, Créer, lancer |
-| [Suivre une impression](guide/suivre.md) | caméra et IA, couches, couleurs, galerie, bilan, entretien |
-| [Génération IA avec ComfyUI](guide/comfyui.md) | installer ComfyUI, modèles à télécharger, workflows |
-| [Réglages (`config.toml`)](guide/configuration.md) | toutes les options |
-| [Ligne de commande](guide/ligne-de-commande.md) | `cc2 status`, `cc2 slice`, `cc2 gen`… |
-| [Ce qu'il faut savoir sur la CC2](guide/cc2.md) | firmware, CANVAS, purge, limites du réseau local |
-| [Dépannage](guide/depannage.md) | les problèmes courants et quoi faire |
-| [Développement](guide/developpement.md) | organisation du code, tests, simulateur |
+| [Installation](guide/en/installation.md) | PC or headless server, automatic start, updates |
+| [First connection to the CC2](guide/en/first-connection.md) | LAN mode, access code, test prints |
+| [Phone, tablet, away from home](guide/en/phone-and-tablet.md) | HTTPS, installable app, wall tablet, Tailscale |
+| [Alerts](guide/en/alerts.md) | notifications, ntfy, plate cold |
+| [Prepare and print](guide/en/prepare-and-print.md) | colours and spools, optimise, multicolour, cutting, Create, starting a print |
+| [Monitor a print](guide/en/monitoring.md) | camera and AI, layers, colours, gallery, review, maintenance |
+| [AI generation with ComfyUI](guide/en/comfyui.md) | installing ComfyUI, models to download, workflows |
+| [Settings (`config.toml`)](guide/en/configuration.md) | every option |
+| [Command line](guide/en/command-line.md) | `cc2 status`, `cc2 slice`, `cc2 gen`… |
+| [What to know about the CC2](guide/en/cc2.md) | firmware, CANVAS, purge, local network limits |
+| [Troubleshooting](guide/en/troubleshooting.md) | common problems and what to do |
+| [Development](guide/en/development.md) | code layout, tests, simulator |
 
-## Limites
+The interface uses French labels; the guides give each label in French with its meaning, so you can find your way.
 
-- Linux x86-64 seulement (OrcaSlicer y est fourni en AppImage). Pas de version Windows ou macOS pour l'instant.
-- Une seule imprimante testée : une CC2 avec CANVAS. La Centauri Carbon (première du nom) n'a pas été essayée :
-  l'atelier est pensé pour la CC2 et son CANVAS.
-- Le réseau local de la CC2 refuse certaines commandes (mise en origine, déplacements, calibrations, chargement de
-  filament) : elles restent sur l'écran de l'imprimante. L'atelier le dit quand c'est le cas.
+## Limits
+
+- Linux x86-64 only (OrcaSlicer ships there as an AppImage). No Windows or macOS version for now.
+- One printer tested: a CC2 with CANVAS. The original Centauri Carbon hasn't been tried: the workshop is designed for
+  the CC2 and its CANVAS.
+- The CC2's local network refuses some commands (homing, moves, calibrations, filament loading): they stay on the
+  printer's screen. The workshop says so when it happens.
+- The interface is in French only for now.
 
 ## Licence
 
-Code sous licence MIT (voir [`LICENSE`](LICENSE)). Fourni avec : three.js (MIT, `src/elegoo_lab/web/vendor`).
-Téléchargés à l'installation, sous leurs propres licences : OrcaSlicer et le plateau Elegoo qu'il contient
-(AGPL-3.0), pycentauri (Apache-2.0), le modèle de détection d'Obico (AGPL-3.0, `make ia`). Les workflows ComfyUI
-utilisent des modèles aux licences variées : voir [le guide ComfyUI](guide/comfyui.md).
+Code under the MIT licence (see [`LICENSE`](LICENSE)). Bundled: three.js (MIT, `src/elegoo_lab/web/vendor`).
+Downloaded at install time, under their own licences: OrcaSlicer and the Elegoo build plate it contains (AGPL-3.0),
+pycentauri (Apache-2.0), Obico's detection model (AGPL-3.0, `make ia`). The ComfyUI workflows use models with various
+licences: see [the ComfyUI guide](guide/en/comfyui.md).

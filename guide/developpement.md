@@ -1,6 +1,6 @@
 # Développement
 
-[← Retour au README](../README.md)
+[← Retour au README](../README.fr.md) · 🇬🇧 [English](en/development.md)
 
 ## Organisation
 
@@ -33,7 +33,7 @@ src/elegoo_lab/
 workflows/          workflows ComfyUI (format API) et leur .map.json
 tests/              test_core.py (serveur), test_ui.py (un vrai Chrome clique dans l'atelier), conftest.py
 docs/               la page d'accueil (GitHub Pages) et ses images
-guide/              ces guides
+guide/              ces guides (français), guide/en/ (anglais)
 ```
 
 ## Lancer en développement

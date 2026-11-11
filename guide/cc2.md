@@ -1,6 +1,6 @@
 # Ce qu'il faut savoir sur la CC2
 
-[← Retour au README](../README.md)
+[← Retour au README](../README.fr.md) · 🇬🇧 [English](en/cc2.md)
 
 Ce que l'atelier a appris de la Centauri Carbon 2, et dont il tient compte. Sources : le **code source officiel du
 firmware** ([elegooofficial/CentauriCarbon2](https://github.com/elegooofficial/CentauriCarbon2), GPL-3.0 : codes

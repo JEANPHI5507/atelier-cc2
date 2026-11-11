@@ -1,6 +1,6 @@
 # Préparer et imprimer
 
-[← Retour au README](../README.md)
+[← Retour au README](../README.fr.md) · 🇬🇧 [English](en/prepare-and-print.md)
 
 Tout se passe dans l'onglet **Atelier**, en trois étapes guidées à droite de la vue 3D : **1. Couleurs**, **2. Taille et
 réglages**, **3. Trancher**, puis **Imprimer**. Les mêmes opérations existent en ligne de commande

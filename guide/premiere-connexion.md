@@ -1,6 +1,6 @@
 # Première connexion à la CC2
 
-[← Retour au README](../README.md)
+[← Retour au README](../README.fr.md) · 🇬🇧 [English](en/first-connection.md)
 
 L'atelier parle à l'imprimante sur le réseau local, comme le logiciel d'Elegoo, mais sans passer par le cloud.
 Il lui faut trois choses : l'imprimante en **mode réseau local**, son **adresse IP** et son **code d'accès**.

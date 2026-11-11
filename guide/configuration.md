@@ -1,6 +1,6 @@
 # Réglages (`config.toml`)
 
-[← Retour au README](../README.md)
+[← Retour au README](../README.fr.md) · 🇬🇧 [English](en/configuration.md)
 
 Les réglages sont dans `config.toml`, à la racine du projet (ignoré par git, lisible par ton utilisateur seulement).
 La plupart s'écrivent depuis l'atelier (onglet Démarrage, carte Machine, cloche des alertes…) : tu n'as pas besoin

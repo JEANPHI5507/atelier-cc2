@@ -1,6 +1,6 @@
 # Ligne de commande
 
-[← Retour au README](../README.md)
+[← Retour au README](../README.fr.md) · 🇬🇧 [English](en/command-line.md)
 
 Tout passe par la commande `cc2`, lancée avec uv depuis le dossier du projet (`uv run cc2 …`), ou directement après
 `source .venv/bin/activate`. `cc2 --help` et `cc2 <commande> --help` donnent toutes les options.
