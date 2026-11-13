@@ -156,6 +156,40 @@ def without_purge(gcode: bytes) -> bytes:
     return _M6211.sub(swap, gcode)
 
 
+# M6211 ends with the new filament pulled back 6/7 of its D length (2 mm by default): put just that back
+REPRIME_MM = b"1.7"
+
+
+def without_toolchange_reprime(gcode: bytes) -> bytes:
+    """Drop OrcaSlicer's re-push after a CANVAS colour change.
+
+    Around each change OrcaSlicer retracts ``retract_length_toolchange`` (10 mm in Elegoo's CC2 profile), lets
+    ``M6211`` run, then pushes the same 10 mm back on the spot where printing resumes. But ``M6211`` unloads,
+    reloads and flushes the nozzle itself, so that push lands as a ~24 mm³ blob: on the part without a tower, in the
+    tower's corner with one (seen on the real CC2, 2026-11-13). The push becomes the 1.7 mm M6211 itself pulled
+    back; the retract before the change is kept."""
+    lines = gcode.split(b"\n")
+    pending: bytes | None = None   # the length retracted before the last M6211, waiting for its push back
+    retracted: bytes | None = None
+    for i, line in enumerate(lines):
+        m = re.match(rb"G1 E-([\d.]+)( F\d+)? *$", line)
+        if m:
+            retracted = m.group(1)
+        elif line.startswith(b"M6211 ") and b" A1" not in line:
+            # L0 = the same spool: M6211 returns at once without reloading, so the retract must be undone in full
+            reloads = (n := re.search(rb"\bL([\d.]+)", line)) is not None and float(n.group(1)) > 0
+            pending, retracted = (retracted if reloads else None), None
+        elif pending is not None:
+            m = re.match(rb"G1 E([\d.]+) F\d+ *$", line)
+            if m and float(m.group(1)) == float(pending):
+                lines[i] = (b"G1 E" + REPRIME_MM + m.group(0)[len(b"G1 E") + len(m.group(1)):]
+                            + b" ; (au lieu de " + line + b" : re-poussee apres changement de couleur)")
+                pending = None
+            elif re.match(rb"G1 .*[XY][-\d.].* E", line):   # printing resumed without the push: nothing to drop
+                pending = None
+    return b"\n".join(lines)
+
+
 def firmware_purge_m(gcode: bytes, n_fil: int) -> list[float]:
     """Metres of filament purged per filament, counted the way the CC2 firmware does it.
 
@@ -313,6 +347,7 @@ def slice_model(
                 data = without_bed_mesh(data)
             if no_purge:
                 data = without_purge(data)
+            data = without_toolchange_reprime(data)
             dest.write_bytes(data)
             res.gcode.append(dest)
             if i == 0:

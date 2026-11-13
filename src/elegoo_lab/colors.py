@@ -511,7 +511,10 @@ def _luminance(h: str) -> float:
     return 0.2126 * r + 0.7152 * g + 0.0722 * b
 
 
-def flush_matrix(colours: list[str], smart: bool = True) -> list[int]:
+FLUSH_STANDARD = 280    # OrcaSlicer's default for every pair (x0.3 = ~35 mm of filament at the CC2): Elegoo's own purge
+
+
+def flush_matrix(colours: list[str], smart: bool | str = True) -> list[int]:
     """Purge volume for every filament change, row = from, column = to (OrcaSlicer units, before ×0.3).
 
     Going from a light to a dark colour hides contamination, so it needs little purge; dark to light
@@ -524,6 +527,8 @@ def flush_matrix(colours: list[str], smart: bool = True) -> list[int]:
         for j in range(n):
             if i == j:
                 out.append(0)
+            elif smart == "standard":
+                out.append(FLUSH_STANDARD)
             elif not smart:
                 out.append(FLUSH_MAX)
             else:

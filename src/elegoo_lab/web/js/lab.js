@@ -633,7 +633,7 @@ async function select(f) {
   const [inf, col] = await Promise.allSettled([api(`/models/${encodeURIComponent(f.name)}/info`), api(`/models/${encodeURIComponent(f.name)}/colors`)]);
   if (sel !== f) return;
   info = inf.status === 'fulfilled' ? inf.value : null;
-  setUsage(info?.usage || 'decoratif');
+  setUsage(info?.usage || savedUsage() || 'decoratif');
   showRetour(f, info?.retour);
   if (f.ext !== 'gcode') loadOrients(f);
   analysis = col.status === 'fulfilled' ? col.value : { colours: [{ index: 1, hex: '#C0C0C0', share: 100, slot: 1 }], source: 'inconnu' };
@@ -692,6 +692,7 @@ $('supports').onchange = () => { $('plate-row').hidden = $('supports').value ===
 const MODE_NOTE = {
   economie: 'Sans tour d\'essuyage, purge dosée selon les couleurs (bien plus forte vers le blanc) : le moins de filament sans mélange visible.',
   equilibre: 'Tour d\'essuyage et purge dosée : le plus net quand le modèle change souvent de couleur (gouttes et bavures essuyées sur la tour).',
+  standard: 'Tour d\'essuyage et purge standard d\'Elegoo (environ 35 mm par changement, la même pour toutes les couleurs) : la goutte de la buse tombe sur la tour, en plus petit. Un léger mélange de couleur est possible. Pour tester.',
   sans_purge: 'Aucune purge ni tour : le changement de couleur est juste le changement de bobine. Le plus économe et le plus rapide, mais un court mélange des deux couleurs apparaît après chaque changement. Essai à surveiller.',
   qualite: 'Tour d\'essuyage et purge maximale à chaque changement, quelles que soient les couleurs : le plus sûr, le plus de filament.',
 };
@@ -1034,6 +1035,8 @@ function renderUsages() {
   $('usage').innerHTML = (cfg.usages || []).map(u => `<button data-usage="${u.value}" title="${esc(u.hint)}">${esc(u.label)}</button>`).join('');
   $('usage').querySelectorAll('[data-usage]').forEach(b => b.onclick = () => setUsage(b.dataset.usage, true));
 }
+/* the usage last picked by hand is kept: opening a file used to put it back on « Décoratif » */
+const savedUsage = () => { try { return localStorage.getItem('lab-usage'); } catch { return null; } };
 function setUsage(u, byUser = false) {
   const def = (cfg?.usages || []).find(x => x.value === u); if (!def) return;
   printUsage = u;
@@ -1042,7 +1045,7 @@ function setUsage(u, byUser = false) {
   if (def.quality && cfg.qualities.includes(def.quality)) $('quality').value = def.quality;
   else if (!def.quality) $('quality').value = cfg.default_quality;
   infillTouched = false; $('inf-v').textContent = u === 'profil' ? 'selon le profil' : 'selon l\'usage';
-  if (byUser) { scheduleAdvice(); scheduleEstimate(); }
+  if (byUser) { try { localStorage.setItem('lab-usage', u); } catch {} scheduleAdvice(); scheduleEstimate(); }
 }
 /* what the chosen usage costs, under the usage buttons: filament, time, price (one slice of just that choice) */
 let estTimer = 0, estSeq = 0; const estCache = new Map();

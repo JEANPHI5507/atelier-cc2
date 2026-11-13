@@ -1288,6 +1288,20 @@ def test_without_purge_turns_colour_changes_into_a_bare_switch(tmp_path):
     assert slicer._header(f)["colour changes"] == "2"   # the L0 line counts as before
 
 
+def test_toolchange_reprime_no_longer_drops_a_blob():
+    from elegoo_lab import slicer
+    g = (b"M6211 A1 L200 T1 Q220 R220 S220\nT1\nG1 E6 F600\n"          # start load: its push stays
+         b"G1 E-10 F1800\nM6211 T2 L34.9 M299 N299 Q220 R240 S220\nT2\nG1 X10 Y10 F30000\nG1 E10 F1800\n"
+         b"G1 X12 Y10 E.5\n")
+    lines = slicer.without_toolchange_reprime(g).split(b"\n")
+    assert lines[2] == b"G1 E6 F600"
+    assert lines[3] == b"G1 E-10 F1800"                                # the retract before the change is kept
+    assert lines[7].startswith(b"G1 E1.7 F1800 ;")                     # 10 mm pushed on the spot -> 1.7 mm
+    assert lines[8] == b"G1 X12 Y10 E.5"
+    same = b"G1 E-10 F1800\nM6211 T2 L0 M299\nT2\nG1 E10 F1800\n"   # same spool: nothing is reloaded
+    assert slicer.without_toolchange_reprime(same) == same
+
+
 def test_phone_alerts_topic(web):
     """Phone alerts: "on" makes a private ntfy topic, "off" clears it, a test needs it on."""
     client, _ = web

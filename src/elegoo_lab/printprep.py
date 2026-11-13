@@ -21,11 +21,18 @@ SLICEABLE_AS_IS = {".stl", ".obj"}
 # A tower of PLA Silk knocked over at layer 84 on the real CC2 (2026-11-11): the nozzle comes back from each purge
 # (at 240 °C, Elegoo's change macro) oozing, the string curls into loops on top of the tower, and with OrcaSlicer's
 # 0.4 mm hop the nozzle catches them on the next pass. A wider brim holds the tower, a 0.8 mm hop clears the loops.
-TOWER = {"overrides": {"prime_tower_brim_width": "8"}, "filament": {"filament_z_hop": ["0.8"]}}
+# The CC2 purges in its waste chute, so OrcaSlicer's tower only gets the small prime and comes out a thin wall
+# (34 x 5.5 mm at Elegoo's 35 mm width): it came unstuck from the first layers on 2026-11-13. A 20 mm wide tower
+# with the same plastic is about twice as deep, so it stands on a much larger footprint.
+TOWER = {"overrides": {"prime_tower_brim_width": "8", "prime_tower_width": "20"},
+         "filament": {"filament_z_hop": ["0.8"]}}
 MODES = {
     "qualite":   {"smart_flush": False, "overrides": TOWER["overrides"], "filament": TOWER["filament"]},
     "equilibre": {"smart_flush": True,  "overrides": TOWER["overrides"], "filament": TOWER["filament"]},
     "economie":  {"smart_flush": True,  "overrides": {"enable_prime_tower": "0"}},
+    # tower + the purge Elegoo's own slicer would use (same for every colour pair): the CC2 always drips a ball at the nozzle
+    # (also at the start purge line); the tower is where it is meant to fall, a smaller purge makes it smaller
+    "standard":  {"smart_flush": "standard", "overrides": TOWER["overrides"], "filament": TOWER["filament"]},
     # no tower and no flush at all: the colour change is only the CANVAS switch (see slicer.without_purge)
     "sans_purge": {"smart_flush": True, "overrides": {"enable_prime_tower": "0"}, "no_purge": True},
 }
@@ -147,7 +154,7 @@ def prepare_and_slice(
             warnings.append(f"Modèle sans unité réelle ({max(size['size_mm'])} « mm ») : mis à "
                             f"{height_mm:.0f} mm de haut. Indique une hauteur pour changer.")
     if mode not in MODES:
-        raise ValueError(f"mode inconnu « {mode} » (qualite, equilibre, economie, sans_purge)")
+        raise ValueError(f"mode inconnu « {mode} » (qualite, equilibre, economie, standard, sans_purge)")
     info = colors.analyze(src, palette)
     slots = {c["index"]: (mapping or {}).get(c["index"], c["slot"]) for c in info["colours"]}
     n = max(slots.values())
