@@ -127,6 +127,10 @@ async function pvStatus() {
     $('pv-pause').hidden = paused; $('pv-resume').hidden = !paused;
     document.querySelectorAll('[data-start]').forEach(b => { b.disabled = !ctx.control || busy; b.title = busy ? 'Une impression est déjà en cours' : ''; });
     $('pv-pause').disabled = !ctx.control || !busy || ps === 5; $('pv-stop').disabled = !ctx.control || !busy;
+    // print speed: the CC2 only takes it during a print (4 modes); PrintSpeedPct is the mode pycentauri set or settled on
+    document.querySelectorAll('#pv-speed [data-speed]').forEach(b => {
+      b.classList.toggle('on', busy && +b.dataset.pct === info.PrintSpeedPct); b.disabled = !ctx.control || !busy;
+    });
     // temperatures
     const T = s.temperatures || {}, rows = [['nozzle', 'Buse', 300], ['bed', 'Plateau', 110], ['chamber', 'Caisson', 60]];
     if (!$('pv-temps').children.length) $('pv-temps').innerHTML = rows.map(([k, l, max]) => `<div class="temp"><div><div class="lbl">${l}</div><div class="now" id="t-${k}">–</div><span class="heat"><i id="th-${k}"></i></span></div>
@@ -199,6 +203,9 @@ $('pv-refresh').onclick = pvFiles;
 $('pv-pause').onclick = e => act(e.currentTarget, '/print/pause', null, 'Pause demandée');
 $('pv-resume').onclick = e => act(e.currentTarget, '/print/resume', null, 'Reprise demandée');
 $('pv-stop').onclick = e => { if (confirm('Arrêter l\'impression en cours ?\n\nElle ne pourra pas être reprise.')) act(e.currentTarget, '/print/stop', null, 'Arrêt demandé'); };
+$('pv-speed').addEventListener('click', e => {
+  const b = e.target.closest('[data-speed]'); if (b && !b.disabled) act(b, '/print/speed', { mode: b.dataset.speed }, 'Vitesse changée');
+});
 $('pv-light').onchange = e => act(null, '/light', { on: e.target.checked });
 $('pv-cam-light').onclick = e => act(e.currentTarget, '/light', { on: true });
 // the CC2 cannot switch itself off over the network: the closest is everything that heats, blows or lights, off

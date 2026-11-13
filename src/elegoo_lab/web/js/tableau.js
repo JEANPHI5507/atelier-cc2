@@ -180,6 +180,10 @@
       $('b-pause').disabled = !ctx.control || !busy || ps === 5;
       $('b-stop').disabled = !ctx.control || !busy;
       $('b-light').disabled = !ctx.control;
+      [].forEach.call(document.querySelectorAll('#spd [data-speed]'), function (b) {   // the CC2 only takes a speed during a print
+        b.className = 'btn' + (busy && +b.getAttribute('data-pct') === info.PrintSpeedPct ? ' on' : '');
+        b.disabled = !ctx.control || !busy;
+      });
       $('idle').hidden = busy;
       autoNight();
     }).catch(function () { $('state').textContent = 'Imprimante injoignable'; $('pill').className = 'pill bad'; $('pill-t').textContent = 'Hors ligne'; });
@@ -264,6 +268,9 @@
       .catch(function (e) { toast(path === '/print/resume' ? 'Reprise refusée en réseau' : 'Commande refusée', path === '/print/resume' ? 'Reprends depuis l\'écran de l\'imprimante.' : e.message, 'bad'); });
   }
   $('b-light').onclick = function () { act('/light', { on: !lightOn }); };
+  $('spd').addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-speed]'); if (b && !b.disabled) act('/print/speed', { mode: b.getAttribute('data-speed') }, 'Vitesse changée');
+  });
   $('b-pause').onclick = function () {
     if (paused) { act('/print/resume', null, 'Reprise demandée'); return; }
     if (confirm('Mettre l\'impression en pause ?')) act('/print/pause', null, 'Pause demandée');

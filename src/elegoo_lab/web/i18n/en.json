@@ -1,5 +1,9 @@
 {
 "exact": {
+"Vitesse": "Speed",
+"Normal": "Normal",
+"Turbo": "Turbo",
+"Vitesse changée": "Speed changed",
 "Monocouleur rapide et propre : couches de 0,20 mm, intérieur et accélérations poussés, paroi extérieure au rythme du profil Elegoo.": "Fast and clean single colour: 0.20 mm layers, faster inside and higher accelerations, outer wall at the Elegoo profile's pace.",
 "Glisse une pièce pour la déplacer sur le plateau.": "Drag a piece to move it on the plate.",
 " par pièce": " per piece",
