@@ -511,10 +511,7 @@ def _luminance(h: str) -> float:
     return 0.2126 * r + 0.7152 * g + 0.0722 * b
 
 
-FLUSH_STANDARD = 280    # OrcaSlicer's default for every pair (x0.3 = ~35 mm of filament at the CC2): Elegoo's own purge
-
-
-def flush_matrix(colours: list[str], smart: bool | str = True) -> list[int]:
+def flush_matrix(colours: list[str], smart: bool = True) -> list[int]:
     """Purge volume for every filament change, row = from, column = to (OrcaSlicer units, before ×0.3).
 
     Going from a light to a dark colour hides contamination, so it needs little purge; dark to light
@@ -527,8 +524,6 @@ def flush_matrix(colours: list[str], smart: bool | str = True) -> list[int]:
         for j in range(n):
             if i == j:
                 out.append(0)
-            elif smart == "standard":
-                out.append(FLUSH_STANDARD)
             elif not smart:
                 out.append(FLUSH_MAX)
             else:
@@ -671,8 +666,27 @@ def to_canvas(path: Path, out: Path, mapping: dict[int, int], *, height_mm: floa
         offset = avoid_exclude(lo, hi, offset)
     elif any(lo[:2] + offset[:2] < 0) or any(hi[:2] + offset[:2] > mesh.BED_MM):
         raise ValueError("une pièce déplacée sort du plateau : rapproche-la")
-    threemf.write(pr, out, filaments=n, colours=slot_hex, offset=offset, flush=flush_matrix(slot_hex, smart_flush))
+    tower = tower_spot(lo[:2] + offset[:2], hi[:2] + offset[:2]) if n > 1 else None
+    threemf.write(pr, out, filaments=n, colours=slot_hex, offset=offset, flush=flush_matrix(slot_hex, smart_flush), tower=tower)
     return {"file": out.name, "filaments": n, "slot_colours": slot_hex, "simplified": simplified}
+
+
+TOWER_W, TOWER_D = 20.0, 12.0   # printprep.TOWER's 20 mm width; about 11 mm deep on a small model
+TOWER_GAP = 20.0                # tower body to part: the part's brim (6 mm) + the tower's (8 mm) + a margin
+
+
+def tower_spot(lo: np.ndarray, hi: np.ndarray) -> tuple[float, float] | None:
+    """Front-left corner of the prime tower, beside the part instead of Elegoo's back-left corner (X 15, Y 220):
+    every colour change travels to it, so a long trip across the bed means strings and lost time. Left of the
+    part, else right of it; None (the profile's place) when neither side has room."""
+    y = float(np.clip((lo[1] + hi[1]) / 2 - TOWER_D / 2, 15, mesh.BED_MM - 15 - TOWER_D))
+    left = float(lo[0]) - TOWER_GAP - TOWER_W
+    if left >= 15:
+        return round(left, 1), round(y, 1)
+    right = float(hi[0]) + TOWER_GAP
+    if right + TOWER_W <= mesh.BED_MM - 15 and not (right + TOWER_W > EXCLUDE[0] and y < EXCLUDE[3] + 8):
+        return round(right, 1), round(y, 1)
+    return None
 
 
 SIMPLIFY_SHARE = 0.03   # a colour under 3 % of a layer's surface is a speck nobody sees, yet a whole change and purge

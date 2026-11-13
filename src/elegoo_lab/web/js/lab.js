@@ -692,7 +692,6 @@ $('supports').onchange = () => { $('plate-row').hidden = $('supports').value ===
 const MODE_NOTE = {
   economie: 'Sans tour d\'essuyage, purge dosée selon les couleurs (bien plus forte vers le blanc) : le moins de filament sans mélange visible.',
   equilibre: 'Tour d\'essuyage et purge dosée : le plus net quand le modèle change souvent de couleur (gouttes et bavures essuyées sur la tour).',
-  standard: 'Tour d\'essuyage et purge standard d\'Elegoo (environ 35 mm par changement, la même pour toutes les couleurs) : la goutte de la buse tombe sur la tour, en plus petit. Un léger mélange de couleur est possible. Pour tester.',
   sans_purge: 'Aucune purge ni tour : le changement de couleur est juste le changement de bobine. Le plus économe et le plus rapide, mais un court mélange des deux couleurs apparaît après chaque changement. Essai à surveiller.',
   qualite: 'Tour d\'essuyage et purge maximale à chaque changement, quelles que soient les couleurs : le plus sûr, le plus de filament.',
 };

@@ -30,9 +30,6 @@ MODES = {
     "qualite":   {"smart_flush": False, "overrides": TOWER["overrides"], "filament": TOWER["filament"]},
     "equilibre": {"smart_flush": True,  "overrides": TOWER["overrides"], "filament": TOWER["filament"]},
     "economie":  {"smart_flush": True,  "overrides": {"enable_prime_tower": "0"}},
-    # tower + the purge Elegoo's own slicer would use (same for every colour pair): the CC2 always drips a ball at the nozzle
-    # (also at the start purge line); the tower is where it is meant to fall, a smaller purge makes it smaller
-    "standard":  {"smart_flush": "standard", "overrides": TOWER["overrides"], "filament": TOWER["filament"]},
     # no tower and no flush at all: the colour change is only the CANVAS switch (see slicer.without_purge)
     "sans_purge": {"smart_flush": True, "overrides": {"enable_prime_tower": "0"}, "no_purge": True},
 }
@@ -154,7 +151,7 @@ def prepare_and_slice(
             warnings.append(f"Modèle sans unité réelle ({max(size['size_mm'])} « mm ») : mis à "
                             f"{height_mm:.0f} mm de haut. Indique une hauteur pour changer.")
     if mode not in MODES:
-        raise ValueError(f"mode inconnu « {mode} » (qualite, equilibre, economie, standard, sans_purge)")
+        raise ValueError(f"mode inconnu « {mode} » (qualite, equilibre, economie, sans_purge)")
     info = colors.analyze(src, palette)
     slots = {c["index"]: (mapping or {}).get(c["index"], c["slot"]) for c in info["colours"]}
     n = max(slots.values())

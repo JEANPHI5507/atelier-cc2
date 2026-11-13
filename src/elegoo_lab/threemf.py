@@ -160,9 +160,10 @@ _NS = ('xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02" '
 
 
 def write(project: Project, out: Path, *, filaments: int, colours: list[str], offset: np.ndarray | None = None,
-          flush: list[int] | None = None) -> None:
+          flush: list[int] | None = None, tower: tuple[float, float] | None = None) -> None:
     """Write ``project`` as a clean OrcaSlicer 3MF. ``offset`` is added to every vertex; ``flush`` is the
-    n x n purge matrix (mm³ before OrcaSlicer's 0.3 multiplier), 280 everywhere when omitted."""
+    n x n purge matrix (mm³ before OrcaSlicer's 0.3 multiplier), 280 everywhere when omitted; ``tower`` is where
+    the prime tower's front-left corner goes (the profile's corner when omitted)."""
     off = np.zeros(3) if offset is None else offset
     files: dict[str, str] = {}
     res_objects, items, cfg_objects, rels = [], [], [], []
@@ -215,6 +216,7 @@ def write(project: Project, out: Path, *, filaments: int, colours: list[str], of
         "flush_volumes_matrix": [str(v) for v in flush] if flush else
                                 ["0" if i == j else "280" for i in range(filaments) for j in range(filaments)],
         "flush_volumes_vector": ["140"] * (2 * filaments),
+        **({"wipe_tower_x": [f"{tower[0]:.1f}"], "wipe_tower_y": [f"{tower[1]:.1f}"]} if tower else {}),
     }, indent=2)
     files["_rels/.rels"] = (
         '<?xml version="1.0" encoding="UTF-8"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n'

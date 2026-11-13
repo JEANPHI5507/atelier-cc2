@@ -2,8 +2,6 @@
 "exact": {
 "Monocouleur rapide et propre : couches de 0,20 mm, intérieur et accélérations poussés, paroi extérieure au rythme du profil Elegoo.": "Fast and clean single colour: 0.20 mm layers, faster inside and higher accelerations, outer wall at the Elegoo profile's pace.",
 "Glisse une pièce pour la déplacer sur le plateau.": "Drag a piece to move it on the plate.",
-"Purge Elegoo": "Elegoo purge",
-"Tour d'essuyage et purge standard d'Elegoo (environ 35 mm par changement, la même pour toutes les couleurs) : la goutte de la buse tombe sur la tour, en plus petit. Un léger mélange de couleur est possible. Pour tester.": "Wipe tower and Elegoo's standard purge (about 35 mm per change, the same for every colour pair): the nozzle's drop falls on the tower, and smaller. A slight colour mix is possible. For testing.",
 " par pièce": " per piece",
 "% du modèle fait moins de": "% of the model is thinner than",
 "% du modèle) n'a pas de bobine proche : elle sera imprimée en": "% of the model) has no close spool: it will be printed in",
