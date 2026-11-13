@@ -49,6 +49,16 @@ USAGES: dict[str, dict[str, Any]] = {
     "rapide": {"label": "Rapide", "quality": "0.24mm Draft",
                "hint": "Essai, prototype : couches épaisses, le moins de temps et de filament.",
                "overrides": {"sparse_infill_pattern": "lightning", "sparse_infill_density": "8%", "wall_loops": "2"}},
+    # Single-colour fast-and-clean: the filament's volumetric flow (21 mm³/s for Elegoo PLA) is the real ceiling, so 0.20 mm
+    # layers at 250 mm/s cost about what 0.28 mm ones do. Only the visible outer wall stays at the profile's pace.
+    "turbo": {"label": "Turbo", "quality": "0.20mm Standard",
+              "hint": "Monocouleur rapide et propre : couches de 0,20 mm, intérieur et accélérations poussés, "
+                      "paroi extérieure au rythme du profil Elegoo.",
+              "overrides": {"sparse_infill_pattern": "lightning", "sparse_infill_density": "5%", "wall_loops": "2",
+                            "top_shell_layers": "5", "inner_wall_speed": "250", "sparse_infill_speed": "250",
+                            "internal_solid_infill_speed": "250", "inner_wall_acceleration": "15000",
+                            "sparse_infill_acceleration": "20000", "travel_acceleration": "20000",
+                            "travel_speed": "500"}},
     "profil": {"label": "Profil Elegoo", "quality": None, "hint": "Les réglages d'origine du profil CC2, sans changement.",
                "overrides": {}},
 }

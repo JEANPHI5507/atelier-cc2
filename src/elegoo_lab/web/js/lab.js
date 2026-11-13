@@ -167,7 +167,7 @@ function vtoolsShow() {
   $('vtools').hidden = !on;
   const model = on && !paths?.parts?.some(p => p.lines.parent === current);
   $('vtools').querySelectorAll('[data-vt="over"], [data-vt="dims"], [data-vt="paint"]').forEach(b => b.hidden = !model);
-  const movable = model && mv.ranges.length > 1 && sel?.name === mv.file;
+  const movable = model && mv.ranges.length >= 1 && sel?.name === mv.file;
   $('vtools').querySelector('[data-vt="move"]').hidden = !movable;
   $('vtools').querySelector('[data-vt="regroup"]').hidden = !movable || !Object.keys(mv.moves).length;
   $('vtools').querySelector('[data-vt="paint"]').hidden = !model || !sel || !['glb', 'gltf', 'obj', 'ply'].includes(sel.ext);   // painted formats only
@@ -214,10 +214,10 @@ function shiftPiece(k, d) {
   pos.needsUpdate = true; m.geometry.computeBoundingBox(); m.geometry.computeBoundingSphere();
 }
 function setMove(on) {
-  mv.on = on && mv.ranges.length > 1; mv.drag = null; if (controls) controls.enabled = true;
+  mv.on = on && mv.ranges.length >= 1; mv.drag = null; if (controls) controls.enabled = true;
   $('vtools').querySelector('[data-vt="move"]').classList.toggle('on', mv.on);
   stage.style.cursor = mv.on ? 'grab' : '';
-  if (mv.on) { camTo('top'); toast('Glisse une pièce pour la déplacer sur le plateau. Les autres restent en place.'); }
+  if (mv.on) { camTo('top'); toast('Glisse une pièce pour la déplacer sur le plateau.'); }
 }
 const moved = () => sel?.name === mv.file && previewKey !== 'cut' && Object.values(mv.moves).some(d => d.some(Boolean));
 const shiftXY = () => { current.updateMatrixWorld(true); const c = new THREE.Box3().setFromObject(current).getCenter(new THREE.Vector3()); return [c.x, c.y]; };
@@ -622,7 +622,7 @@ async function select(f) {
   if (f.ext === 'gcode') {
     lastGcode = f.name; showPaths(f.name);
     $('prep').hidden = true; $('ready').hidden = false; $('r-name').textContent = f.name;
-    const USE = { decoratif: 'décoratif', fonctionnel: 'solide', detaille: 'détaillé', rapide: 'rapide', profil: 'profil Elegoo' };
+    const USE = { decoratif: 'décoratif', fonctionnel: 'solide', detaille: 'détaillé', rapide: 'rapide', turbo: 'turbo', profil: 'profil Elegoo' };
     $('r-sub').innerHTML = [f.source ? 'depuis ' + esc(f.source) : 'tranché ailleurs', f.qualite, USE[f.usage], shortT(f.temps), f.g ? fmtG(f.g) : '', f.eur ? euro(f.eur) : '']
       .filter(Boolean).join(' · ') + (onPrinter.has(f.name) ? ' <span class="fbadge cc2">sur la CC2</span>' : '');
     $('r-body').innerHTML = sendBlock(f.name); bindSend(); return;
