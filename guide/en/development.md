@@ -20,6 +20,7 @@ src/elegoo_lab/
   colorize.py       assembling parts into a multicolour 3MF
   mesh.py, orient.py, cut.py, advisor.py, optimize.py   mesh, positions, cutting, advisor, "Optimiser"
   parametric.py, parametric_more.py, addtext.py          the "Créer" parts
+  forme.py          drill or add a shape; couches.py (variable layer height)
   launch.py         starting a print (spool table, machine options); spools.py, stock.py (spools, costs)
   alerts.py         continuous printer monitoring and alerts; vision.py (camera AI); gallery.py
   camfeed.py        the camera frame by frame; coupe.py, suivi_couleurs.py (tablet, upcoming colours)

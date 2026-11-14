@@ -12,6 +12,8 @@
 - **Caméra** en direct, image par image (toujours la plus récente, même sur une connexion lente), avec la lumière.
 - **Couche par couche** : la pièce en 3D, en couleur ce qui est imprimé, en gris ce qui reste ; elle avance toute seule.
 - **Températures** (buse, plateau, caisson) avec des préréglages PLA, PETG, ABS et « Refroidir ».
+- **Position de la buse** : X, Y, Z en mm, chaque seconde, et le plateau vu de dessus avec les derniers déplacements ;
+  « À la goulotte » quand elle va purger à un changement de couleur.
 - **Bobines CANVAS** : couleur, matière, grammes restants, recharge automatique. Cliquer une bobine corrige son poids,
   le poids d'une bobine pleine et son prix au kilo.
 - **Fichiers sur l'imprimante** et **Historique** (repliés) ; « Interface avancée » ouvre l'interface de pycentauri.

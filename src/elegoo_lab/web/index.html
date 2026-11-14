@@ -96,6 +96,7 @@
         <button data-vt="over" title="Montrer en rouge ce qui aura besoin de supports">Surplombs</button>
         <button data-vt="dims" title="Afficher les dimensions">Cotes</button>
         <button data-vt="paint" title="Retoucher les couleurs au pinceau">Pinceau</button>
+        <button data-vt="marks" title="Peindre où mettre des supports (ou jamais), et où placer la couture">Supports</button>
         <button data-vt="move" title="Glisser chaque pièce sur le plateau pour la déplacer" hidden>Déplacer</button>
         <button data-vt="regroup" title="Remet les pièces à leur place d'origine" hidden>Regrouper</button>
         <span class="vsep"></span>
@@ -128,7 +129,7 @@
       <div class="muted-box" id="nosel"><div class="big">Rien de sélectionné</div>Choisis un modèle à gauche ou dépose un fichier : ses couleurs sont détectées automatiquement.</div>
 
       <div id="prep" hidden>
-        <div class="panel-head"><div><div class="t" id="p-name"></div><div class="s" id="p-sub"></div></div><button class="btn ghost" id="add-text" title="Ajouter un prénom ou un texte"><svg class="i"><use href="#i-text"/></svg></button><button class="btn ghost" data-ren title="Renommer"><svg class="i"><use href="#i-edit"/></svg></button><button class="btn ghost" data-del title="Supprimer"><svg class="i"><use href="#i-trash"/></svg></button></div>
+        <div class="panel-head"><div><div class="t" id="p-name"></div><div class="s" id="p-sub"></div></div><button class="btn ghost" id="add-text" title="Ajouter un prénom ou un texte"><svg class="i"><use href="#i-text"/></svg></button><button class="btn ghost" id="add-shape" title="Percer un trou ou ajouter une forme"><svg class="i"><use href="#i-cube"/></svg></button><button class="btn ghost" data-ren title="Renommer"><svg class="i"><use href="#i-edit"/></svg></button><button class="btn ghost" data-del title="Supprimer"><svg class="i"><use href="#i-trash"/></svg></button></div>
         <div class="opt">
           <button class="btn primary block" id="opt-go"><svg class="i"><use href="#i-spark"/></svg>Optimiser pour la CC2</button>
           <p class="note" id="opt-hint">Répare, met à la bonne taille, choisit la meilleure face, puis supports, bordure et découpe si besoin.</p>
@@ -313,6 +314,22 @@
               <button class="btn" data-ctl data-preset="0,0">Refroidir</button>
             </div>
           </div>
+          <div class="card o1" id="pv-pos" hidden>
+            <div class="card-h"><h3>Position de la buse</h3><span class="note" id="pv-pos-where" style="margin:0"></span></div>
+            <div class="pos">
+              <svg class="pos-map" id="pv-pos-map" viewBox="-8 -22 272 286" role="img" aria-label="Plateau vu de dessus, avant en bas">
+                <rect class="pos-bed" x="0" y="0" width="256" height="256" rx="6"/>
+                <path class="pos-grid" d="M64 0V256M128 0V256M192 0V256M0 64H256M0 128H256M0 192H256"/>
+                <rect class="pos-chute" x="246" y="236" width="10" height="20"/>
+                <text class="pos-lbl" x="128" y="-10" text-anchor="middle">arrière : essuyage</text>
+                <polyline class="pos-trail" id="pv-pos-trail" points=""/>
+                <circle class="pos-dot" id="pv-pos-dot" r="5" cx="-50" cy="-50"/>
+                <text class="pos-lbl" x="128" y="252" text-anchor="middle">avant</text>
+              </svg>
+              <div class="pos-xyz"><div><span>X</span><b id="pv-pos-x">–</b></div><div><span>Y</span><b id="pv-pos-y">–</b></div><div><span>Z</span><b id="pv-pos-z">–</b></div></div>
+            </div>
+            <p class="note" style="margin:10px 0 0">Mise à jour chaque seconde par l'imprimante, en mm. En rouge, la goulotte où la buse purge à chaque changement de couleur.</p>
+          </div>
           <div class="card o1">
             <div class="card-h"><h3>Bobines CANVAS</h3><div class="switch" style="gap:10px"><label for="pv-refill" style="font-size:12.5px;color:var(--dim)">Recharge auto</label><input id="pv-refill" type="checkbox" data-ctl></div></div>
             <div class="trays" id="pv-trays"><div class="empty">…</div></div>
@@ -486,6 +503,26 @@
     <div class="field"><label for="txt-size">Hauteur des majuscules (mm)</label><input id="txt-size" type="number" min="3" max="60" step="0.5" placeholder="automatique"></div>
   </div>
   <div class="dlg-f"><button class="btn" data-close>Annuler</button><button class="btn primary" id="txt-go">Ajouter</button></div>
+</dialog>
+
+<dialog id="shp">
+  <div class="dlg-h">Percer ou ajouter une forme<button class="btn ghost" data-close aria-label="Fermer"><svg class="i"><use href="#i-x"/></svg></button></div>
+  <div class="dlg-b">
+    <p class="note">La forme apparaît en transparence sur le modèle pendant que tu la règles. Position : depuis le centre du modèle, dans ses propres axes (Z vers le haut). Un nouveau fichier est créé, l'original reste intact.</p>
+    <div class="two">
+      <div class="field"><label for="shp-op">Opération</label><select id="shp-op"><option value="percer">Percer (enlever la forme)</option><option value="ajouter">Ajouter la forme</option><option value="garder">Garder seulement le commun</option></select></div>
+      <div class="field"><label for="shp-kind">Forme</label><select id="shp-kind"><option value="cylindre">Cylindre (trou rond)</option><option value="cube">Pavé</option><option value="sphere">Boule</option></select></div>
+      <div class="field"><label for="shp-w" id="shp-w-l">Diamètre (mm)</label><input id="shp-w" type="number" min="0.5" max="300" step="0.5" value="5"></div>
+      <div class="field" id="shp-d-f" hidden><label for="shp-d">Profondeur (mm)</label><input id="shp-d" type="number" min="0.5" max="300" step="0.5" value="10"></div>
+      <div class="field" id="shp-h-f"><label for="shp-h">Longueur (mm)</label><input id="shp-h" type="number" min="0.5" max="300" step="0.5" value="30"></div>
+      <div class="field" id="shp-axis-f"><label for="shp-axis">Sens</label><select id="shp-axis"><option value="z">Debout (de haut en bas)</option><option value="x">Couché, de gauche à droite</option><option value="y">Couché, d'avant en arrière</option></select></div>
+      <div class="field"><label for="shp-x">Décalage gauche / droite (mm)</label><input id="shp-x" type="number" min="-300" max="300" step="0.5" value="0"></div>
+      <div class="field"><label for="shp-y">Décalage avant / arrière (mm)</label><input id="shp-y" type="number" min="-300" max="300" step="0.5" value="0"></div>
+      <div class="field"><label for="shp-z">Décalage bas / haut (mm)</label><input id="shp-z" type="number" min="-300" max="300" step="0.5" value="0"></div>
+      <div class="field" id="shp-col-f" hidden><label for="shp-col">Couleur de la forme</label><select id="shp-col"></select></div>
+    </div>
+  </div>
+  <div class="dlg-f"><button class="btn" data-close>Annuler</button><button class="btn primary" id="shp-go">Créer le fichier</button></div>
 </dialog>
 
 <dialog id="tray-dlg">

@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 import os
 import time
 from typing import Any
@@ -83,8 +84,11 @@ class Sim:
         layer = int(s.get("layers", 100) * s["progress"] / 100) if printing else 0
         left = int((100 - s["progress"]) / 100 * self.print_seconds) if printing else 0
         return {
+            # the head draws a loop over the plate while printing (the Printer tab shows where it is)
             "gcode_move": {"speed": 6000 if printing else 0, "speed_mode": s["speed_mode"],
-                           "x": 128.0, "y": 128.0, "z": 0.2 + layer * 0.2, "extruder": 0.0},
+                           "x": round(128.0 + (40 * math.sin(time.time() * 0.9) if printing else 0), 3),
+                           "y": round(128.0 + (30 * math.sin(time.time() * 1.3) if printing else 0), 3),
+                           "z": 0.2 + layer * 0.2, "extruder": 0.0},
             "extruder": {"temperature": round(s["nozzle"], 1), "target": s["nozzle_t"],
                          "filament_detect_enable": 1, "filament_detected": 1},
             "heater_bed": {"temperature": round(s["bed"], 1), "target": s["bed_t"]},

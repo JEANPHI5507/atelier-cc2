@@ -20,6 +20,7 @@ src/elegoo_lab/
   colorize.py       assemblage de pièces en un 3MF multicolore
   mesh.py, orient.py, cut.py, advisor.py, optimize.py   maillage, positions, découpe, conseiller, « Optimiser »
   parametric.py, parametric_more.py, addtext.py          les pièces de « Créer »
+  forme.py          percer ou ajouter une forme ; couches.py (hauteur de couche variable)
   launch.py         lancement (table bobines, options machine) ; spools.py, stock.py (bobines, coûts)
   alerts.py         le suivi permanent de l'imprimante et les alertes ; vision.py (IA caméra) ; gallery.py
   camfeed.py        la caméra image par image ; coupe.py, suivi_couleurs.py (tablette, couleurs à venir)

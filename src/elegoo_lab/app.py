@@ -84,6 +84,21 @@ class RetouchIn(BaseModel):
     clear: bool = False
 
 
+class MarksIn(BaseModel):
+    add: dict[str, list[int]] = {}
+    erase: list[int] = []
+    clear: bool = False
+
+
+class FormeIn(BaseModel):
+    forme: str = "cylindre"
+    operation: str = "percer"
+    taille: list[float] = [5, 5, 30]
+    position: list[float] = [0, 0, 0]
+    axe: str = "z"
+    couleur: int = 1
+
+
 class TextIn(BaseModel):
     texte: str
     police: str = "manuscrite"
@@ -354,6 +369,22 @@ def lab_router(cfg: config.Config) -> APIRouter:
         except Exception as err:
             raise HTTPException(422, f"analyse des couleurs impossible: {err}") from err
 
+    @r.get("/models/{name}/marks")
+    def marks_get(name: str) -> dict[str, list[int]]:
+        """Supports and seam painted by hand: kind -> faces (same numbering as preview.glb)."""
+        return colors.load_marks(_model_path(name))
+
+    @r.post("/models/{name}/marks")
+    async def marks_set(name: str, body: MarksIn) -> dict[str, int]:
+        """Paint where supports must go or never go, and where the seam goes; kept beside the model."""
+        path = _model_path(name)
+        if path.suffix.lower() == ".gcode":
+            raise HTTPException(400, "déjà tranché")
+        try:
+            return await asyncio.to_thread(colors.save_marks, path, body.add, body.erase, body.clear)
+        except (ValueError, OSError) as err:
+            raise HTTPException(422, str(err)) from err
+
     @r.post("/models/{name}/retouch")
     async def retouch(name: str, body: RetouchIn) -> dict[str, int]:
         """Repaint faces with one of the model's colours, kept beside it (the model file is never changed)."""
@@ -458,6 +489,21 @@ def lab_router(cfg: config.Config) -> APIRouter:
         try:
             return await asyncio.to_thread(addtext.add, src, body.texte, font=body.police, angle=body.angle,
                                            size_mm=body.taille)
+        except (ValueError, OSError) as err:
+            raise HTTPException(422, str(err)) from err
+
+    @r.post("/models/{name}/forme")
+    async def add_shape(name: str, body: FormeIn) -> dict[str, Any]:
+        """Drill a shape through the model, add it, or keep only what both share: a new file, the original kept."""
+        from . import forme
+        src = _model_path(name)
+        if src.suffix.lower() == ".gcode":
+            raise HTTPException(400, "déjà tranché")
+        if len(body.taille) != 3 or len(body.position) != 3:
+            raise HTTPException(422, "taille et position : trois nombres (mm)")
+        try:
+            return await asyncio.to_thread(forme.apply, src, shape=body.forme, op=body.operation, size=tuple(body.taille),
+                                           at=tuple(body.position), axis=body.axe, colour=body.couleur)
         except (ValueError, OSError) as err:
             raise HTTPException(422, str(err)) from err
 

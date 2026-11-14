@@ -166,7 +166,7 @@ function vtoolsShow() {
   const on = !!renderer && !!current;
   $('vtools').hidden = !on;
   const model = on && !paths?.parts?.some(p => p.lines.parent === current);
-  $('vtools').querySelectorAll('[data-vt="over"], [data-vt="dims"], [data-vt="paint"]').forEach(b => b.hidden = !model);
+  $('vtools').querySelectorAll('[data-vt="over"], [data-vt="dims"], [data-vt="paint"], [data-vt="marks"]').forEach(b => b.hidden = !model);
   const movable = model && mv.ranges.length >= 1 && sel?.name === mv.file;
   $('vtools').querySelector('[data-vt="move"]').hidden = !movable;
   $('vtools').querySelector('[data-vt="regroup"]').hidden = !movable || !Object.keys(mv.moves).length;
@@ -252,9 +252,13 @@ $('vtools').querySelector('[data-vt="regroup"]').onclick = () => {
   mv.moves = {}; vtoolsShow();
 };
 /* colour touch-up: a brush repaints faces with one of the model's own colours; saved beside the model */
-let paint = null;   // { mesh, geo, pos, nor, col, centres, hex, rgb, strokes, dirty, brush, down, busy }
+let paint = null;   // { mode, mesh, geo, pos, nor, col, orig, centres, hex, rgb, strokes, dirty, brush, down, busy }
 const ray = renderer ? new THREE.Raycaster() : null, ptr = new THREE.Vector2();
-function paintOn() {
+// marks painted for the slicer (supports, seam), shown in these colours while painting; '' = eraser
+const MARKS = [{ kind: 'support', hex: '#2ECC71', label: 'Support ici' }, { kind: 'sans_support', hex: '#E5484D', label: 'Jamais de support ici' },
+  { kind: 'couture', hex: '#3B82F6', label: 'Couture ici (début de chaque couche)' }, { kind: '', hex: '', label: 'Gomme' }];
+const vtFor = mode => $('vtools').querySelector(mode === 'marks' ? '[data-vt="marks"]' : '[data-vt="paint"]');
+async function paintOn(mode = 'colour') {
   const mesh = (() => { let m = null; current?.traverse(o => { if (o.isMesh && !m) m = o; }); return m; })();
   const geo = mesh?.geometry;
   if (!geo?.attributes.color || geo.index) return toast('Ce modèle ne peut pas être retouché au pinceau (aperçu indisponible).', 'bad');
@@ -263,27 +267,45 @@ function paintOn() {
   geo.computeBoundingSphere();
   const brush = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: .28, depthWrite: false }));
   brush.visible = false; scene.add(brush);
-  paint = { mesh, geo, pos, nor: geo.attributes.normal, col: geo.attributes.color, centres, hex: null, strokes: [], dirty: new Map(), brush, down: false, busy: false, hit: null };
+  const col = geo.attributes.color;
+  paint = { mode, mesh, geo, pos, nor: geo.attributes.normal, col, orig: mode === 'marks' ? col.clone() : null, centres, hex: null,
+            strokes: [], dirty: new Map(), brush, down: false, busy: false, hit: null };
   controls.mouseButtons.LEFT = -1; controls.mouseButtons.RIGHT = THREE.MOUSE.ROTATE;   // left paints, right turns
   controls.touches.ONE = -1; controls.touches.TWO = THREE.TOUCH.DOLLY_ROTATE;
-  stage.classList.add('painting'); $('paintbar').hidden = false; $('vtools').querySelector('[data-vt="paint"]').classList.add('on');
+  stage.classList.add('painting'); $('paintbar').hidden = false; vtFor(mode).classList.add('on');
+  $('paintbar').setAttribute('aria-label', mode === 'marks' ? 'Supports et couture au pinceau' : 'Retouche des couleurs');
+  $('pb-reset').title = mode === 'marks' ? 'Efface toutes les zones peintes (supports, couture)' : 'Remet les couleurs d\'origine du modèle';
   camTo('iso'); paintView();
-  $('pb-sw').innerHTML = analysis.colours.map((c, i) => `<button data-hex="${c.hex}" style="background:${c.hex}" title="Peindre en ${c.hex}" role="radio" aria-checked="false"></button>`).join('');
-  $('pb-sw').querySelectorAll('button').forEach(b => b.onclick = () => pickBrush(b.dataset.hex));
-  pickBrush(analysis.colours[0].hex); paintButtons();
+  const swatches = mode === 'marks' ? MARKS.map(m => ({ key: m.kind, hex: m.hex, label: m.label }))
+    : analysis.colours.map(c => ({ key: c.hex, hex: c.hex, label: `Peindre en ${c.hex}` }));
+  $('pb-sw').innerHTML = swatches.map(w => `<button data-key="${w.key}" class="${w.hex ? '' : 'erase'}" style="${w.hex ? `background:${w.hex}` : ''}" title="${esc(w.label)}" aria-label="${esc(w.label)}" role="radio" aria-checked="false">${w.hex ? '' : '<svg class="i"><use href="#i-x"/></svg>'}</button>`).join('');
+  $('pb-sw').querySelectorAll('button').forEach(b => b.onclick = () => pickBrush(b.dataset.key));
+  pickBrush(swatches[0].key); paintButtons();
+  if (mode === 'marks') {   // show what is already painted
+    try {
+      const saved = await api(`/models/${encodeURIComponent(sel.name)}/marks`), P = paint;
+      if (paint !== P) return;
+      for (const m of MARKS.filter(x => x.kind)) {
+        const [r, g, b] = [1, 3, 5].map(i => parseInt(m.hex.slice(i, i + 2), 16) / 255);
+        for (const f of saved[m.kind] || []) for (let k = 0; k < 3; k++) col.setXYZ(3 * f + k, r, g, b);
+      }
+      col.needsUpdate = true;
+    } catch { /* nothing painted yet */ }
+  }
 }
-function pickBrush(hex) {
-  paint.hex = hex; paint.rgb = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255);
-  $('pb-sw').querySelectorAll('button').forEach(b => { const on = b.dataset.hex === hex; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); });
+function pickBrush(key) {
+  const mark = paint.mode === 'marks' ? MARKS.find(m => m.kind === key) : null, hex = mark ? mark.hex : key;
+  paint.hex = key; paint.rgb = hex ? [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255) : null;   // null: the eraser
+  $('pb-sw').querySelectorAll('button').forEach(b => { const on = b.dataset.key === key; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); });
 }
 function paintOff(keep) {
   if (!paint) return;
   scene.remove(paint.brush);
   controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE; controls.mouseButtons.RIGHT = THREE.MOUSE.PAN; controls.touches.ONE = THREE.TOUCH.ROTATE; controls.touches.TWO = THREE.TOUCH.DOLLY_PAN;
-  stage.classList.remove('painting'); $('paintbar').hidden = true; $('vtools').querySelector('[data-vt="paint"]').classList.remove('on');
+  stage.classList.remove('painting'); $('paintbar').hidden = true; vtFor(paint.mode).classList.remove('on');
   paintView();
-  const dirty = paint.dirty.size; paint = null;
-  if (dirty && !keep && sel) { previewKey = ''; preview(sel, mapString()); }    // drop the unsaved strokes
+  const redraw = paint.dirty.size || paint.mode === 'marks'; paint = null;
+  if (redraw && !keep && sel) { previewKey = ''; preview(sel, mapString()); }    // drop the unsaved strokes, or the marks' colours
 }
 // while painting, centre the picture in the free space above the brush bar (it covers the bottom of the view on a phone)
 function paintView() {
@@ -301,7 +323,7 @@ function paintHit(ev) {
 function dab(hit, stroke) {
   const P = paint, inv = new THREE.Matrix4().copy(P.mesh.matrixWorld).invert(), local = hit.point.clone().applyMatrix4(inv);
   const R = P.geo.boundingSphere.radius * $('pb-size').value / 50, R2 = R * R, c = P.centres, n = c.length / 3;
-  const hn = hit.face.normal, nor = P.nor, [r, g, b] = P.rgb;
+  const hn = hit.face.normal, nor = P.nor, rgb = P.rgb, orig = P.orig;
   for (let f = 0; f < n; f++) {
     const dx = c[3 * f] - local.x, dy = c[3 * f + 1] - local.y, dz = c[3 * f + 2] - local.z;
     if (stroke.seen.has(f)) continue;
@@ -311,7 +333,10 @@ function dab(hit, stroke) {
     }
     stroke.seen.add(f); stroke.faces.push(f);
     stroke.old.push(P.col.getX(3 * f), P.col.getY(3 * f), P.col.getZ(3 * f), P.dirty.get(f) || null);
-    for (let k = 0; k < 3; k++) P.col.setXYZ(3 * f + k, r, g, b);
+    for (let k = 0; k < 3; k++) {
+      const v = 3 * f + k;
+      if (rgb) P.col.setXYZ(v, rgb[0], rgb[1], rgb[2]); else P.col.setXYZ(v, orig.getX(v), orig.getY(v), orig.getZ(v));
+    }
     P.dirty.set(f, P.hex);
   }
   P.col.needsUpdate = true; paintButtons();
@@ -340,6 +365,7 @@ function paintUndo() {
   paint.col.needsUpdate = true; paintButtons();
 }
 async function paintSave(clear = false) {
+  if (paint?.mode === 'marks') return marksSave(clear);
   const body = clear ? { clear: true } : { paint: {} };
   if (!clear) paint.dirty.forEach((h, f) => (body.paint[h] ||= []).push(f));
   try {
@@ -361,11 +387,24 @@ if (renderer) {
   dom.addEventListener('pointerup', up); dom.addEventListener('pointercancel', up);
   dom.addEventListener('contextmenu', ev => { if (paint) ev.preventDefault(); });
   $('vtools').querySelector('[data-vt="paint"]').onclick = () => paint ? paintOff() : paintOn();
+  $('vtools').querySelector('[data-vt="marks"]').onclick = () => paint ? paintOff() : paintOn('marks');
   $('pb-undo').onclick = paintUndo; $('pb-save').onclick = () => paintSave();
   $('pb-close').onclick = () => { if (!paint?.dirty.size || confirm('Abandonner la retouche non enregistrée ?')) paintOff(); };
-  $('pb-reset').onclick = () => { if (confirm('Effacer toutes les retouches de ce modèle ?')) paintSave(true); };
+  $('pb-reset').onclick = () => { if (confirm(paint?.mode === 'marks' ? 'Effacer toutes les zones peintes (supports, couture) de ce modèle ?' : 'Effacer toutes les retouches de ce modèle ?')) paintSave(true); };
 }
 if (renderer) setInterval(vtoolsShow, 700);   // cheap: follows whatever the stage shows
+
+async function marksSave(clear) {
+  const body = clear ? { clear: true } : { add: {}, erase: [] };
+  if (!clear) paint.dirty.forEach((k, f) => { if (k) (body.add[k] ||= []).push(f); else body.erase.push(f); });
+  try {
+    const r = await api(`/models/${encodeURIComponent(sel.name)}/marks`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const any = r.support || r.sans_support || r.couture;   // one fixed sentence: the English page translates it whole
+    toast(clear || !any ? 'Zones peintes effacées'
+      : `Faces enregistrées : ${r.support || 0} à soutenir, ${r.sans_support || 0} sans support, ${r.couture || 0} pour la couture. Prises en compte au tranchage.`, 'ok');
+    paintOff(true); previewKey = ''; select(sel);
+  } catch (e) { toast('Enregistrement impossible : ' + e.message, 'bad'); }
+}
 
 /* slicing preview: printed paths, layer by layer */
 let paths = null, pathsFor = '';
@@ -555,6 +594,54 @@ $('txt-go').onclick = async () => {
     await loadFiles(); select(files.find(x => x.name === r.name));
   } catch (e) { toast(e.message, 'bad'); }
   b.disabled = false; b.textContent = 'Ajouter';
+};
+
+/* a shape drilled through the model, added to it, or kept where both meet: placed by eye on the 3D view */
+let shpGhost = null;
+function shpValues() {
+  const kind = $('shp-kind').value, op = $('shp-op').value, w = +$('shp-w').value || 5;
+  return { forme: kind, operation: op, axe: kind === 'sphere' ? 'z' : $('shp-axis').value, couleur: +$('shp-col').value || 1,
+           taille: [w, kind === 'cube' ? (+$('shp-d').value || w) : w, kind === 'sphere' ? w : (+$('shp-h').value || w)],
+           position: [+$('shp-x').value || 0, +$('shp-y').value || 0, +$('shp-z').value || 0] };
+}
+function shpDraw() {
+  const v = shpValues(), kind = v.forme;
+  $('shp-w-l').textContent = kind === 'cube' ? 'Largeur (mm)' : 'Diamètre (mm)';
+  $('shp-d-f').hidden = kind !== 'cube'; $('shp-h-f').hidden = kind === 'sphere'; $('shp-axis-f').hidden = kind === 'sphere';
+  $('shp-h-f').querySelector('label').textContent = kind === 'cube' ? 'Hauteur (mm)' : 'Longueur (mm)';
+  $('shp-col-f').hidden = v.operation !== 'ajouter';
+  const mesh = pieceMesh(); if (!mesh || !renderer) return;
+  if (shpGhost) { shpGhost.parent?.remove(shpGhost); shpGhost.geometry.dispose(); }
+  // the viewer's geometry is Y-up: the model's (x, y, z) is (x, z, -y) here; its length runs along Y like the model's Z
+  const [w, d, h] = v.taille, geo = kind === 'cube' ? new THREE.BoxGeometry(w, h, d) : kind === 'sphere' ? new THREE.SphereGeometry(w / 2, 40, 24)
+    : new THREE.CylinderGeometry(w / 2, w / 2, h, 48);
+  shpGhost = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: v.operation === 'percer' ? 0xff5a4e : 0x4ea8ff, transparent: true, opacity: .45, depthWrite: false }));
+  if (v.axe === 'x') shpGhost.rotation.z = Math.PI / 2; else if (v.axe === 'y') shpGhost.rotation.x = Math.PI / 2;
+  mesh.geometry.computeBoundingBox();
+  const c = mesh.geometry.boundingBox.getCenter(new THREE.Vector3()), [x, y, z] = v.position;
+  shpGhost.position.set(c.x + x, c.y + z, c.z - y); shpGhost.renderOrder = 2;
+  mesh.parent.add(shpGhost);
+}
+function shpClear() { if (shpGhost) { shpGhost.parent?.remove(shpGhost); shpGhost.geometry.dispose(); shpGhost = null; } }
+$('add-shape').onclick = () => {
+  if (!sel || sel.ext === 'gcode') return;
+  const cols = analysis?.colours || [];
+  $('shp-col').innerHTML = cols.map((c, i) => `<option value="${c.index}">Couleur ${i + 1} (${c.hex})</option>`).join('')
+    + (cols.length < 4 ? `<option value="${Math.max(0, ...cols.map(c => c.index)) + 1}">Une nouvelle couleur (bobine suivante)</option>` : '');
+  const box = pieceMesh()?.geometry; box?.computeBoundingBox();
+  if (box) { const s = box.boundingBox.getSize(new THREE.Vector3()); $('shp-h').value = Math.ceil(s.y + 4); }   // through the whole height
+  $('shp').showModal(); shpDraw();
+};
+$('shp').addEventListener('input', shpDraw); $('shp').addEventListener('change', shpDraw); $('shp').addEventListener('close', shpClear);
+$('shp-go').onclick = async () => {
+  const f = sel, b = $('shp-go'); if (!f) return;
+  b.disabled = true; b.textContent = 'Calcul…';
+  try {
+    const r = await api('/models/' + encodeURIComponent(f.name) + '/forme', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(shpValues()) });
+    $('shp').close(); toast(`Nouveau fichier : ${r.name} (${r.size_mm.join(' × ')} mm)`, 'ok');
+    await loadFiles(); select(files.find(x => x.name === r.name));
+  } catch (e) { toast(e.message, 'bad'); }
+  b.disabled = false; b.textContent = 'Créer le fichier';
 };
 
 async function upload(list) {

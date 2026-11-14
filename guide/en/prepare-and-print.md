@@ -20,6 +20,11 @@ On the left: your models and the files ready to print.
   printer.
 - **Rename**, **select several files**, **clean up** (technical files and orphan G-codes, with the space saved):
   "⋯" menu.
+- **Percer ou ajouter une forme** (drill or add a shape, cube button at the top of the model card): a cylinder, box or
+  ball, drilled through the model (a hole for a screw, a magnet, a string), added to it (a peg, a base, in one of the
+  model's colours or a new one) or kept alone (what the shape and the model share). The shape shows see-through on the
+  model while you set it (size, direction, offset from its centre). The model's colours are kept; a new file is
+  created, the original stays untouched.
 
 ## The 3D view
 
@@ -46,6 +51,9 @@ colour, or **Modifier** (edit).
 - **Assembler** (assemble, at the top of the library): a model shipped as several files, one per colour, becomes a
   single multicolour model.
 - **Pinceau** (brush, 3D view, GLB, OBJ, PLY models): touch up the colours by hand.
+- **Supports** (3D view, every model): paint "Support ici" (support here, green), "Jamais de support ici" (never support
+  here, red) and "Couture ici" (seam here, blue: where each layer starts); the eraser clears. Supports painted without
+  asking for supports: there are some only there. The areas are kept beside the model, the file itself does not change.
 
 ## 2. Size and settings
 
@@ -86,10 +94,11 @@ Measured: a 95 mm figurine goes from 62 g / 3 h 35 (Elegoo profile) to 26 g / 2 
   workshop or the screen.
 - **Exemplaires** (copies) on the plate (up to 50, in a grid). Each part is labelled in the G-code: if one fails, it can
   be dropped and the others finished.
-- **Réglages avancés** (advanced settings; empty = CC2 profile value): walls, solid layers, infill pattern, top surface
-  pattern, only one wall on top surfaces (already on in the CC2 profile), precise outer wall (true dimensions for parts
-  that fit together), seam, ironing, brim, raft, support angle, temperatures, pressure advance, flow… Each value is
-  checked before going to the slicer.
+- **Réglages avancés** (advanced settings; empty = CC2 profile value): walls, solid layers, infill pattern, top
+  surface pattern, only one wall on top surfaces (already on in the CC2 profile), variable layer height (thinner
+  layers where the surface slopes gently, for smoother domes and curves), precise outer wall (true dimensions for
+  parts that fit together), seam, ironing, brim, raft, support angle, temperatures, pressure advance, flow… Each value
+  is checked before going to the slicer.
 
 ### Multicolour
 

@@ -24,7 +24,8 @@ BED_TOL = 0.25                 # mm above the lowest point still counted as touc
 SLICE_STEP = 1.0               # mm between analysed sections (upper bound 300 sections)
 
 
-def _sections(v: np.ndarray, f: np.ndarray) -> list[tuple[float, mf.CrossSection]] | None:
+def manifold(v: np.ndarray, f: np.ndarray) -> mf.Manifold | None:
+    """The mesh as a closed volume (vertices merged when it needs it), or None for an open mesh."""
     try:
         solid = mf.Manifold(mf.Mesh(vert_properties=np.asarray(v, np.float32), tri_verts=np.asarray(f, np.uint32)))
         if solid.status() != mf.Error.NoError or solid.is_empty():
@@ -34,6 +35,13 @@ def _sections(v: np.ndarray, f: np.ndarray) -> list[tuple[float, mf.CrossSection
         if solid.status() != mf.Error.NoError or solid.is_empty():
             return None
     except Exception:
+        return None
+    return solid
+
+
+def _sections(v: np.ndarray, f: np.ndarray) -> list[tuple[float, mf.CrossSection]] | None:
+    solid = manifold(v, f)
+    if solid is None:
         return None
     h = float(v[:, 2].max())
     step = max(SLICE_STEP, h / 300)

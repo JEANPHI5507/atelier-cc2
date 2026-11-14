@@ -237,6 +237,84 @@ def test_3mf_reader_unusual_shapes_and_cache(tmp_path):
     assert threemf.read(src).objects[0].parts[0].vertices[0].tolist() == [20, 20, 30]  # a new version is read again
 
 
+def test_variable_layer_height_follows_the_slopes(tmp_path):
+    import re
+    import zipfile
+    import numpy as np
+    from elegoo_lab import couches, printprep, settings, slicer
+    ball = trimesh.creation.icosphere(4, radius=15)
+    ball.apply_translation([0, 0, 15])
+    b = couches.bands(np.asarray(ball.vertices), np.asarray(ball.faces), 0.2, "pentes")
+    h = lambda z: next(x for z0, z1, x in b if z0 <= z <= z1)                         # noqa: E731
+    assert h(29.5) < h(15) == 0.2 and min(x for *_, x in b) >= couches.MIN_MM       # thin at the pole, as is at the equator
+    tube = trimesh.creation.cylinder(radius=10, height=30, sections=64)
+    tube.apply_translation([0, 0, 15])
+    assert couches.bands(np.asarray(tube.vertices), np.asarray(tube.faces), 0.2, "rapide") == [(0.0, 30.0, 0.28)]   # walls only
+    with pytest.raises(ValueError):
+        settings.build({"couches": "partout"})
+    if not (slicer.TOOLS / "squashfs-root" / "AppRun").exists():
+        pytest.skip("slicer non installé")
+    src = tmp_path / "boule.stl"
+    ball.export(src)
+    flat = printprep.prepare_and_slice(src, out_dir=tmp_path / "a")
+    var = printprep.prepare_and_slice(src, out_dir=tmp_path / "b", advanced={"couches": "pentes"})
+    assert zipfile.ZipFile(tmp_path / "b" / "boule_canvas.3mf").read("Metadata/layer_config_ranges.xml").count(b"<range") > 2
+    assert var["layers"] > flat["layers"] and any("couches de plus" in w for w in var["warnings"])
+    g = (tmp_path / "b" / var["gcode"][0]).read_text(errors="ignore")
+    zs = [float(z) for z in re.findall(r"^;Z:([\d.]+)", g, re.M)]
+    assert min(round(b - a, 2) for a, b in zip(zs, zs[1:])) < 0.2
+
+
+def test_painted_supports_and_seam_reach_the_slicer():
+    import zipfile
+    from elegoo_lab import colors, printprep, slicer, threemf
+    foot, cap = trimesh.creation.box((8, 8, 20)), trimesh.creation.box((30, 30, 4))
+    foot.apply_translation([0, 0, 10])
+    cap.apply_translation([0, 0, 22])
+    src = config.MODELS_DIR / "champi.stl"                                           # a mushroom: the cap hangs out
+    trimesh.util.concatenate([foot, cap]).export(src)
+    pv = colors.preview_glb(src)
+    under = [i for i, (c, n) in enumerate(zip(pv.triangles_center, pv.face_normals)) if n[2] < -0.9 and c[1] > 19]   # Y-up
+    assert colors.save_marks(src, {"support": under, "couture": [0]}) == {"support": len(under), "couture": 1}
+    with pytest.raises(ValueError):
+        colors.save_marks(src, {"partout": [1]})
+    out = config.MODELS_DIR / "c.3mf"
+    colors.to_canvas(src, out, {1: 1}, copies=2)
+    parts = [p for o in threemf.read(out).objects for p in o.parts]
+    assert all(sum(1 for c in p.supports if c) == len(under) and p.seam[0] for p in parts)   # every copy carries them
+    assert b'paint_supports="4"' in zipfile.ZipFile(out).read("3D/Objects/part_1.model")
+    if not (slicer.TOOLS / "squashfs-root" / "AppRun").exists():
+        pytest.skip("slicer non installé")
+    support = lambda r, d: (d / r["gcode"][0]).read_text(errors="ignore").count(";TYPE:Support")   # noqa: E731
+    d = config.MODELS_DIR / "a"
+    r = printprep.prepare_and_slice(src, out_dir=d)
+    assert support(r, d) > 0 and any("peints" in w for w in r["warnings"])         # painted, none asked: only there
+    colors.save_marks(src, {"sans_support": list(range(len(pv.faces)))}, clear=False)
+    d = config.MODELS_DIR / "b"
+    assert support(printprep.prepare_and_slice(src, out_dir=d, supports=True), d) == 0   # never here, everywhere
+
+
+def test_drill_add_or_keep_a_shape():
+    from elegoo_lab import colors, forme, threemf
+    lib = config.MODELS_DIR
+    trimesh.creation.box((30, 30, 10)).export(lib / "plaque.stl")
+    vol = lambda n: sum(trimesh.Trimesh(p.vertices, p.faces).volume for o in threemf.read(lib / n).objects for p in o.parts)  # noqa: E731
+    hole = forme.apply(lib / "plaque.stl", shape="cylindre", op="percer", size=(8, 8, 20), at=(0, 0, 0))
+    assert hole["name"] == "plaque_perce.3mf" and abs(vol(hole["name"]) - (9000 - 3.1416 * 16 * 10)) < 60
+    peg = forme.apply(lib / "plaque.stl", shape="cylindre", op="ajouter", size=(8, 8, 20), at=(0, 0, 5), colour=2)
+    parts = [p for o in threemf.read(lib / peg["name"]).objects for p in o.parts]
+    assert [p.extruder for p in parts] == [1, 2] and abs(vol(peg["name"]) - (9000 + 3.1416 * 16 * 10)) < 60   # no overlap: the 10 mm above
+    assert forme.apply(lib / "plaque.stl", shape="sphere", op="garder", size=(10, 10, 10), at=(0, 0, 0))["size_mm"] == [10.0, 10.0, 10.0]
+    with pytest.raises(ValueError):
+        forme.apply(lib / "plaque.stl", shape="cylindre", op="percer", size=(8, 8, 20), at=(100, 0, 0))   # misses: nothing changes
+    two = trimesh.creation.box((20, 20, 20))
+    two.unmerge_vertices()
+    two.visual = trimesh.visual.ColorVisuals(two, face_colors=[[200, 0, 0, 255]] * 6 + [[0, 120, 0, 255]] * 6)
+    two.export(lib / "deux.glb")
+    cut = forme.apply(lib / "deux.glb", shape="sphere", op="percer", size=(14, 14, 14), at=(0, 0, 10))
+    assert sorted(c["hex"] for c in colors.analyze(lib / cut["name"])["colours"]) == ["#007800", "#C80000"]   # no blend
+
+
 def test_compact_preview_glb_is_face_for_face():
     import struct
     import numpy as np

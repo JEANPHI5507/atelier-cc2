@@ -163,7 +163,7 @@ def thumbnail(name: str) -> bytes | None:
     return png
 
 
-SIDECARS = (".retouches", ".repairs")    # small files kept beside a model, named after it
+SIDECARS = (".retouches", ".repairs", ".marques")    # small files kept beside a model, named after it
 
 
 def rename(old: str, new: str) -> str:

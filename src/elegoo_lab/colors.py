@@ -32,7 +32,7 @@ import trimesh
 from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import connected_components
 
-from . import colorize, mesh, threemf
+from . import colorize, config, mesh, threemf
 
 MAX_SLOTS = 4
 MIN_SHARE = 0.01   # colours covering less than 1 % of the surface join their nearest colour
@@ -192,6 +192,72 @@ def save_retouch(path: Path, paint: dict[str, list[int]], erase: list[int] | Non
         f.unlink(missing_ok=True)
     os.utime(path)
     return len(faces)
+
+
+# painted by hand in the viewer, for the slicer: kind -> (Part field, TriangleSelector state)
+MARKS = {"support": ("supports", 1), "sans_support": ("supports", 2), "couture": ("seam", 1)}
+
+
+def marks_file(path: Path) -> Path:
+    return path.parent / ".marques" / (path.name + ".json")
+
+
+def load_marks(path: Path) -> dict[str, list[int]]:
+    """{"support" | "sans_support" | "couture": [face index, ...]}, faces in the model's own order."""
+    try:
+        data = json.loads(marks_file(path).read_text())
+    except (OSError, ValueError):
+        return {}
+    return {k: [int(i) for i in v] for k, v in data.items() if k in MARKS} if isinstance(data, dict) else {}
+
+
+def save_marks(path: Path, add: dict[str, list[int]], erase: list[int] | None = None, clear: bool = False) -> dict[str, int]:
+    """Merge painted marks into the model's sidecar (a face has one mark at most); returns the count per kind.
+    The model's date is left alone: the marks change nothing the colour and preview caches keep."""
+    f = marks_file(path)
+    if clear:
+        f.unlink(missing_ok=True)
+        return {}
+    total = int(mesh.info(path)["triangles"])
+    faces: dict[int, str] = {i: k for k, idx in load_marks(path).items() for i in idx}
+    for i in erase or []:
+        faces.pop(int(i), None)
+    for k, idx in add.items():
+        if k not in MARKS:
+            raise ValueError(f"marque inconnue : {k} ({', '.join(MARKS)})")
+        for i in idx:
+            if not 0 <= int(i) < total:
+                raise ValueError(f"face {i} hors du modèle ({total} faces)")
+            faces[int(i)] = k
+    out: dict[str, list[int]] = {}
+    for i, k in faces.items():
+        out.setdefault(k, []).append(i)
+    if out:
+        f.parent.mkdir(exist_ok=True)
+        config.write_atomic(f, json.dumps({k: sorted(v) for k, v in out.items()}))
+    else:
+        f.unlink(missing_ok=True)
+    return {k: len(v) for k, v in out.items()}
+
+
+def _apply_marks(path: Path, parts: list[threemf.Part]) -> None:
+    marks = load_marks(path)
+    if not marks or not parts:
+        return
+    starts = np.cumsum([0] + [len(p.faces) for p in parts])
+    for kind, idx in marks.items():
+        field, state = MARKS[kind]
+        code = encode_state(state)
+        ids = np.asarray(idx, dtype=int)
+        ids = ids[(ids >= 0) & (ids < starts[-1])]
+        which = np.searchsorted(starts, ids, side="right") - 1
+        for k, p in enumerate(parts):
+            local = ids[which == k] - starts[k]
+            if len(local):
+                codes = getattr(p, field) or [None] * len(p.faces)
+                for i in local.tolist():
+                    codes[i] = code
+                setattr(p, field, codes)
 
 
 def _apply_retouch(path: Path, parts: list[threemf.Part]) -> None:
@@ -599,11 +665,12 @@ def to_canvas(path: Path, out: Path, mapping: dict[int, int], *, height_mm: floa
               smart_flush: bool = True, rotate: tuple[float, ...] | None = None,
               copies: int = 1, palette: Palette | None = None, simplify: float = 0.0, layer_mm: float = 0.2,
               moves: dict[int, tuple[float, float, float]] | None = None,
-              shift: tuple[float, float] | None = None) -> dict[str, Any]:
+              shift: tuple[float, float] | None = None, marks_from: Path | None = None) -> dict[str, Any]:
     """Write a clean CANVAS 3MF where source colour ``i`` prints from slot ``mapping[i]`` (1..4),
     centred on the bed, optionally rotated, rescaled to ``height_mm`` and repeated ``copies`` times.
     ``moves``: object index -> translation in the model's own axes (pieces dragged apart in the viewer);
-    ``shift``: where the middle of the result sits, from the bed centre (None = centred)."""
+    ``shift``: where the middle of the result sits, from the bed centre (None = centred);
+    ``marks_from``: the model whose painted supports and seam apply (``path`` itself when None)."""
     if any(not 1 <= s <= MAX_SLOTS for s in mapping.values()):
         raise ValueError("chaque couleur doit aller dans une bobine de 1 à 4")
     info = analyze(path, palette)
@@ -619,6 +686,7 @@ def to_canvas(path: Path, out: Path, mapping: dict[int, int], *, height_mm: floa
             for p in pr.objects[k].parts:
                 p.vertices = p.vertices + np.asarray(d, float)
     parts = _parts(pr)
+    _apply_marks(marks_from or path, parts)   # faces follow the model's order here, as in the viewer
     rgb = _rgb_mode(pr)      # asked once: the colours per face are replaced by paint codes below
     if rgb:
         _, labels, _ = _rgb_labels(pr, palette)
@@ -661,7 +729,8 @@ def to_canvas(path: Path, out: Path, mapping: dict[int, int], *, height_mm: floa
         for k, (dx, dy) in enumerate(spots):
             for o in pr.objects:
                 objects.append(threemf.Object(f"{o.name} #{k + 1}", [
-                    threemf.Part(p.name, p.vertices + [dx, dy, 0], p.faces, p.extruder, p.paint, p.face_rgb) for p in o.parts]))
+                    threemf.Part(p.name, p.vertices + [dx, dy, 0], p.faces, p.extruder, p.paint, p.face_rgb,
+                                 supports=p.supports, seam=p.seam) for p in o.parts]))
         pr = threemf.Project(objects, pr.colours)
         hi = hi + [max(x for x, _ in spots), max(y for _, y in spots), 0]
     sx, sy = shift or (0.0, 0.0)

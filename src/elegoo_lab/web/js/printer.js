@@ -141,10 +141,29 @@ async function pvStatus() {
       $('th-' + k).style.width = g ? Math.min(100, 100 * a / g) + '%' : '0';
       if (document.activeElement !== $('tv-' + k)) $('tv-' + k).placeholder = g || 0;
     }
+    nozzleAt(raw.CurrenCoord, busy);
     $('pv-light').checked = !!raw.LightStatus?.SecondLight;
     $('pv-cam-light').hidden = !!raw.LightStatus?.SecondLight || !raw.LightStatus;   // light off: the camera shows black
   } catch { $('pv-state').textContent = 'Imprimante injoignable'; $('pv-pill').className = 'pill'; $('pv-pill-t').textContent = 'Hors ligne'; }
-  if (pvOpen) pvTimer = setTimeout(pvStatus, 2000);
+  if (pvOpen) pvTimer = setTimeout(pvStatus, BUSY.has(lastSt?.print_status ?? 0) ? 1000 : 2000);   // the CC2 sends its position once a second
+}
+// where the nozzle is: "x,y,z" in mm from the CC2 (its spelling: CurrenCoord), drawn on the plate seen from above
+const trail = [];
+function nozzleAt(coord, busy) {
+  const xyz = String(coord || '').split(',').map(Number);
+  $('pv-pos').hidden = xyz.length !== 3 || xyz.some(v => !Number.isFinite(v));
+  if ($('pv-pos').hidden) return;
+  const [x, y, z] = xyz, inChute = x >= 246 && y <= 20, fmt = v => v.toLocaleString('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  $('pv-pos-x').textContent = fmt(x); $('pv-pos-y').textContent = fmt(y); $('pv-pos-z').textContent = fmt(z);
+  // seen on the CC2: it purges in the front-right chute and wipes behind the plate (Y up to about 265)
+  $('pv-pos-where').textContent = inChute ? 'À la goulotte (purge)' : y > 256 ? 'Derrière le plateau (essuyage)'
+    : busy ? 'Au-dessus du plateau' : 'À l\'arrêt';
+  const px = Math.max(-6, Math.min(262, x)), py = 256 - Math.max(-6, Math.min(276, y));   // the front of the plate at the bottom
+  const last = trail[trail.length - 1];
+  if (!last || last[0] !== px || last[1] !== py) trail.push([px, py]);
+  if (trail.length > 40) trail.shift();
+  $('pv-pos-dot').setAttribute('cx', px); $('pv-pos-dot').setAttribute('cy', py);
+  $('pv-pos-trail').setAttribute('points', busy ? trail.map(p => p.join(',')).join(' ') : '');
 }
 
 let stockData = null, trayEdit = null;

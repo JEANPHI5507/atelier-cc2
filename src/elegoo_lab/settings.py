@@ -36,6 +36,10 @@ CHOICES: dict[str, tuple[str, str, dict[str, tuple[str, str]]]] = {
         "oui": ("1", "Oui"), "non": ("0", "Non")}),
     "paroi_precise": ("precise_outer_wall", "Paroi extérieure précise (cotes justes, pièces qui s'emboîtent)", {
         "oui": ("1", "Oui"), "non": ("0", "Non")}),
+    # no OrcaSlicer key: printprep writes height ranges into the model (couches.py)
+    "couches": ("", "Hauteur de couche variable", {
+        "non": ("", "Non (même hauteur partout)"), "pentes": ("pentes", "Plus fines sur les pentes (dômes et arrondis plus lisses)"),
+        "rapide": ("rapide", "Fines sur les pentes, épaisses sur les parois droites")}),
     "lissage": ("ironing_type", "Lissage du dessus", {
         "non": ("no ironing", "Non"), "dessus": ("top", "Toutes les faces du dessus"), "dernier": ("topmost", "Seulement la face la plus haute")}),
     "peau": ("fuzzy_skin", "Texture « peau » (aspect granuleux)", {
@@ -93,7 +97,8 @@ def build(advanced: dict[str, Any] | None, plate: str = DEFAULT_PLATE) -> tuple[
             key, label, opts = CHOICES[name]
             if value not in opts:
                 raise ValueError(f"{label} : valeur « {value} » inconnue ({', '.join(opts)})")
-            proc[key] = opts[value][0]
+            if key:
+                proc[key] = opts[value][0]
         elif name in NUMBERS:
             key, label, lo, hi, unit = NUMBERS[name]
             v = float(value)

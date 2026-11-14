@@ -44,14 +44,7 @@ def _stats(v: np.ndarray, f: np.ndarray) -> dict[str, float]:
 
 def _solid(v: np.ndarray, f: np.ndarray) -> mf.Manifold | None:
     """The part as a closed volume (like the advisor), or None for an open mesh."""
-    secs = advisor._sections(v, f)          # validates and repairs once
-    if secs is None:
-        return None
-    import trimesh
-    m = trimesh.Trimesh(v, f)
-    m.merge_vertices()
-    solid = mf.Manifold(mf.Mesh(vert_properties=np.asarray(m.vertices, np.float32), tri_verts=np.asarray(m.faces, np.uint32)))
-    return solid if solid.status() == mf.Error.NoError and not solid.is_empty() else None
+    return advisor.manifold(v, f)
 
 
 def _layer_stats(solid: mf.Manifold, rot: np.ndarray | None, scale: float) -> dict[str, float]:
@@ -92,7 +85,7 @@ def orientations(path: Path, height_mm: float | None = None, rz: int = 0) -> lis
         v = (v0 @ rot.T if rot is not None else v0.copy()) * scale
         v = v - v.min(axis=0)
         s = _layer_stats(solid, rot, scale) if solid is not None else _stats(v, f)
-        png = thumbnail.render(v, tf, trgb, size=112, most=25000)   # 112 px: two faces a pixel is plenty
+        png = thumbnail.render(v, tf, trgb, size=112, most=12000)   # 112 px: about one face a pixel is plenty
         out.append({"id": key_, "label": label, "rotate": [rx, ry, rz], **{k: round(x, 1) for k, x in s.items()},
                     "size_mm": [round(float(x), 1) for x in np.ptp(v, axis=0)],
                     "image": "data:image/png;base64," + base64.b64encode(png).decode()})

@@ -13,7 +13,7 @@ from typing import Any
 import numpy as np
 import trimesh
 
-from . import colorize, colors, config, cut, mesh, settings, slicer, thumbnail
+from . import colorize, colors, config, couches, cut, mesh, settings, slicer, thumbnail
 
 SLICEABLE_AS_IS = {".stl", ".obj"}
 
@@ -176,7 +176,10 @@ def prepare_and_slice(
                                 slot_colours=slot_colours, adv=(adv_proc, adv_fil), rotate=rotate, palette=palette)
 
     target, slot_hex = src, None
-    if n > 1 or src.suffix.lower() not in SLICEABLE_AS_IS or height_mm or rot is not None or copies > 1 or moves:
+    layers = settings.CHOICES["couches"][2].get((advanced or {}).get("couches") or "non", ("",))[0]
+    marks = colors.load_marks(src)
+    if (n > 1 or src.suffix.lower() not in SLICEABLE_AS_IS or height_mm or rot is not None or copies > 1 or moves
+            or layers or marks):
         base = src
         if height_mm and src.suffix.lower() == ".stl":
             base = out_dir / f".{src.stem}_scaled.stl"
@@ -184,10 +187,11 @@ def prepare_and_slice(
         target = out_dir / f"{src.stem}_canvas.3mf"
         try:
             conv = colors.to_canvas(base, target, slots, height_mm=height_mm, rotate=rotate, copies=copies, moves=moves, shift=shift,
+                                    marks_from=src,
                                     smart_flush=MODES[mode]["smart_flush"], palette=palette,
                                     simplify=colors.SIMPLIFY_LEVELS.get(simplify_colours, colors.SIMPLIFY_SHARE) if isinstance(simplify_colours, str)
                                     else (colors.SIMPLIFY_SHARE if simplify_colours else 0.0),
-                                    layer_mm=float(re.match(r"[\d.]+", quality).group()) if re.match(r"[\d.]+", quality) else 0.2)
+                                    layer_mm=_layer_mm(quality))
             slot_hex = conv["slot_colours"]
             if conv.get("simplified"):
                 warnings.append(f"{conv['simplified']} petite(s) tache(s) de couleur fondue(s) dans la couleur voisine : "
@@ -195,9 +199,16 @@ def prepare_and_slice(
         finally:
             if base != src:
                 base.unlink(missing_ok=True)
+        if layers:
+            more = couches.apply(target, _layer_mm(quality), layers)
+            warnings.append("Hauteur de couche variable : " + (f"environ {more} couches de plus, sur les pentes." if more > 0 else
+                            f"environ {-more} couches de moins." if more < 0 else "aucune pente douce, hauteur inchangée."))
 
     slot_hex = _real_colours(slot_hex, slot_colours, n)
     sup_on, sup_ov = support_overrides(supports, plate_only)
+    if marks.get("support") and not sup_on:   # supports painted by hand, none asked for: only where painted
+        sup_on, sup_ov = True, {"support_type": "tree(manual)", **({"support_on_build_plate_only": "1"} if plate_only else {})}
+        warnings.append("Supports ajoutés seulement là où tu les as peints.")
     try:
         res = slicer.slice_model(target, out_dir, quality=quality, filament=fil, infill=infill, supports=sup_on,
                                  colours=slot_hex, no_purge=bool(MODES[mode].get("no_purge")) and n > 1, overrides={**(MODES[mode]["overrides"] if n > 1 else {}), **sup_ov,
@@ -232,6 +243,11 @@ def prepare_and_slice(
                    "metres": round(per[i] + purge[i], 2), "purge_m": purge[i]}
                   for i, f in enumerate(fil)],
     }
+
+
+def _layer_mm(quality: str) -> float:
+    m = re.match(r"[\d.]+", quality)
+    return float(m.group()) if m else 0.2
 
 
 def _real_colours(slot_hex: list[str] | None, slot_colours: dict[int, str] | None, n: int) -> list[str] | None:

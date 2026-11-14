@@ -75,6 +75,7 @@
 "Agrandie à": "Scaled up to",
 "Agrandir à": "Scale up to",
 "Ajouter": "Add",
+"Ajouter la forme": "Add the shape",
 "Ajouter un fichier": "Add a file",
 "Ajouter un prénom ou un texte": "Add a name or a text",
 "Ajouter un texte": "Add a text",
@@ -131,6 +132,7 @@
 "Attends que le plateau redescende sous 35 °C (il était à": "Wait until the plate drops below 35 °C (it was at",
 "Attends que le plateau refroidisse avant de décoller la pièce : je te préviens quand il est sous": "Wait for the plate to cool before removing the part: I'll let you know when it is below",
 "Au pied à coulisse : 20,0 mm sur X, Y et Z (± 0,2 mm).": "With calipers: 20.0 mm on X, Y and Z (± 0.2 mm).",
+"Au-dessus du plateau": "Over the plate",
 "Aucun": "None",
 "Aucun défaut de surface trouvé : seule l'orientation des faces posait problème.": "No surface defect found: only the face orientation was a problem.",
 "Aucun fichier. Envoie un G-code depuis l'atelier.": "No file. Send a G-code from the workshop.",
@@ -169,7 +171,7 @@
 "Bordure d'adhérence": "Adhesion brim",
 "Bordure de": "Brim of",
 "Bouchon du filament externe anormal": "External filament plug abnormal",
-"Boule": "Bauble",
+"Boule": "Ball",
 "Boule, étoile ou sapin à suspendre, prénom d'une autre couleur.": "Bauble, star or tree to hang, the name in another colour.",
 "Boîte avec couvercle": "Box with lid",
 "Branche la tablette sur le secteur. Pour la garder allumée sans toucher : réglages de la tablette → écran → ne jamais éteindre (en charge).": "Plug the tablet in. To keep it on without touching it: tablet settings → display → never turn off (while charging).",
@@ -179,6 +181,7 @@
 "Cadre": "Frame",
 "Caisson": "Chamber",
 "Calcul des positions…": "Computing positions…",
+"Calcul…": "Computing…",
 "Calibrations automatiques": "Automatic calibrations",
 "Caméra": "Camera",
 "Caméra de l'imprimante": "Printer camera",
@@ -258,9 +261,12 @@
 "Couches mal soudées (buse un peu froide) ou parois trop fines.": "Layers poorly fused (nozzle a bit cold) or walls too thin.",
 "Couches pleines dessous": "Bottom solid layers",
 "Couches pleines dessus": "Top solid layers",
+"Couché, d'avant en arrière": "Lying, front to back",
+"Couché, de gauche à droite": "Lying, left to right",
 "Couchée vers l'arrière": "Lying backwards",
 "Couchée vers l'avant": "Lying forwards",
 "Couleur": "Colour",
+"Couleur de la forme": "Shape colour",
 "Couleur du pinceau": "Brush colour",
 "Couleur en cours": "Current colour",
 "Couleurs": "Colours",
@@ -272,16 +278,20 @@
 "Coupe les chauffes, les ventilateurs et la lumière. Pour couper le courant : interrupteur de l'imprimante": "Turns off heaters, fans and light. To cut the power: the printer's switch",
 "Courbe de Hilbert (labyrinthe)": "Hilbert curve (maze)",
 "Couture (point de départ de chaque couche)": "Seam (where each layer starts)",
+"Couture ici (début de chaque couche)": "Seam here (where each layer starts)",
 "Coût": "Cost",
 "Crochet mural": "Wall hook",
 "Création…": "Creating…",
 "Créer": "Create",
 "Créer la pièce": "Create the part",
+"Créer le fichier": "Create the file",
 "Créer une copie fermée, couleurs gardées": "Create a closed copy, colours kept",
 "Créer une pièce sur mesure": "Create a custom part",
 "Créer une pièce sur mesure (boîte, étiquette, crochet…)": "Create a custom part (box, label, hook…)",
 "Cube de calibration 20 mm": "20 mm calibration cube",
 "Cubique": "Cubic",
+"Cylindre": "Cylinder",
+"Cylindre (trou rond)": "Cylinder (round hole)",
 "Côté": "Side",
 "D'un seul trait, comme le dessin": "A single stroke, like the drawing",
 "Damier à 4 couleurs sur le dessus, sans traînées d'une couleur dans l'autre.": "A 4-colour checkerboard on top, with no colour streaking into another.",
@@ -291,8 +301,10 @@
 "De dessus": "Top",
 "De face": "Front",
 "De face : en couleur ce qui est imprimé": "Front view: printed part in colour",
+"Debout (de haut en bas)": "Standing (top to bottom)",
 "Denture en développante, module et nombre de dents au choix.": "Involute teeth, module and number of teeth of your choice.",
 "Dernière impression": "Last print",
+"Derrière le plateau (essuyage)": "Behind the plate (wiping)",
 "Des zones de la pièce sont dans le vide (surplombs) : active les supports ou change l'orientation.": "Parts of the model are in the air (overhangs): enable supports or change the orientation.",
 "Des zones penchées n'avaient rien dessous.": "Tilted areas had nothing underneath.",
 "Description de l'objet (en anglais de préférence)": "Description of the object (preferably in English)",
@@ -303,6 +315,7 @@
 "Diagnostic impossible :": "Diagnosis failed:",
 "Diagonale descendante ↘": "Falling diagonal ↘",
 "Diagonale montante ↗": "Rising diagonal ↗",
+"Diamètre (mm)": "Diameter (mm)",
 "Diamètre de vis": "Screw diameter",
 "Diamètre des câbles": "Cable diameter",
 "Disponible": "Available",
@@ -313,6 +326,9 @@
 "Débit (tour de calibration, 1 = 100 %)": "Flow (calibration tower, 1 = 100 %)",
 "Débit = le pourcentage de cette bande × 0,98 (débit du profil) : reporte-le dans Réglages avancés → Débit.": "Flow = that band's percentage × 0.98 (profile flow): enter it in Advanced settings → Flow.",
 "Décalage Z (première couche)": "Z offset (first layer)",
+"Décalage avant / arrière (mm)": "Front / back offset (mm)",
+"Décalage bas / haut (mm)": "Down / up offset (mm)",
+"Décalage gauche / droite (mm)": "Left / right offset (mm)",
 "Déchargement": "Unloading",
 "Décollée ou coins relevés": "Came loose or corners lifted",
 "Décoratif": "Decorative",
@@ -336,8 +352,10 @@
 "Détails plus fins qu'environ 1 % de la taille lissés ou retirés : vérifie l'aperçu": "Details finer than about 1 % of the size smoothed or removed: check the preview",
 "Détection des couleurs…": "Detecting colours…",
 "Eau chaude et liquide vaisselle, rinçage, séchage sans toucher la surface. Les traces de doigts suffisent à faire décoller une première couche.": "Hot water and dish soap, rinse, dry without touching the surface. Fingerprints are enough to make a first layer come loose.",
+"Efface toutes les zones peintes (supports, couture)": "Clears every painted area (supports, seam)",
 "Effacer": "Clear",
 "Effacer toutes les retouches de ce modèle ?": "Clear all touch-ups of this model?",
+"Effacer toutes les zones peintes (supports, couture) de ce modèle ?": "Clear every painted area (supports, seam) of this model?",
 "Elle ne peut pas commencer celle-ci maintenant.": "It can't start this one now.",
 "En couleur ce qui est imprimé, en gris ce qui reste. Tourne avec un doigt, zoome en pinçant.": "Printed in colour, what's left in grey. Rotate with a finger, pinch to zoom.",
 "En cours": "In progress",
@@ -397,6 +415,7 @@
 "Filetage métrique ISO de M3 à M10 ; le jeu compense le plastique.": "ISO metric thread from M3 to M10; the clearance makes up for the plastic.",
 "Fils fins entre les parties": "Thin strings between the parts",
 "Fin vers": "Ends around",
+"Fines sur les pentes, épaisses sur les parois droites": "Thin on slopes, thick on straight walls",
 "Forme": "Shape",
 "Fort : les petites zones aussi (moins de 10 % d'une couche)": "Strong: small areas too (under 10 % of a layer)",
 "Fragile, couches qui se séparent": "Fragile, layers splitting",
@@ -407,10 +426,12 @@
 "Garder ces options pour les prochaines fois": "Keep these options for next time",
 "Garder la taille d'origine": "Keep the original size",
 "Garder pour la prochaine fois": "Keep for next time",
+"Garder seulement le commun": "Keep only what both share",
 "Glisse une pièce pour la déplacer sur le plateau.": "Drag a piece to move it on the plate.",
 "Glisse une pièce pour la déplacer sur le plateau. Les autres restent en place.": "Drag a piece to move it on the plate. The others stay put.",
 "Glisser chaque pièce sur le plateau pour la déplacer": "Drag each piece across the plate to move it",
 "Glisser pour tourner · molette pour zoomer": "Drag to rotate · scroll to zoom",
+"Gomme": "Eraser",
 "Gouttes ou pâtés aux changements de couleur": "Drops or blobs at colour changes",
 "Grammes": "Grams",
 "Grille": "Grid",
@@ -421,7 +442,10 @@
 "Générer un modèle avec l'IA": "Generate a model with AI",
 "HTTPS non activé": "HTTPS not enabled",
 "Hauteur": "Height",
+"Hauteur (mm)": "Height (mm)",
 "Hauteur (unités de 7 mm)": "Height (7 mm units)",
+"Hauteur de couche variable": "Variable layer height",
+"Hauteur de couche variable : aucune pente douce, hauteur inchangée.": "Variable layer height: no gentle slope, height unchanged.",
 "Hauteur des lettres": "Letter height",
 "Hauteur des majuscules (mm)": "Capital letter height (mm)",
 "Hauteur du dos": "Back height",
@@ -469,6 +493,7 @@
 "Interface avancée": "Advanced interface",
 "Interface d'origine de pycentauri": "pycentauri's original interface",
 "JPEG ou PNG, réduite avant l'envoi": "JPEG or PNG, shrunk before sending",
+"Jamais de support ici": "Never support here",
 "Je viens de mettre une bobine neuve": "I just put on a new spool",
 "Jeu d'impression": "Print clearance",
 "Jeu du couvercle": "Lid clearance",
@@ -494,6 +519,7 @@
 "La couleur": "Colour",
 "La couture : chaque couche commence au même endroit.": "The seam: every layer starts at the same place.",
 "La fermeture de la grille d'extraction a échoué": "Closing the exhaust grille failed",
+"La forme apparaît en transparence sur le modèle pendant que tu la règles. Position : depuis le centre du modèle, dans ses propres axes (Z vers le haut). Un nouveau fichier est créé, l'original reste intact.": "The shape shows see-through on the model while you set it. Position: from the model's centre, in its own axes (Z up). A new file is created, the original stays untouched.",
 "La plaque qui reçoit les bacs, à poser au fond d'un tiroir.": "The baseplate that holds the bins, to put at the bottom of a drawer.",
 "La plus discrète": "The most discreet",
 "La prochaine fois : mode multicolore Équilibré (tour d'essuyage).": "Next time: Balanced multicolour mode (wipe tower).",
@@ -512,6 +538,7 @@
 "Langue · Language": "Language · Langue",
 "Largeur": "Width",
 "Largeur (cases de 42 mm)": "Width (42 mm cells)",
+"Largeur (mm)": "Width (mm)",
 "Largeur de bordure": "Brim width",
 "Largeur de bordure (mm)": "Brim width (mm)",
 "Laver le plateau PEI": "Wash the PEI plate",
@@ -563,6 +590,7 @@
 "Liste indisponible (certains firmwares ne la fournissent pas)": "List unavailable (some firmware versions don't provide it)",
 "Lithophanie photo": "Photo lithophane",
 "Longueur": "Length",
+"Longueur (mm)": "Length (mm)",
 "Longueur (vis, entretoise)": "Length (screw, spacer)",
 "Lumière": "Light",
 "Lumière éteinte": "Light off",
@@ -587,6 +615,7 @@
 "Miroir (gauche ↔ droite)": "Mirror (left ↔ right)",
 "Mise en origine": "Homing",
 "Mise en origine, déplacer la tête": "Homing, moving the head",
+"Mise à jour chaque seconde par l'imprimante, en mm. En rouge, la goulotte où la buse purge à chaque changement de couleur.": "Updated every second by the printer, in mm. In red, the chute where the nozzle purges at each colour change.",
 "Mise à jour du firmware": "Firmware update",
 "Mode LAN seulement": "LAN-only mode",
 "Modifier": "Edit",
@@ -615,6 +644,7 @@
 "Nombre de dents": "Number of teeth",
 "Nombre de parois": "Number of walls",
 "Non": "No",
+"Non (même hauteur partout)": "No (same height everywhere)",
 "Non : toutes les taches de couleur": "No: every colour patch",
 "Normal": "Normal",
 "Note l'": "Write down the",
@@ -628,6 +658,7 @@
 "Option enregistrée pour les prochains lancements": "Option saved for future prints",
 "Options de l'imprimante": "Printer options",
 "Options par défaut au lancement d'une impression": "Default options when starting a print",
+"Opération": "Operation",
 "OrcaSlicer a échoué (code": "OrcaSlicer failed (code",
 "Oreilles aux angles": "Mouse ears at corners",
 "Organiseur à compartiments": "Compartment organiser",
@@ -663,8 +694,13 @@
 "Pause ignorée : la pièce est découpée en morceaux, chacun avec sa propre hauteur.": "Pause ignored: the part is cut into pieces, each with its own height.",
 "Pause par l'IA": "Paused by the AI",
 "Pause à la hauteur (mm)": "Pause at height (mm)",
+"Pavé": "Box",
 "Peigne de bureau : les câbles se clipsent par le dessus.": "Desk comb: cables clip in from the top.",
+"Peindre où mettre des supports (ou jamais), et où placer la couture": "Paint where supports go (or never go), and where the seam goes",
 "Pense à vider le bac de purge.": "Remember to empty the purge bin.",
+"Percer (enlever la forme)": "Drill (remove the shape)",
+"Percer ou ajouter une forme": "Drill or add a shape",
+"Percer un trou ou ajouter une forme": "Drill a hole or add a shape",
 "Peu de contact avec le plateau": "Little contact with the plate",
 "Photo": "Photo",
 "Photo de fin d'impression": "End-of-print photo",
@@ -683,6 +719,7 @@
 "Plateau froid : tu peux retirer la pièce": "Plate cold: you can remove the part",
 "Plateau ingénierie": "Engineering plate",
 "Plateau vidé : lancer la suivante": "Plate cleared: start the next one",
+"Plateau vu de dessus, avant en bas": "Plate seen from above, front at the bottom",
 "Plein écran": "Full screen",
 "Plus d'actions": "More actions",
 "Plus d'options": "More options",
@@ -690,12 +727,14 @@
 "Plus de changement de couleur jusqu'à la fin": "No more colour changes until the end",
 "Plus de filament": "Out of filament",
 "Plus de filament (bobine vide)": "Out of filament (empty spool)",
+"Plus fines sur les pentes (dômes et arrondis plus lisses)": "Thinner on slopes (smoother domes and curves)",
 "Plus grand que le plateau": "Larger than the plate",
 "Plus grand que le plateau (256 mm)": "Larger than the plate (256 mm)",
 "Plus tard": "Later",
 "Plusieurs couleurs : vide le bac de purge à l'arrière avant la prochaine impression.": "Several colours: empty the purge bin at the back before the next print.",
 "Porte-clés prénom (2 couleurs)": "Name keychain (2 colours)",
 "Pose l'imprimante sur un support rigide et plat, plateau propre et bien en place, puis relance. Signalé : si la buse insiste toujours au même endroit, arrête (elle peut abîmer le PEI) et rebranche les câbles des capteurs de pesée.": "Put the printer on a rigid, flat surface, plate clean and properly seated, then start again. Reported: if the nozzle keeps pressing at the same spot, stop (it can damage the PEI) and reconnect the load-cell sensor cables.",
+"Position de la buse": "Nozzle position",
 "Posée": "Laid",
 "Pour le": "For the",
 "Pour tiroir ou bureau : nombre de cases réglable.": "For a drawer or a desk: adjustable number of cells.",
@@ -710,6 +749,7 @@
 "Profil Elegoo": "Elegoo profile",
 "Profondeur": "Depth",
 "Profondeur (cases)": "Depth (cells)",
+"Profondeur (mm)": "Depth (mm)",
 "Profondeur du crochet": "Hook depth",
 "Préchauffe": "Preheating",
 "Prénom": "Name",
@@ -814,6 +854,7 @@
 "Scanne avec l'appareil photo, ouvre dans Safari,": "Scan with the camera, open in Safari,",
 "Scanne, saisis le": "Scan, enter the",
 "Score de l'IA sur les dernières images": "AI score over the latest images",
+"Sens": "Direction",
 "Sensibilité": "Sensitivity",
 "Seulement depuis le plateau (rien ne s'appuie sur le modèle)": "Only from the plate (nothing rests on the model)",
 "Seulement la couche choisie, vue de dessus": "Only the chosen layer, seen from above",
@@ -835,11 +876,14 @@
 "Suivi interrompu": "Tracking interrupted",
 "Suivi pas encore démarré": "Tracking not started yet",
 "Support de téléphone": "Phone stand",
+"Support ici": "Support here",
 "Support, crochet, boîte, pièce qui force : 4 parois et remplissage gyroïde.": "Support, hook, box, part under load: 4 walls and gyroid infill.",
 "Supports": "Supports",
 "Supports : retire-les pièce froide, à la pince coupante, en commençant par les plus fins.": "Supports: remove them once the part is cold, with flush cutters, starting with the thinnest.",
+"Supports ajoutés seulement là où tu les as peints.": "Supports added only where you painted them.",
 "Supports durs à enlever ou marques": "Supports hard to remove or marks",
 "Supports en arbre ajoutés : OrcaSlicer a trouvé des parties qui flotteraient sans support.": "Tree supports added: OrcaSlicer found parts that would float without support.",
+"Supports et couture au pinceau": "Supports and seam brush",
 "Supports trop solides ou trop collés à la pièce.": "Supports too strong or too stuck to the part.",
 "Supprimer": "Delete",
 "Supprimer cette impression de la galerie (vidéo et photos) ?": "Delete this print from the gallery (video and photos)?",
@@ -933,6 +977,7 @@
 "Une bobine intermédiaire est inutilisée : elle doit quand même être chargée.": "An intermediate spool is unused: it must still be loaded.",
 "Une couche vide a été détectée : la pièce a peut-être une partie détachée ou trop fine.": "An empty layer was detected: the part may have a detached or too thin section.",
 "Une impression est déjà en cours": "A print is already in progress",
+"Une nouvelle couleur (bobine suivante)": "A new colour (next spool)",
 "Une pause tombe au-dessus de la pièce ou sur la même couche qu'une autre : elle est ignorée.": "A pause falls above the part or on the same layer as another one: it is ignored.",
 "Une pièce sort du plateau : rapproche-la avant d'imprimer.": "A piece is off the plate: bring it back before printing.",
 "Une seule couleur : la bobine du CANVAS est choisie, son filament est réglé.": "A single colour: the CANVAS spool is chosen, its filament is set.",
@@ -980,6 +1025,7 @@
 "WebGL est désactivé dans ce navigateur.": "WebGL is disabled in this browser.",
 "WebGL est désactivé dans ce navigateur. Tout le reste fonctionne.": "WebGL is disabled in this browser. Everything else works.",
 "Workflow ComfyUI": "ComfyUI workflow",
+"Zones peintes effacées": "Painted areas cleared",
 "[comfyui] url": "[comfyui] url",
 "a cette couleur : la plus proche est proposée.": "has this colour: the closest is suggested.",
 "active sur le téléphone (même compte que ce PC), l'atelier marche partout : chez toi comme dehors. Déjà installée avec l'ancienne adresse ? Réinstalle-la avec celle-ci. Sans Tailscale, à la maison :": "app active on the phone (same account as this PC), the workshop works everywhere: at home and away. Already installed with the old address? Reinstall it with this one. Without Tailscale, at home:",
@@ -991,6 +1037,7 @@
 "analyse des couleurs impossible:": "colour analysis failed:",
 "angle entre -90 et 90°": "angle between -90 and 90°",
 "aperçu impossible:": "preview failed:",
+"arrière : essuyage": "back: wiping",
 "arrêt sur erreur. Regarde l'écran de l'imprimante.": "stopped on an error. Look at the printer's screen.",
 "arrêté": "off",
 "arrêtée": "stopped",
@@ -1004,6 +1051,8 @@
 "aucune bobine chargée dans le CANVAS": "no spool loaded in the CANVAS",
 "aucune pièce n'a pu être tranchée :": "no piece could be sliced:",
 "automatique": "automatic",
+"avant": "front",
+"axe : z (debout), x ou y (couché)": "axis: z (standing), x or y (lying)",
 "calcul de la découpe…": "computing the cut…",
 "calcul du filament et du temps…": "working out filament and time…",
 "caméra : flux terminé sans image": "camera: stream ended without an image",
@@ -1017,6 +1066,7 @@
 "ces cotes ne donnent aucune pièce": "these dimensions don't give any part",
 "changements de couleur (≈ 1 min chacun) : pour gagner du temps, passe en couches de 0,28 mm ou regroupe une couleur peu utilisée avec une autre.": "colour changes (≈ 1 min each): to save time, use 0.28 mm layers or merge a little-used colour with another.",
 "chaque couleur doit aller dans une bobine de 1 à 4": "each colour must go to a spool from 1 to 4",
+"chaque dimension de la forme entre 0,5 et 300 mm": "each shape dimension between 0.5 and 300 mm",
 "chevilles de": "dowels of",
 "chrome://certificate-manager": "chrome://certificate-manager",
 "code d'accès": "access code",
@@ -1063,6 +1113,7 @@
 "hors CANVAS.": "outside the CANVAS.",
 "hors de": "outside",
 "hors du modèle (": "outside the model (",
+"il ne reste rien du modèle : la forme ne le touche pas, ou l'enlève en entier": "nothing is left of the model: the shape misses it, or removes all of it",
 "image trop sombre : allume la lumière de la chambre": "image too dark: turn on the chamber light",
 "impression lancée hors de l'atelier : pas de G-code à lire": "print started outside the workshop: no G-code to read",
 "imprimante injoignable": "printer unreachable",
@@ -1074,6 +1125,7 @@
 "l'imprimante refuse le lancement (code": "the printer refuses to start (code",
 "l'épaisseur max doit dépasser l'épaisseur min": "the max thickness must exceed the min thickness",
 "la bobine": "spool",
+"la forme ne touche pas le modèle : rapproche-la (décalages en mm depuis son centre)": "the shape does not touch the model: move it closer (offsets in mm from its centre)",
 "la pièce (": "the part (",
 "lancé ?": "running?",
 "le CANVAS gère 4 filaments au maximum": "the CANVAS handles 4 filaments at most",
@@ -1173,6 +1225,7 @@
 "supports inconnus «": "unknown supports “",
 "sur la CC2": "on the CC2",
 "tableau de bord": "dashboard",
+"taille et position : trois nombres (mm)": "size and position: three numbers (mm)",
 "taille inconnue «": "unknown size “",
 "telle quelle": "as is",
 "temps restant": "time left",
@@ -1212,7 +1265,9 @@
 "» inconnue (": "” unknown (",
 "», original gardé.": "”, original kept.",
 "À l'arrière": "At the back",
+"À l'arrêt": "At rest",
 "À l'envers": "Upside down",
+"À la goulotte (purge)": "At the chute (purging)",
 "À quoi sert la pièce ?": "What is the part for?",
 "À régler sur l'écran de la CC2": "To set on the CC2's screen",
 "Ébavure au cutter. La prochaine fois : couture cachée à l'arrière.": "Deburr with a cutter. Next time: seam hidden at the back.",
@@ -1317,6 +1372,10 @@
 "{}{}Wait for the plate to cool before removing the part: I'll let you know when it is below {} °C."
 ],
 [
+"Faces enregistrées : {} à soutenir, {} sans support, {} pour la couture. Prises en compte au tranchage.",
+"Faces saved: {} to support, {} without support, {} for the seam. Used when slicing."
+],
+[
 "plus stable : {} mm² posés au lieu de {}, {} mm de haut au lieu de {} (les surplombs auront des supports)",
 "more stable: {} mm² on the plate instead of {}, {} mm high instead of {} (overhangs will get supports)"
 ],
@@ -1349,6 +1408,10 @@
 "About {} mm² hang in the air (more than {}°): they will sag without support."
 ],
 [
+"« {} » n'est pas un volume fermé : répare le modèle d'abord (bouton « Réparer »)",
+"“{}” is not a closed volume: repair the model first (“Réparer” button)"
+],
+[
 "Ajouté à la file ({}) : il se lancera depuis l'onglet Imprimante, plateau vidé",
 "Added to the queue ({}): it will start from the Printer tab, once the plate is cleared"
 ],
@@ -1359,6 +1422,10 @@
 [
 "La couleur {} du modèle n'a pas de bobine proche : il sortira en {} (bobine {}).",
 "The model's colour {} has no close spool: it will come out in {} (spool {})."
+],
+[
+"Hauteur de couche variable : environ {} couches de plus, sur les pentes.",
+"Variable layer height: about {} more layers, on the slopes."
 ],
 [
 "Analyse en cours : {} image{} (l'IA juge à partir de 30, soit 5 minutes).",
@@ -1411,6 +1478,10 @@
 [
 "{} : l'IA voit peut-être un raté. Jette un œil à la caméra",
 "{}: the AI may see a failure. Have a look at the camera"
+],
+[
+"Hauteur de couche variable : environ {} couches de moins.",
+"Variable layer height: about {} fewer layers."
 ],
 [
 "qualité '{}' inconnue pour une buse de {} mm. Disponibles: {}",
@@ -1625,6 +1696,10 @@
 ", {} dowels of {} mm to glue"
 ],
 [
+"Enregistrement impossible : {}",
+"Could not save: {}"
+],
+[
 "Supprimer {} de l'imprimante ?",
 "Delete {} from the printer?"
 ],
@@ -1661,6 +1736,10 @@
 "On the plate: {} × {} × {} mm"
 ],
 [
+"opération inconnue « {} » ({})",
+"unknown operation “{}” ({})"
+],
+[
 "{} : valeur « {} » inconnue ({})",
 "{}: value “{}” unknown ({})"
 ],
@@ -1675,6 +1754,10 @@
 [
 "Couche {} / {} · {} mm sur {} mm",
 "Layer {} / {} · {} mm of {} mm"
+],
+[
+"Nouveau fichier : {} ({} mm)",
+"New file: {} ({} mm)"
 ],
 [
 "Rien ne répond sur {}:{} ({}).",
@@ -1707,6 +1790,10 @@
 [
 "caméra indisponible ({})",
 "camera unavailable ({})"
+],
+[
+"forme inconnue « {} » ({})",
+"unknown shape “{}” ({})"
 ],
 [
 "Pièce non tranchée — {}",
@@ -1891,6 +1978,10 @@
 [
 "{}arrêtée à {} %",
 "{}stopped at {} %"
+],
+[
+"Couleur {} ({})",
+"Colour {} ({})"
 ],
 [
 "Peindre en {}",

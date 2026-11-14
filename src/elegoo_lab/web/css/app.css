@@ -225,6 +225,8 @@
 
   dialog { background: var(--surface); color: var(--txt); border: 1px solid var(--line-strong); border-radius: 14px; padding: 0; width: min(520px, calc(100vw - 32px)); box-shadow: 0 20px 60px var(--shadow); }
   dialog::backdrop { background: rgba(30,34,42,.45); backdrop-filter: blur(2px); }
+  /* the shape dialog stays beside the 3D view: the shape is placed by looking at it */
+  #shp { margin: auto 16px auto auto; } #shp::backdrop { background: transparent; backdrop-filter: none; }
   .dlg-h { display: flex; align-items: center; justify-content: space-between; padding: 12px 12px 12px 20px; border-bottom: 1px solid var(--line); font-weight: 650; }
   .dlg-b { padding: 18px 20px; max-height: 60vh; overflow: auto; }
   .dlg-f { padding: 14px 20px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; gap: 8px; }
@@ -285,6 +287,17 @@
   }
   .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px; min-width: 0; }
   .card-h { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+  .pos { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; align-items: center; }
+  .pos-map { width: 100%; max-width: 220px; aspect-ratio: 272 / 286; }
+  .pos-bed { fill: var(--plate); stroke: var(--line-strong); }
+  .pos-grid { stroke: var(--grid); stroke-width: .8; fill: none; }
+  .pos-chute { fill: var(--bad); opacity: .55; }
+  .pos-trail { fill: none; stroke: var(--acc); stroke-width: 1.6; stroke-linejoin: round; opacity: .55; }
+  .pos-dot { fill: var(--acc); stroke: var(--surface); stroke-width: 2; }
+  .pos-lbl { fill: var(--faint); font-size: 9px; }
+  .pos-xyz { display: grid; gap: 8px; min-width: 92px; }
+  .pos-xyz div { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .pos-xyz span { color: var(--faint); font-size: 12px; } .pos-xyz b { font-size: 18px; font-variant-numeric: tabular-nums; }
   .card-h h3 { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--dim); }
   .ro { margin: 0 20px; }
   .banner { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 10px; background: var(--acc-soft); border: 1px solid var(--acc); font-size: 13.5px; }
@@ -380,6 +393,7 @@
     .pv { padding: 12px; gap: 12px; } .kpis { gap: 8px; } .stats { grid-template-columns: repeat(2, 1fr); }
     .trays { grid-template-columns: repeat(2, 1fr); } .tests { grid-template-columns: 1fr; }
     dialog { width: calc(100vw - 24px); max-width: none; } .m-hide { display: none !important; }
+    #shp { margin: auto auto 12px; max-height: 58vh; }
     /* phone header: the state in words, one theme swatch (tap it for the next), no tablet button */
     #printer-txt { display: inline; max-width: none; } #printer-temp { display: none; }
     .themes button:not(.on) { display: none; }
@@ -441,6 +455,8 @@
   .pb-sw { display: flex; gap: 6px; }
   .pb-sw button { width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--line); cursor: pointer; padding: 0; }
   .pb-sw button.on { border-color: var(--acc); box-shadow: 0 0 0 2px var(--acc); }
+  .pb-sw button.erase { background: var(--raised); color: var(--txt); display: grid; place-items: center; }
+  .pb-sw button.erase .i { width: 16px; height: 16px; }
   .pb-size { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--dim); }
   .pb-size input { width: 90px; }
   .pb-hint { flex-basis: 100%; text-align: center; font-size: 12px; color: var(--faint); }

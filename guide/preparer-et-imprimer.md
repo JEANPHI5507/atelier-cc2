@@ -20,6 +20,11 @@ réglages**, **3. Trancher**, puis **Imprimer**. Les mêmes opérations existent
   est déjà dans l'imprimante.
 - **Renommer**, **sélectionner plusieurs fichiers**, **faire le ménage** (fichiers techniques et G-code orphelins,
   avec la place gagnée) : menu « ⋯ ».
+- **Percer ou ajouter une forme** (bouton cube en haut de la fiche du modèle) : un cylindre, un pavé ou une boule, à
+  percer dans le modèle (un trou pour une vis, un aimant, une ficelle), à ajouter (un plot, un socle, dans une couleur
+  du modèle ou une nouvelle) ou à garder seul (ce que la forme et le modèle ont en commun). La forme apparaît en
+  transparence sur le modèle pendant qu'on la règle (taille, sens, décalage depuis son centre). Les couleurs du modèle
+  sont gardées ; un nouveau fichier est créé, l'original reste intact.
 
 ## La vue 3D
 
@@ -46,6 +51,9 @@ modifiable : couleur par couleur, ou **Modifier**.
 - **Assembler** (en haut de la bibliothèque) : un modèle livré en plusieurs fichiers, un par couleur, devient un seul
   modèle multicolore.
 - **Pinceau** (vue 3D, modèles GLB, OBJ, PLY) : retoucher les couleurs à la main.
+- **Supports** (vue 3D, tous les modèles) : peindre « Support ici » (vert), « Jamais de support ici » (rouge) et
+  « Couture ici » (bleu, l'endroit où commence chaque couche), la gomme efface. Des supports peints sans avoir demandé de
+  supports : il n'y en a que là. Les zones sont gardées à côté du modèle, le fichier lui-même ne change pas.
 
 ## 2. Taille et réglages
 
@@ -87,9 +95,10 @@ Exemple mesuré : une figurine de 95 mm passe de 62 g / 3 h 35 (profil Elegoo) �
 - **Exemplaires** sur le plateau (jusqu'à 50, en grille). Chaque pièce est marquée dans le G-code : si l'une rate, on
   peut l'abandonner et finir les autres.
 - **Réglages avancés** (vide = valeur du profil CC2) : parois, couches pleines, motif de remplissage, motif du dessus,
-  une seule paroi sur le dessus (déjà active dans le profil CC2), paroi extérieure précise (cotes justes pour les pièces
-  qui s'emboîtent), couture, lissage, bordure, radeau, angle des supports, températures, avance de pression, débit…
-  Chaque valeur est vérifiée avant d'aller au slicer.
+  une seule paroi sur le dessus (déjà active dans le profil CC2), hauteur de couche variable (couches plus fines là où
+  la surface est en pente douce, pour des dômes et arrondis plus lisses), paroi extérieure précise (cotes justes pour
+  les pièces qui s'emboîtent), couture, lissage, bordure, radeau, angle des supports, températures, avance de
+  pression, débit… Chaque valeur est vérifiée avant d'aller au slicer.
 
 ### Multicolore
 

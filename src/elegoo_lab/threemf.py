@@ -39,6 +39,8 @@ class Part:
     paint: list[str | None] | None = None          # TriangleSelector code per face
     face_rgb: np.ndarray | None = None             # (M, 3) from standard 3MF colours
     locked: np.ndarray | None = None               # (M,) faces repainted by hand: kept as painted
+    supports: list[str | None] | None = None       # paint_supports code per face (support here / never here)
+    seam: list[str | None] | None = None           # paint_seam code per face (seam here / never here)
 
 
 @dataclass
@@ -79,6 +81,7 @@ _FAST_T = re.compile(rb'<triangle\s+v1="(\d+)"\s+v2="(\d+)"\s+v3="(\d+)"'
 _PAINT = re.compile(rb'\spaint_color="([^"]*)"')
 _MMU = re.compile(rb'\s[\w.-]+:mmu_segmentation="([^"]*)"')
 _PID, _P1 = re.compile(rb'\spid="([^"]*)"'), re.compile(rb'\sp1="([^"]*)"')
+_SUPPORTS, _SEAM = re.compile(rb'\spaint_supports="([^"]*)"'), re.compile(rb'\spaint_seam="([^"]*)"')
 
 
 def _attr(name: bytes, attrs: list[bytes]) -> list[bytes | None]:
@@ -101,6 +104,8 @@ class _Mesh:
     faces: np.ndarray
     paint: list[str | None] | None
     tris: list[bytes]               # each triangle's raw attributes, only when they carry more (colours)
+    supports: list[str | None] | None = None
+    seam: list[str | None] | None = None
 
 
 def _mesh_arrays(block: bytes) -> _Mesh:
@@ -117,7 +122,9 @@ def _mesh_arrays(block: bytes) -> _Mesh:
     tris = _TRIANGLE.findall(block)
     faces = _numbers(list(zip(*(_attr(k, tris) for k in (b"v1", b"v2", b"v3")))), np.int64)
     paint = [_code(_PAINT.search(b" " + t)) or _code(_MMU.search(b" " + t)) for t in tris]
-    return _Mesh(vertices, faces, paint if any(paint) else None, tris)
+    marks = [[_code(rx.search(b" " + t)) for t in tris] if any(rx.search(b" " + t) for t in tris) else None
+             for rx in (_SUPPORTS, _SEAM)]
+    return _Mesh(vertices, faces, paint if any(paint) else None, tris, *(m if m and any(m) else None for m in marks))
 
 
 _CACHE: dict[tuple, Project] = {}
@@ -136,7 +143,9 @@ def cached(path: Path, load: Callable[[Path], Project]) -> Project:
     return Project([Object(o.name, [Part(p.name, p.vertices.copy(), p.faces.copy(), p.extruder,
                                          None if p.paint is None else list(p.paint),
                                          None if p.face_rgb is None else p.face_rgb.copy(),
-                                         None if p.locked is None else p.locked.copy()) for p in o.parts])
+                                         None if p.locked is None else p.locked.copy(),
+                                         None if p.supports is None else list(p.supports),
+                                         None if p.seam is None else list(p.seam)) for p in o.parts])
                     for o in pr.objects], list(pr.colours))
 
 
@@ -220,7 +229,7 @@ def _read(path: Path) -> Project:
                 p1 = tp1.group(1).decode() if tp1 else (oidx if tp is None else "0")
                 group = mats.get(pid)
                 rgb[i] = group[int(p1 or 0)] if group else (192, 192, 192)
-        return Part(name, vs, faces, ext, paint, rgb)
+        return Part(name, vs, faces, ext, paint, rgb, None, m.supports, m.seam)
 
     def flatten(doc_path: str, oid: str, xf: np.ndarray, top_id: str, name: str) -> list[Part]:
         objs, mats = cache[doc_path]
@@ -269,7 +278,13 @@ def write(project: Project, out: Path, *, filaments: int, colours: list[str], of
             v = np.asarray(p.vertices + off, float)
             # one %-format over the whole array instead of a Python loop: 600k faces took ~1.5 s
             verts = ('     <vertex x="%.5f" y="%.5f" z="%.5f"/>\n' * len(v)) % tuple(v.ravel().tolist())
-            if p.paint:
+            if p.supports or p.seam:   # rare: hand-painted supports or seam, a slower but general loop
+                n = len(p.faces)
+                cols = [(k, c) for k, c in (("paint_color", p.paint), ("paint_supports", p.supports), ("paint_seam", p.seam)) if c]
+                tris = "".join(f'     <triangle v1="{a}" v2="{b}" v3="{c}"'
+                               + "".join(f' {k}="{codes[i]}"' for k, codes in cols if codes[i]) + "/>\n"
+                               for i, (a, b, c) in zip(range(n), np.asarray(p.faces).tolist()))
+            elif p.paint:
                 tris = "".join(f'     <triangle v1="{a}" v2="{b}" v3="{c}"' + (f' paint_color="{code}"/>\n' if code else "/>\n")
                                for (a, b, c), code in zip(np.asarray(p.faces).tolist(), p.paint))
             else:
