@@ -44,7 +44,10 @@ Le dépôt du firmware ne contient pas la couche réseau : les commandes du prot
   (« Elegoo PLA @ECC2 »).
 - **Ramming désactivé**, comme dans ElegooSlicer : activé, il provoque l'erreur 1243 (extrusion anormale).
 - La CC2 **nivelle toujours** avant d'imprimer. L'atelier garde le maillage de nivellement du slicer (limité à la zone
-  de la pièce, plus rapide) ; le retirer (`[tranchage] niveler = false`) la fait niveler tout le plateau.
+  de la pièce, plus rapide) ; le retirer (`[tranchage] niveler = false`) la fait niveler tout le plateau. Sur une
+  petite pièce, elle ne palpe que sa zone (16 points, une étoile de 28 mm) ; sur une grande zone qui touche le bord du
+  plateau (tour de purge comprise), elle a déjà palpé tout le plateau (environ 9 min). Ce choix est fait par un module
+  fermé d'Elegoo.
 - Le firmware lit `EXCLUDE_OBJECT_DEFINE` comme Klipper : avec plusieurs exemplaires, on peut abandonner une pièce
   ratée et finir les autres.
 - `PAUSE` dans le G-code marche : la tête se gare au-dessus du bac et la buse baisse à 100 °C.

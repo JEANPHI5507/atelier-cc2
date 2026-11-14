@@ -43,7 +43,9 @@ The firmware repository doesn't include the network layer: the protocol commands
   ("Elegoo PLA @ECC2").
 - **Ramming disabled**, as in ElegooSlicer: enabled, it causes error 1243 (abnormal extrusion).
 - The CC2 **always levels** before printing. The workshop keeps the slicer's levelling mesh (limited to the part's area,
-  faster); removing it (`[tranchage] niveler = false`) makes it level the whole bed.
+  faster); removing it (`[tranchage] niveler = false`) makes it level the whole bed. On a small part it probes only
+  that area (16 points, a 28 mm star); on a large area reaching the bed's edge (prime tower included) it has probed the
+  whole bed (about 9 min). That choice is made by a closed Elegoo module.
 - The firmware reads `EXCLUDE_OBJECT_DEFINE` like Klipper: with several copies, a failed part can be dropped and the
   others finished.
 - `PAUSE` in the G-code works: the head parks above the bin and the nozzle drops to 100 °C.
