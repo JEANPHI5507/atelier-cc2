@@ -20,7 +20,7 @@ is). Every event goes into the log (the bell at the top of the workshop).
 | **Printer unreachable** / reachable again | no news during a print |
 | Suspicious print / **Failure detected** | the camera AI has a doubt / is sure (automatic pause if enabled) |
 | Camera frozen | the camera no longer changes picture (a known defect of some firmware versions) |
-| Spool almost empty / new spool | under 100 g left, another spool detected in the CANVAS |
+| Spool almost empty / new spool / spool put back | under 100 g left, another spool detected in the CANVAS, a spool seen before put back with its weight |
 | Maintenance due | a task in the maintenance log is due |
 
 (In the English interface, and on the phone once English is chosen, the alerts are in English.)

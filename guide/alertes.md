@@ -20,7 +20,7 @@ le cas en permanence). Chaque événement est noté dans le journal (la cloche e
 | **Imprimante injoignable** / de nouveau joignable | plus de nouvelles pendant une impression |
 | Impression suspecte / **Raté détecté** | l'IA de la caméra a un doute / est sûre (pause automatique si activée) |
 | Caméra figée | la caméra ne change plus d'image (un défaut connu de certains firmwares) |
-| Bobine presque vide / nouvelle bobine | moins de 100 g restants, autre bobine détectée dans le CANVAS |
+| Bobine presque vide / nouvelle bobine / bobine remise | moins de 100 g restants, autre bobine détectée dans le CANVAS, bobine déjà vue remise avec son poids |
 | Entretien à faire | une tâche du carnet d'entretien arrive à échéance |
 
 ## Sur une page ouverte

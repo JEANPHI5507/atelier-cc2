@@ -27,6 +27,15 @@ CHOICES: dict[str, tuple[str, str, dict[str, tuple[str, str]]]] = {
     "couture": ("seam_position", "Couture (point de départ de chaque couche)", {
         "alignee": ("aligned", "Alignée"), "proche": ("nearest", "La plus discrète"), "arriere": ("back", "À l'arrière"),
         "aleatoire": ("random", "Aléatoire (pas de ligne visible)")}),
+    "motif_dessus": ("top_surface_pattern", "Motif de la face du dessus", {
+        "lignes_regulieres": ("monotonicline", "Lignes régulières"), "monotone": ("monotonic", "Lignes dans un seul sens"),
+        "lignes": ("rectilinear", "Lignes (aller-retour)"), "concentrique": ("concentric", "Concentrique (suit le contour)"),
+        "spirale": ("octagramspiral", "Spirale étoilée"), "hilbert": ("hilbertcurve", "Courbe de Hilbert (labyrinthe)"),
+        "cordes": ("archimedeanchords", "Cordes d'Archimède (cercles)")}),
+    "paroi_dessus": ("only_one_wall_top", "Une seule paroi sur le dessus (dessus plus net)", {
+        "oui": ("1", "Oui"), "non": ("0", "Non")}),
+    "paroi_precise": ("precise_outer_wall", "Paroi extérieure précise (cotes justes, pièces qui s'emboîtent)", {
+        "oui": ("1", "Oui"), "non": ("0", "Non")}),
     "lissage": ("ironing_type", "Lissage du dessus", {
         "non": ("no ironing", "Non"), "dessus": ("top", "Toutes les faces du dessus"), "dernier": ("topmost", "Seulement la face la plus haute")}),
     "peau": ("fuzzy_skin", "Texture « peau » (aspect granuleux)", {

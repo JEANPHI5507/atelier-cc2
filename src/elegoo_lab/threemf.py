@@ -11,11 +11,13 @@ Per part we keep: world-space mesh, filament (``extruder``), per-triangle painti
 
 from __future__ import annotations
 
+import itertools
 import json
 import re
 import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Callable
 from xml.etree import ElementTree as ET
 from xml.sax.saxutils import quoteattr
 
@@ -65,10 +67,102 @@ def _colour(c: str) -> tuple[int, int, int]:
     return int(c[0:2], 16), int(c[2:4], 16), int(c[4:6], 16)
 
 
+# Meshes are cut out of the XML before parsing it and decoded in bulk: one Element per vertex and triangle
+# took ~2.5 s on a 600k-triangle model, read several times per slice.
+_MESH = re.compile(rb"<((?:[\w.-]+:)?)mesh(?:\s[^>]*?)?(?<!/)>")
+_VERTEX = re.compile(rb"<(?:[\w.-]+:)?vertex[\s/>]([^>]*)>")
+_TRIANGLE = re.compile(rb"<(?:[\w.-]+:)?triangle[\s/>]([^>]*)>")
+# the usual shapes (what Orca, Bambu, Prusa and we write), decoded with no per-element Python
+_FAST_V = re.compile(rb'<vertex\s+x="([^"]*)"\s+y="([^"]*)"\s+z="([^"]*)"\s*/>')
+_FAST_T = re.compile(rb'<triangle\s+v1="(\d+)"\s+v2="(\d+)"\s+v3="(\d+)"'
+                     rb'(?:\s+(?:paint_color|[\w.-]+:mmu_segmentation)="([^"]*)")?\s*/>')
+_PAINT = re.compile(rb'\spaint_color="([^"]*)"')
+_MMU = re.compile(rb'\s[\w.-]+:mmu_segmentation="([^"]*)"')
+_PID, _P1 = re.compile(rb'\spid="([^"]*)"'), re.compile(rb'\sp1="([^"]*)"')
+
+
+def _attr(name: bytes, attrs: list[bytes]) -> list[bytes | None]:
+    rx = re.compile(rb"\s" + name + rb'="([^"]*)"')
+    return [m.group(1) if (m := rx.search(b" " + a)) else None for a in attrs]
+
+
+def _code(m: re.Match | None) -> str | None:
+    return m.group(1).decode() or None if m else None
+
+
+def _numbers(rows: list[tuple], dtype: type) -> np.ndarray:
+    flat = b" ".join(itertools.chain.from_iterable(rows))
+    return np.fromstring(flat, dtype=dtype, sep=" ").reshape(-1, 3) if rows else np.zeros((0, 3), dtype)
+
+
+@dataclass
+class _Mesh:
+    vertices: np.ndarray
+    faces: np.ndarray
+    paint: list[str | None] | None
+    tris: list[bytes]               # each triangle's raw attributes, only when they carry more (colours)
+
+
+def _mesh_arrays(block: bytes) -> _Mesh:
+    """Vertices, faces and painting from the inside of a <mesh>."""
+    xyz = _FAST_V.findall(block)
+    if len(xyz) != block.count(b"vertex"):   # attributes in another order, or others in between
+        vattrs = _VERTEX.findall(block)
+        xyz = list(zip(*(_attr(k, vattrs) for k in (b"x", b"y", b"z"))))
+    vertices = _numbers(xyz, float)
+    rows = _FAST_T.findall(block)
+    if len(rows) == block.count(b"triangle") - block.count(b"triangles"):   # <triangles> and </triangles> aside
+        paint = [r[3].decode() or None for r in rows] if any(r[3] for r in rows) else None
+        return _Mesh(vertices, _numbers([r[:3] for r in rows], np.int64), paint, [])
+    tris = _TRIANGLE.findall(block)
+    faces = _numbers(list(zip(*(_attr(k, tris) for k in (b"v1", b"v2", b"v3")))), np.int64)
+    paint = [_code(_PAINT.search(b" " + t)) or _code(_MMU.search(b" " + t)) for t in tris]
+    return _Mesh(vertices, faces, paint if any(paint) else None, tris)
+
+
+_CACHE: dict[tuple, Project] = {}
+
+
+def cached(path: Path, load: Callable[[Path], Project]) -> Project:
+    """``load(path)``, kept per file version: one slice reads its model four times, and every analysis of a
+    model just opened reads it again. Callers get their own copy, since they move and repaint the parts."""
+    st = Path(path).stat()
+    key = (str(Path(path).resolve()), st.st_mtime_ns, st.st_size, load.__qualname__)
+    if key not in _CACHE:
+        _CACHE[key] = load(Path(path))
+        while len(_CACHE) > 6:
+            _CACHE.pop(next(iter(_CACHE)))
+    pr = _CACHE[key]
+    return Project([Object(o.name, [Part(p.name, p.vertices.copy(), p.faces.copy(), p.extruder,
+                                         None if p.paint is None else list(p.paint),
+                                         None if p.face_rgb is None else p.face_rgb.copy(),
+                                         None if p.locked is None else p.locked.copy()) for p in o.parts])
+                    for o in pr.objects], list(pr.colours))
+
+
 def read(path: Path) -> Project:
+    return cached(path, _read)
+
+
+def _read(path: Path) -> Project:
+    meshes: dict[str, _Mesh] = {}
+
+    def parse(name: str, data: bytes) -> ET.Element:
+        out, pos = [], 0
+        while m := _MESH.search(data, pos):
+            close = b"</" + m.group(1) + b"mesh>"
+            end = data.find(close, m.end())
+            if end < 0:
+                break
+            key = f"{name}#{len(meshes)}"
+            meshes[key] = _mesh_arrays(data[m.end():end])
+            out += [data[pos:m.start()], b"<" + m.group(1) + b'mesh cc2ref="' + key.encode() + b'"/>']
+            pos = end + len(close)
+        return ET.fromstring(b"".join(out) + data[pos:])
+
     with zipfile.ZipFile(path) as z:
         names = z.namelist()
-        docs = {"/" + n: ET.fromstring(z.read(n)) for n in names if n.endswith(".model")}
+        docs = {"/" + n: parse("/" + n, z.read(n)) for n in names if n.endswith(".model")}
         settings = z.read("Metadata/model_settings.config").decode("utf-8", "ignore") \
             if "Metadata/model_settings.config" in names else ""
         try:
@@ -113,21 +207,20 @@ def read(path: Path) -> Project:
 
     def mesh_part(el: ET.Element, mats: dict, xf: np.ndarray, name: str, ext: int) -> Part:
         mesh = el.find(f"{{{CORE}}}mesh")
-        vs = np.array([[float(v.get("x")), float(v.get("y")), float(v.get("z"))]
-                       for v in mesh.find(f"{{{CORE}}}vertices")], dtype=float) * unit
-        vs = (np.c_[vs, np.ones(len(vs))] @ xf)[:, :3]
-        tris = list(mesh.find(f"{{{CORE}}}triangles"))
-        faces = np.array([[int(t.get("v1")), int(t.get("v2")), int(t.get("v3"))] for t in tris], dtype=np.int64)
-        paint = [t.get("paint_color") or t.get(f"{{{SLIC3R}}}mmu_segmentation") for t in tris]
+        m = meshes[mesh.get("cc2ref")]
+        vs, faces, paint, tris = m.vertices, m.faces, m.paint, m.tris
+        vs = (np.c_[vs * unit, np.ones(len(vs))] @ xf)[:, :3]
         rgb = None
         opid, oidx = el.get("pid"), el.get("pindex")
-        if mats and (opid or any(t.get("pid") for t in tris)):
-            rgb = np.zeros((len(tris), 3))
-            for i, t in enumerate(tris):
-                pid, p1 = t.get("pid", opid), t.get("p1", oidx if t.get("pid") is None else "0")
+        if mats and (opid or any(_PID.search(b" " + t) for t in tris)):
+            rgb = np.zeros((len(faces), 3))
+            for i, t in enumerate(tris or [b""] * len(faces)):
+                tp, tp1 = _PID.search(b" " + t), _P1.search(b" " + t)
+                pid = tp.group(1).decode() if tp else opid
+                p1 = tp1.group(1).decode() if tp1 else (oidx if tp is None else "0")
                 group = mats.get(pid)
                 rgb[i] = group[int(p1 or 0)] if group else (192, 192, 192)
-        return Part(name, vs, faces, ext, paint if any(paint) else None, rgb)
+        return Part(name, vs, faces, ext, paint, rgb)
 
     def flatten(doc_path: str, oid: str, xf: np.ndarray, top_id: str, name: str) -> list[Part]:
         objs, mats = cache[doc_path]
@@ -173,17 +266,19 @@ def write(project: Project, out: Path, *, filaments: int, colours: list[str], of
         for p in o.parts:
             pid += 1
             fname = f"3D/Objects/part_{pid}.model"
-            v = p.vertices + off
-            tri = []
-            for k, (a, b, c) in enumerate(p.faces):
-                code = p.paint[k] if p.paint else None
-                tri.append(f'     <triangle v1="{a}" v2="{b}" v3="{c}"' + (f' paint_color="{code}"' if code else "") + "/>")
+            v = np.asarray(p.vertices + off, float)
+            # one %-format over the whole array instead of a Python loop: 600k faces took ~1.5 s
+            verts = ('     <vertex x="%.5f" y="%.5f" z="%.5f"/>\n' * len(v)) % tuple(v.ravel().tolist())
+            if p.paint:
+                tris = "".join(f'     <triangle v1="{a}" v2="{b}" v3="{c}"' + (f' paint_color="{code}"/>\n' if code else "/>\n")
+                               for (a, b, c), code in zip(np.asarray(p.faces).tolist(), p.paint))
+            else:
+                tris = ('     <triangle v1="%d" v2="%d" v3="%d"/>\n' * len(p.faces)) % tuple(np.asarray(p.faces).ravel().tolist())
             files[fname] = (
                 f'<?xml version="1.0" encoding="UTF-8"?>\n<model unit="millimeter" xml:lang="en-US" {_NS}>\n'
                 f' <resources>\n  <object id="{pid}" type="model">\n   <mesh>\n    <vertices>\n'
-                + "\n".join(f'     <vertex x="{x:.5f}" y="{y:.5f}" z="{z:.5f}"/>' for x, y, z in v)
-                + "\n    </vertices>\n    <triangles>\n" + "\n".join(tri)
-                + "\n    </triangles>\n   </mesh>\n  </object>\n </resources>\n <build/>\n</model>\n"
+                + verts + "    </vertices>\n    <triangles>\n" + tris
+                + "    </triangles>\n   </mesh>\n  </object>\n </resources>\n <build/>\n</model>\n"
             )
             comps.append(f'    <component p:path="/{fname}" objectid="{pid}" transform="1 0 0 0 1 0 0 0 1 0 0 0"/>')
             rels.append(f' <Relationship Target="/{fname}" Id="rel-{pid}" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/>')
@@ -227,7 +322,8 @@ def write(project: Project, out: Path, *, filaments: int, colours: list[str], of
         ' <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>\n'
         ' <Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/>\n</Types>\n')
     out.parent.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
+    # light compression: level 6 spent a second on a big model for files 20 % smaller
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED, compresslevel=1) as z:
         for name, data in files.items():
             z.writestr(name, data)
 

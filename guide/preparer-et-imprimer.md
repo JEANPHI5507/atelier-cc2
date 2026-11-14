@@ -86,9 +86,10 @@ Exemple mesuré : une figurine de 95 mm passe de 62 g / 3 h 35 (profil Elegoo) �
   depuis l'atelier ou l'écran.
 - **Exemplaires** sur le plateau (jusqu'à 50, en grille). Chaque pièce est marquée dans le G-code : si l'une rate, on
   peut l'abandonner et finir les autres.
-- **Réglages avancés** (vide = valeur du profil CC2) : parois, couches pleines, motif de remplissage, couture, lissage,
-  bordure, radeau, angle des supports, températures, avance de pression, débit… Chaque valeur est vérifiée avant
-  d'aller au slicer.
+- **Réglages avancés** (vide = valeur du profil CC2) : parois, couches pleines, motif de remplissage, motif du dessus,
+  une seule paroi sur le dessus (déjà active dans le profil CC2), paroi extérieure précise (cotes justes pour les pièces
+  qui s'emboîtent), couture, lissage, bordure, radeau, angle des supports, températures, avance de pression, débit…
+  Chaque valeur est vérifiée avant d'aller au slicer.
 
 ### Multicolore
 

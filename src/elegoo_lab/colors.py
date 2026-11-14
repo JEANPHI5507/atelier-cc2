@@ -22,6 +22,7 @@ import copy
 import json
 import os
 import re
+import struct
 from collections import Counter
 from pathlib import Path
 from typing import Any, Callable
@@ -252,10 +253,13 @@ def _mesh_project(path: Path) -> threemf.Project:
 
 
 def _load(path: Path) -> threemf.Project:
-    ext = path.suffix.lower()
-    if ext == ".3mf":
+    if path.suffix.lower() == ".3mf":
         return threemf.read(path)
-    if ext in MESH_COLOUR_EXT:
+    return threemf.cached(path, _load_mesh)
+
+
+def _load_mesh(path: Path) -> threemf.Project:
+    if path.suffix.lower() in MESH_COLOUR_EXT:
         return _mesh_project(path)
     m = mesh.load(path)  # plain STL & co: one colour
     return threemf.Project([threemf.Object(path.stem, [threemf.Part(path.stem, np.asarray(m.vertices, float),
@@ -770,20 +774,67 @@ def piece_ranges(path: Path) -> list[dict[str, Any]]:
     return out
 
 
-def preview_glb(path: Path, mapping: dict[int, int] | None = None, palette: Palette | None = None) -> trimesh.Trimesh:
-    """``preview`` for the viewer: triangle ``i`` is face ``i`` of the model (so a brush can name faces), each
-    corner is its own vertex (crisp colour edges), normals are smoothed over the real surface."""
+def _preview_corners(path: Path, mapping: dict[int, int] | None, palette: Palette | None
+                     ) -> tuple[np.ndarray, np.ndarray, np.ndarray | None]:
+    """Corner positions (3 per face, in face order), their RGBA, and normals smoothed over the real surface
+    (None when welding changes the face count)."""
     m = preview(path, mapping, palette)
     v, f = np.asarray(m.vertices, float), np.asarray(m.faces)
     rgba = np.asarray(m.visual.face_colors)
     welded = trimesh.Trimesh(v, f, process=False)
     welded.merge_vertices()
-    corner = f.reshape(-1)
-    out = trimesh.Trimesh(v[corner], np.arange(len(corner)).reshape(-1, 3), process=False)
-    out.visual = trimesh.visual.ColorVisuals(out, vertex_colors=np.repeat(rgba, 3, axis=0))
-    if len(welded.faces) == len(f):
-        out.vertex_normals = welded.vertex_normals[welded.faces].reshape(-1, 3)
+    normals = welded.vertex_normals[welded.faces].reshape(-1, 3) if len(welded.faces) == len(f) else None
+    return v[f.reshape(-1)], np.repeat(rgba, 3, axis=0), normals
+
+
+def preview_glb(path: Path, mapping: dict[int, int] | None = None, palette: Palette | None = None) -> trimesh.Trimesh:
+    """``preview`` for the viewer: triangle ``i`` is face ``i`` of the model (so a brush can name faces), each
+    corner is its own vertex (crisp colour edges), normals are smoothed over the real surface."""
+    pos, rgba, normals = _preview_corners(path, mapping, palette)
+    out = trimesh.Trimesh(pos, np.arange(len(pos)).reshape(-1, 3), process=False)
+    out.visual = trimesh.visual.ColorVisuals(out, vertex_colors=rgba)
+    if normals is not None:
+        out.vertex_normals = normals
     return out
+
+
+def preview_glb_bytes(path: Path, mapping: dict[int, int] | None = None, palette: Palette | None = None) -> bytes:
+    """``preview_glb`` written compactly: no index (it was the identity), normals on one byte per axis
+    (KHR_mesh_quantization). 20 bytes a corner instead of 32: a 600k-face model drops from 59 to 37 MB."""
+    pos, rgba, normals = _preview_corners(path, mapping, palette)
+    n = len(pos)
+    views, accessors, attrs, blobs, offset = [], [], {}, [], 0
+
+    def add(name: str, data: np.ndarray, kind: str, ctype: int, stride: int | None = None, **extra: Any) -> None:
+        nonlocal offset
+        raw = np.ascontiguousarray(data).tobytes()
+        views.append({"buffer": 0, "byteOffset": offset, "byteLength": len(raw), "target": 34962,
+                      **({"byteStride": stride} if stride else {})})
+        accessors.append({"bufferView": len(views) - 1, "componentType": ctype, "count": n, "type": kind, **extra})
+        attrs[name] = len(accessors) - 1
+        blobs.append(raw)
+        offset += len(raw)
+
+    p32 = pos.astype(np.float32)
+    add("POSITION", p32, "VEC3", 5126, min=p32.min(0).tolist() if n else [0, 0, 0],
+        max=p32.max(0).tolist() if n else [0, 0, 0])
+    add("COLOR_0", rgba.astype(np.uint8), "VEC4", 5121, normalized=True)
+    used = []
+    if normals is not None:   # signed bytes, each padded to 4 (vertex attributes are 4-byte aligned)
+        q = np.zeros((n, 4), np.int8)
+        q[:, :3] = np.clip(np.round(normals * 127), -127, 127)
+        add("NORMAL", q, "VEC3", 5120, stride=4, normalized=True)
+        used = ["KHR_mesh_quantization"]
+    gltf = {"asset": {"version": "2.0", "generator": "atelier-cc2"}, "scene": 0, "scenes": [{"nodes": [0]}],
+            "nodes": [{"mesh": 0}], "meshes": [{"primitives": [{"attributes": attrs, "mode": 4}]}],
+            "accessors": accessors, "bufferViews": views, "buffers": [{"byteLength": offset}],
+            **({"extensionsUsed": used, "extensionsRequired": used} if used else {})}
+    js = json.dumps(gltf, separators=(",", ":")).encode()
+    js += b" " * (-len(js) % 4)
+    body = b"".join(blobs)
+    body += b"\0" * (-len(body) % 4)
+    head = struct.pack("<4sII", b"glTF", 2, 12 + 8 + len(js) + 8 + len(body))
+    return head + struct.pack("<I4s", len(js), b"JSON") + js + struct.pack("<I4s", len(body), b"BIN\0") + body
 
 
 def solid(path: Path, mapping: dict[int, int], *, height_mm: float | None = None,

@@ -78,7 +78,9 @@ def orientations(path: Path, height_mm: float | None = None, rz: int = 0) -> lis
     if not height_mm and mesh.info(path).get("unitless"):
         height_mm = mesh.DEFAULT_AI_HEIGHT_MM
     v0, f, slots, slot_hex = colors.solid(path, {})          # loaded once, turned six times
-    rgb = np.array([colors._rgb(slot_hex[int(s) - 1]) for s in slots]) if slot_hex else np.full((len(f), 3), 190.0)
+    rgb = (np.array([colors._rgb(h) for h in slot_hex])[np.asarray(slots, int) - 1] if slot_hex
+           else np.full((len(f), 3), 190.0))
+    tf, trgb = thumbnail.largest(v0, f, rgb)                 # the six pictures draw the same faces
     solid = _solid(v0, f)
     out = []
     # one object, laid six ways: the same scale for every position (height_mm is its height as it comes), so a
@@ -90,7 +92,7 @@ def orientations(path: Path, height_mm: float | None = None, rz: int = 0) -> lis
         v = (v0 @ rot.T if rot is not None else v0.copy()) * scale
         v = v - v.min(axis=0)
         s = _layer_stats(solid, rot, scale) if solid is not None else _stats(v, f)
-        png = thumbnail.render(v, f, rgb, size=112)
+        png = thumbnail.render(v, tf, trgb, size=112, most=25000)   # 112 px: two faces a pixel is plenty
         out.append({"id": key_, "label": label, "rotate": [rx, ry, rz], **{k: round(x, 1) for k, x in s.items()},
                     "size_mm": [round(float(x), 1) for x in np.ptp(v, axis=0)],
                     "image": "data:image/png;base64," + base64.b64encode(png).decode()})

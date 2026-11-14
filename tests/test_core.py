@@ -209,6 +209,55 @@ def test_standard_3mf_colours_and_roundtrip(tmp_path):
     assert len(r["slots"]) == 2 and all(s["metres"] > 0 for s in r["slots"]) and r["colour_changes"] >= 1
 
 
+def test_3mf_reader_unusual_shapes_and_cache(tmp_path):
+    import os
+    import zipfile
+    from elegoo_lab import threemf
+    head = ('<?xml version="1.0"?>\n<model unit="centimeter" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02"'
+            ' xmlns:m="http://schemas.microsoft.com/3dmanufacturing/material/2015/02" xmlns:s="http://schemas.slic3r.org/3mf/2017/06">')
+    verts = '<vertices><vertex y="2" x="1" z="3"/><vertex x="4" y="5" z="6" /><vertex x="7" y="8" z="9"/></vertices>'
+    tris = ('<triangles><triangle v3="2" v1="0" v2="1" s:mmu_segmentation="8"/>\n<triangle\n v1="0"\tv2="2" v3="1"/>'
+            '<triangle v1="1" v2="2" v3="0" paint_color="" s:mmu_segmentation="C" pid="5" p1="0"/></triangles>')
+    doc = (head + '<resources><m:colorgroup id="5"><m:color color="#FF0000"/><m:color color="#00FF00"/></m:colorgroup>'
+           f'<object id="1" type="model" pid="5" pindex="1"><mesh>{verts}{tris}</mesh></object>'
+           '<object id="2" type="model"><mesh/></object></resources><build><item objectid="1"/></build></model>')
+    src = tmp_path / "odd.3mf"
+    with zipfile.ZipFile(src, "w") as z:
+        z.writestr("3D/3dmodel.model", doc)
+    p = threemf.read(src).objects[0].parts[0]
+    assert p.vertices[0].tolist() == [10, 20, 30]                                    # attribute order, unit
+    assert p.faces.tolist() == [[0, 1, 2], [0, 2, 1], [1, 2, 0]]
+    assert p.paint == ["8", None, "C"]                                               # an empty paint_color falls back
+    assert p.face_rgb.tolist() == [[0, 255, 0], [0, 255, 0], [255, 0, 0]]            # object colour, then the triangle's
+    p.vertices += 100                                                                # a caller moving its copy...
+    assert threemf.read(src).objects[0].parts[0].vertices[0].tolist() == [10, 20, 30]  # ...never moves the cached one
+    with zipfile.ZipFile(src, "w") as z:
+        z.writestr("3D/3dmodel.model", doc.replace('y="2" x="1"', 'y="2" x="2"'))
+    os.utime(src, ns=(src.stat().st_mtime_ns + 10**6,) * 2)
+    assert threemf.read(src).objects[0].parts[0].vertices[0].tolist() == [20, 20, 30]  # a new version is read again
+
+
+def test_compact_preview_glb_is_face_for_face():
+    import struct
+    import numpy as np
+    from elegoo_lab import colors
+    src = config.MODELS_DIR / "boule.stl"
+    trimesh.creation.icosphere(2, radius=10).export(src)
+    glb = colors.preview_glb_bytes(src)
+    n, kind = struct.unpack("<I4s", glb[12:20])
+    gltf = json.loads(glb[20:20 + n])
+    prim = gltf["meshes"][0]["primitives"][0]
+    assert glb[:4] == b"glTF" and struct.unpack("<I", glb[8:12])[0] == len(glb) and "indices" not in prim
+    acc = {k: gltf["accessors"][i] for k, i in prim["attributes"].items()}
+    assert acc["POSITION"]["count"] == 3 * 320 and acc["NORMAL"]["componentType"] == 5120   # one corner per face corner
+    assert gltf["extensionsRequired"] == ["KHR_mesh_quantization"]
+    ref = colors.preview_glb(src)
+    start = 20 + n + 8
+    view = gltf["bufferViews"][acc["POSITION"]["bufferView"]]
+    pos = np.frombuffer(glb[start + view["byteOffset"]:start + view["byteOffset"] + view["byteLength"]], np.float32)
+    assert np.allclose(pos.reshape(-1, 3), ref.vertices, atol=1e-5)
+
+
 def test_economy_mode_purge_and_tower(tmp_path):
     import numpy as np
     from elegoo_lab import colors, printprep, slicer
@@ -391,11 +440,13 @@ def test_advanced_settings_reach_the_gcode(tmp_path):
     src = tmp_path / "cyl.stl"
     trimesh.creation.cylinder(radius=10, height=30, sections=48).export(src)
     r = printprep.prepare_and_slice(src, out_dir=tmp_path / "a", rotate=(90, 0, 0), copies=2,
-                                    advanced={"parois": 4, "motif": "gyroide", "temp_buse": 215})
+                                    advanced={"parois": 4, "motif": "gyroide", "temp_buse": 215, "motif_dessus": "concentrique",
+                                              "paroi_dessus": "non", "paroi_precise": "oui"})
     g = (tmp_path / "a" / r["gcode"][0]).read_text(errors="ignore")
     val = lambda k: re.search(rf"^; {k} = (.*)$", g, re.M).group(1)
     assert val("curr_bed_type") == "Textured PEI Plate" and re.search(r"^M140 S60", g, re.M)   # PEI plate, 60 °C
     assert val("wall_loops") == "4" and val("sparse_infill_pattern") == "gyroid" and re.search(r"^M10[49] S215", g, re.M)
+    assert val("top_surface_pattern") == "concentric" and val("only_one_wall_top") == "0" and val("precise_outer_wall") == "1"
     assert abs(float(re.search(r"^; max_z_height: ([\d.]+)", g, re.M).group(1)) - 20) < 0.5   # lying down: 20 mm tall
     with pytest.raises(ValueError):
         printprep.prepare_and_slice(src, out_dir=tmp_path / "b", copies=50, height_mm=60)       # does not fit
@@ -693,8 +744,21 @@ def test_spool_stock_and_costs(tmp_path, monkeypatch):
     before = s["trays"][0]["restant_g"]
     assert stock.consume("chat.gcode", 1.0, s["history"][0]["ref"]) == []            # counted once only
     assert stock.summary()["trays"][0]["restant_g"] == before
+    left = stock.summary()["trays"][1]["restant_g"]
     trays[1]["code"] = "R9"                                                          # another spool in tray 1
-    assert stock.sync(trays) == [1] and stock.summary()["trays"][1]["restant_g"] == 1000
+    assert [(t["tray"], t["remise"]) for t in stock.sync(trays)] == [(1, False)]
+    assert stock.summary()["trays"][1]["restant_g"] == 1000
+    trays[1]["code"] = "R1"                                                          # the first one comes back
+    assert [(t["tray"], t["remise"], t["restant_g"]) for t in stock.sync(trays)] == [(1, True, round(left))]
+    assert stock.summary()["trays"][1]["restant_g"] == left
+    stock.set_tray(0, restant_g=300)
+    trays[0]["color"], trays[1]["color"] = trays[1]["color"], trays[0]["color"]   # two spools swap trays
+    trays[0]["code"], trays[1]["code"] = "R1", "R0"
+    assert {t["tray"]: t["restant_g"] for t in stock.sync(trays)} == {0: round(left), 1: 300}
+    assert stock.sync(trays[:1]) == []                                               # tray 1 emptied...
+    trays[1]["pos"] = 2
+    assert [(t["tray"], t["remise"]) for t in stock.sync([trays[0], {**trays[1], "tray_id": 2}])] == [(2, True)]
+    assert stock.summary()["trays"][2]["restant_g"] == 300                          # ...its spool found again in tray 3
     with pytest.raises(ValueError):
         stock.set_tray(0, restant_g=5000)
 

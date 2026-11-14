@@ -18,8 +18,20 @@ SIZE = 144
 MAX_FACES = 60000  # enough for 144 px; bigger meshes are sampled (largest faces first)
 
 
-def render(v: np.ndarray, f: np.ndarray, rgb: np.ndarray, size: int = SIZE) -> bytes:
-    """PNG of a Z-up mesh seen from the front-left, 30° above; ``rgb`` = one colour per face."""
+def largest(v: np.ndarray, f: np.ndarray, rgb: np.ndarray, most: int = MAX_FACES) -> tuple[np.ndarray, np.ndarray]:
+    """The faces ``render`` keeps of a big mesh: the same however it is turned, so a caller drawing one mesh
+    several ways samples it once."""
+    if len(f) <= most:
+        return f, rgb
+    tri = v[f]
+    area = np.linalg.norm(np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0]), axis=1)
+    keep = np.argsort(-area)[:most]
+    return f[keep], rgb[keep]
+
+
+def render(v: np.ndarray, f: np.ndarray, rgb: np.ndarray, size: int = SIZE, most: int = MAX_FACES) -> bytes:
+    """PNG of a Z-up mesh seen from the front-left, 30° above; ``rgb`` = one colour per face; at most ``most``
+    faces drawn (each one is a Python call)."""
     # big flat faces (a label's plate) sort badly against small nearby ones (its letters):
     # split them so the far-to-near drawing order stays right
     span = float(np.ptp(v, axis=0).max()) or 1.0
@@ -27,11 +39,7 @@ def render(v: np.ndarray, f: np.ndarray, rgb: np.ndarray, size: int = SIZE) -> b
     if (edges > span / 25).any() and len(f) < MAX_FACES:
         v, f, idx = trimesh.remesh.subdivide_to_size(v, f, max_edge=span / 25, max_iter=8, return_index=True)
         rgb = rgb[idx]
-    if len(f) > MAX_FACES:
-        tri = v[f]
-        area = np.linalg.norm(np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0]), axis=1)
-        keep = np.argsort(-area)[:MAX_FACES]
-        f, rgb = f[keep], rgb[keep]
+    f, rgb = largest(v, f, rgb, most)
     c = v.mean(axis=0)
     yaw, pitch = np.radians(-35), np.radians(28)
     ry = np.array([[np.cos(yaw), -np.sin(yaw), 0], [np.sin(yaw), np.cos(yaw), 0], [0, 0, 1]])

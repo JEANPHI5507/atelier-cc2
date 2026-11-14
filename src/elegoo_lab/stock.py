@@ -5,8 +5,9 @@ many grams each tray will use (OrcaSlicer's extrusion plus the CC2's purge into 
 watcher sees the print end, the grams are taken off the trays (in proportion to the progress if the
 print was stopped). Before a print starts, the workshop checks that every tray holds enough.
 
-A spool whose identity changes in the CANVAS (other RFID code, colour or material) is counted as a
-new full spool; the user can correct the weight in the Imprimante tab. Kept in models/.bobines.json.
+A spool taken out of the CANVAS is set aside with what is left on it; when a spool of the same identity
+(RFID code, colour, material) comes back in any tray it takes that weight again. Any other spool is counted
+as a new full one; the user can correct the weight in the Imprimante tab. Kept in models/.bobines.json.
 """
 
 from __future__ import annotations
@@ -41,6 +42,7 @@ def load() -> dict[str, Any]:
     data.setdefault("trays", {})
     data.setdefault("prints", {})
     data.setdefault("history", [])
+    data.setdefault("rangees", {})   # spools taken out, by identity: what was left on them
     for i in range(TRAYS):
         data["trays"].setdefault(str(i), {"poids_g": SPOOL_G, "restant_g": SPOOL_G, "prix_kg": PRICE_KG,
                                           "matiere": "PLA", "couleur": "", "nom": "", "code": "", "depuis": 0})
@@ -60,25 +62,51 @@ def grams(metres: float, material: str = "PLA") -> float:
     return metres * 1000 * area / 1000 * DENSITY.get(material.upper(), 1.24)   # cm³ × g/cm³
 
 
-def sync(loaded: list[dict[str, Any]]) -> list[int]:
-    """Follow what the CANVAS reports; returns the trays that just got a new spool."""
-    fresh = []
+def _ident(code: str, colour: str, material: str) -> str:
+    return f"{code}|{colour.upper()}|{material.upper()}"
+
+
+def sync(loaded: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Follow what the CANVAS reports; returns the trays that just got another spool: ``{"tray", "remise",
+    "restant_g", "nom"}``, ``remise`` when it is a spool taken out earlier (its weight is back)."""
+    changed = []
     with _lock:
         data = load()
+        aside = data["rangees"]
+        moves, seen = [], set()
         for t in loaded:
             i = str(int(t.get("pos", t["tray_id"])))   # place in the CANVAS (0-3), whatever the printer's numbering
             if i not in data["trays"]:
                 continue
+            seen.add(i)
             cur = data["trays"][i]
             ident = (str(t.get("code") or ""), t["color"].upper(), str(t.get("type") or "PLA").upper())
             known = (cur["code"], cur["couleur"].upper(), cur["matiere"].upper())
             if ident != known:
-                if cur["couleur"]:  # not the very first time we see this tray
-                    cur.update(restant_g=cur["poids_g"], depuis=int(time.time()))
-                    fresh.append(int(i))
-                cur.update(code=ident[0], couleur=ident[1], matiere=ident[2], nom=t.get("filament_name") or ident[2])
+                moves.append((i, t, ident))
+                if cur["couleur"]:  # the spool leaving keeps its weight: the same colour often comes back days later
+                    aside[_ident(*known)] = {k: cur[k] for k in ("poids_g", "restant_g", "prix_kg", "nom", "depuis")} | {
+                        "retiree": int(time.time())}
+        for i, t, ident in moves:   # after every departure: two spools swapping trays both find their weight
+            cur = data["trays"][i]
+            back = aside.pop(_ident(*ident), None)
+            for j, other in data["trays"].items():   # or moved from a tray that is empty now
+                if not back and j not in seen and other["couleur"] and _ident(
+                        other["code"], other["couleur"], other["matiere"]) == _ident(*ident):
+                    back = dict(other)
+                    other.update(code="", couleur="", nom="", restant_g=other["poids_g"])   # the next spool there is new
+            if back:
+                cur.update({k: back[k] for k in ("poids_g", "restant_g", "prix_kg", "depuis")})
+            elif cur["couleur"]:    # not the very first time we see this tray: a new spool
+                cur.update(restant_g=cur["poids_g"], depuis=int(time.time()))
+            if back or cur["couleur"]:
+                changed.append({"tray": int(i), "remise": bool(back), "restant_g": round(cur["restant_g"]),
+                                "nom": t.get("filament_name") or ident[2]})
+            cur.update(code=ident[0], couleur=ident[1], matiere=ident[2], nom=t.get("filament_name") or ident[2])
+        while len(aside) > 40:
+            aside.pop(next(iter(aside)))
         save(data)
-    return fresh
+    return changed
 
 
 def set_tray(tray: int, *, restant_g: float | None = None, poids_g: float | None = None, prix_kg: float | None = None,

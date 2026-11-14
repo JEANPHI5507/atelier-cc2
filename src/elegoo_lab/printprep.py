@@ -130,11 +130,13 @@ def prepare_and_slice(
     simplify_colours: bool | str = "leger",
     moves: dict[int, tuple[float, float, float]] | None = None,
     shift: tuple[float, float] | None = None,
+    screen_thumbnail: bool = True,
 ) -> dict[str, Any]:
     """``mapping``: source colour index -> slot (1..4); colours not listed keep the suggested slot.
     ``palette``: the loaded spools' colours (slot 1 first): the model is repainted with them first.
     ``filaments``: one per slot, padded with PLA. ``advanced``: see settings.CHOICES/NUMBERS/TEMPS.
-    ``pauses_mm``: heights of the finished model where the print stops (magnet, nut, colour swap)."""
+    ``pauses_mm``: heights of the finished model where the print stops (magnet, nut, colour swap).
+    ``screen_thumbnail``: draw the printer-screen picture (an estimate never reaches the printer: 1 s saved)."""
     warnings: list[str] = []
     out_dir = out_dir or config.MODELS_DIR  # read at call time (tests and tools point it elsewhere)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -211,7 +213,8 @@ def prepare_and_slice(
                                                   # (its firmware reads EXCLUDE_OBJECT_DEFINE like Klipper); one part: profile as is
                                                   **({"exclude_object": "1"} if copies > 1 else {}), **adv_proc},
                              filament_overrides={**(MODES[mode].get("filament", {}) if n > 1 else {}), **adv_fil}, cli_args=cli)
-    _thumb_model(src, slots, rot, slot_hex, res.gcode, warnings, palette)
+    if screen_thumbnail:
+        _thumb_model(src, slots, rot, slot_hex, res.gcode, warnings, palette)
     palette = slot_hex or colorize.PALETTE
     per = res.per_filament_m + [0.0] * n
     purge = res.purge_m + [0.0] * n
@@ -357,7 +360,10 @@ def _thumb_model(src: Path, slots: dict[int, int], rot: np.ndarray | None, slot_
     rgb = m.visual.face_colors[:, :3].astype(float)
     if slot_hex:  # show the spools' real colours rather than the model's
         face_slot = {tuple(colors._rgb(c["hex"]).astype(int)): slots.get(c["index"], 1) for c in colors.analyze(src, palette)["colours"]}
-        rgb = np.array([colors._rgb(slot_hex[face_slot.get(tuple(c.astype(int)), 1) - 1]) for c in rgb])
+        c = rgb.astype(np.int64)
+        seen, back = np.unique(c[:, 0] << 16 | c[:, 1] << 8 | c[:, 2], return_inverse=True)   # a few colours, many faces
+        rgb = np.array([colors._rgb(slot_hex[face_slot.get((k >> 16, k >> 8 & 255, k & 255), 1) - 1])
+                        for k in seen.tolist()])[back.reshape(-1)]
     _thumb(v, np.asarray(m.faces), rgb, gcodes, warnings)
 
 
@@ -386,7 +392,7 @@ def compare(src: Path, base: dict[str, Any], on_row=None, only_current: bool = F
             optional = change.pop("_optional", False)
             args = {**base, **change, "split": False}
             try:
-                r = prepare_and_slice(src, **args, out_dir=Path(tmp) / str(i))
+                r = prepare_and_slice(src, **args, out_dir=Path(tmp) / str(i), screen_thumbnail=False)
                 u = stock.usage(r.get("per_filament_m") or [], r.get("purge_m"))
                 copies = int(args.get("copies") or 1)
                 row = {"label": label, "usage": args.get("usage"), "quality": args.get("quality"), "copies": copies,

@@ -50,6 +50,7 @@ KINDS = {
     "retrouvee": ("info", "Imprimante de nouveau joignable"),
     "stock": ("warn", "Bobine presque vide"),
     "bobine": ("info", "Nouvelle bobine détectée"),
+    "remise": ("info", "Bobine remise"),
     "suspect": ("warn", "Impression suspecte"),
     "anomalie": ("warn", "L'imprimante signale un problème"),
     "camera": ("warn", "Caméra figée"),
@@ -620,8 +621,12 @@ class Watcher:
             raw = (await asyncio.wait_for(self.canvas(), timeout=15)).raw
         except Exception:
             return
-        for tray in await asyncio.to_thread(stock.sync, spools.loaded(raw)):
-            self.emit("bobine", f"Bobine {tray + 1} : comptée comme une bobine pleine. Corrige le poids dans l'onglet Imprimante si besoin.")
+        for t in await asyncio.to_thread(stock.sync, spools.loaded(raw)):
+            if t["remise"]:
+                self.emit("remise", f"Bobine {t['tray'] + 1} : {t['nom']} reconnue, il reste environ {t['restant_g']} g comme à son retrait. "
+                                    "Si c'est une bobine neuve, appuie sur « Je viens de mettre une bobine neuve » dans l'onglet Imprimante.")
+            else:
+                self.emit("bobine", f"Bobine {t['tray'] + 1} : comptée comme une bobine pleine. Corrige le poids dans l'onglet Imprimante si besoin.")
 
     async def _photo(self, ev: dict[str, Any]) -> None:
         try:

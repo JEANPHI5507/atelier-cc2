@@ -86,9 +86,10 @@ Measured: a 95 mm figurine goes from 62 g / 3 h 35 (Elegoo profile) to 26 g / 2 
   workshop or the screen.
 - **Exemplaires** (copies) on the plate (up to 50, in a grid). Each part is labelled in the G-code: if one fails, it can
   be dropped and the others finished.
-- **Réglages avancés** (advanced settings; empty = CC2 profile value): walls, solid layers, infill pattern, seam,
-  ironing, brim, raft, support angle, temperatures, pressure advance, flow… Each value is checked before going to the
-  slicer.
+- **Réglages avancés** (advanced settings; empty = CC2 profile value): walls, solid layers, infill pattern, top surface
+  pattern, only one wall on top surfaces (already on in the CC2 profile), precise outer wall (true dimensions for parts
+  that fit together), seam, ironing, brim, raft, support angle, temperatures, pressure advance, flow… Each value is
+  checked before going to the slicer.
 
 ### Multicolour
 

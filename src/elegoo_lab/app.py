@@ -390,11 +390,11 @@ def lab_router(cfg: config.Config) -> APIRouter:
             return Response(status_code=304, headers=cache)
         if key not in preview_cache:
             try:
-                m = await asyncio.to_thread(colors.preview_glb, src, mapping, palette)
+                glb = await asyncio.to_thread(colors.preview_glb_bytes, src, mapping, palette)
             except Exception as err:
                 raise HTTPException(422, f"aperçu impossible: {err}") from err
             preview_cache.clear() if len(preview_cache) > 32 else None
-            preview_cache[key] = m.export(file_type="glb", include_normals=True)
+            preview_cache[key] = glb
         return Response(preview_cache[key], media_type="model/gltf-binary", headers=cache)
 
     # --- first-day setup ------------------------------------------------------------

@@ -66,8 +66,10 @@ If the plate doesn't cool within 3 hours, it gives up.
 
 Each CANVAS spool has a stock (1 kg and €20/kg by default, editable). When slicing: grams and cost per spool, purge
 included. At the end of a print (or when stopped, pro rata), the filament is taken off the right spools; "bobine presque
-vide" (spool almost empty) under 100 g. A new spool (other chip, colour or material) starts full. The month's total is
-shown under the spools.
+vide" (spool almost empty) under 100 g. A spool taken out of the CANVAS keeps what is left on it: put back later, in
+any tray, it takes that weight again ("Bobine remise" alert). A spool never seen before (other chip, colour or material)
+starts full; for a new spool of the same colour as an old one, press "Je viens de mettre une bobine neuve" (I just put on
+a new spool). The month's total is shown under the spools.
 
 ## The maintenance log
 
