@@ -336,6 +336,14 @@
   .cn-next > div { flex: 1; min-width: 92px; display: flex; gap: 8px; align-items: center; padding: 8px; border-radius: var(--r-sm); background: var(--surface); border: 1px solid var(--line); font-size: 12.5px; }
   .cn-next .cn-dot { width: 20px; height: 20px; border-width: 1px; box-shadow: none; }
   .cn-foot { color: var(--faint); font-size: 12px; margin-top: 8px; }
+  .cn-purge { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); display: grid; gap: 6px; font-size: 12.5px; }
+  .cn-purge > small { color: var(--dim); font-size: 12px; }
+  .cn-purge > div { position: relative; display: grid; grid-template-columns: 16px minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding-bottom: 5px; }
+  .cn-purge .cn-dot { width: 14px; height: 14px; border-width: 1px; box-shadow: none; }
+  .cn-purge span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cn-purge b { font-variant-numeric: tabular-nums; } .cn-purge > div small { color: var(--faint); }
+  .cn-purge i { position: absolute; left: 24px; right: 0; bottom: 0; height: 2px; border-radius: 2px; background: var(--line); }
+  .cn-purge i::after { content: ""; position: absolute; inset: 0 auto 0 0; width: var(--w); border-radius: 2px; background: var(--acc); }
   @media (max-width: 600px) { .cn-next { display: grid; grid-template-columns: 1fr 1fr; overflow: visible; } .cn-next > div { min-width: 0; } }
   .cam { position: relative; aspect-ratio: 16 / 9; background: var(--bg); border-radius: 10px; overflow: hidden; display: grid; place-items: center; color: var(--faint); text-align: center; border: 1px solid var(--line); }
   .cam img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }

@@ -712,6 +712,9 @@ def test_colours_now_and_next(web):
     p = suivi_couleurs.plan(f, 2, active=1)                      # white engaged: red comes next, in this layer
     assert p["tool"] == 1 and [n["tool"] for n in p["next"]] == [2, 0] and p["left"] == 2 and p["total"] == 3
     assert [n["tool"] for n in suivi_couleurs.plan(f, 2)["next"]] == [0]   # no CANVAS: the layer's changes are done
+    # purge still to come per tool, as the firmware counts it (L under 23 mm rounded up, +6 mm): white is done
+    assert [(x["tool"], x["left"], x["count"], x["left_m"], x["total_m"]) for x in p["purge"]] == [
+        (0, 1, 2, 0.066, 0.272), (1, 0, 1, 0.0, 0.066), (2, 1, 1, 0.066, 0.066)]
 
     async def status():
         return NS(filename="/local/" + f.name, print_info=NS(current_layer=2))
@@ -727,6 +730,7 @@ def test_colours_now_and_next(web):
     # tray 2 engaged = tool 1 by the launch route; tool 2 is in tray 0, tool 0 in tray 1
     assert d["maintenant"]["tool"] == 1 and d["maintenant"]["bobine"] == 3 and d["maintenant"]["hex"] == "#F72221"
     assert [(n["tool"], n["bobine"], n["couche"]) for n in d["suivants"]] == [(2, 1, 2), (0, 2, 3)]
+    assert [(x["bobine"], x["reste"], x["total"]) for x in d["purge"]] == [(2, 1, 2), (3, 0, 1), (1, 1, 1)]
 
 
 

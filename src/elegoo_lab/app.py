@@ -594,8 +594,11 @@ def lab_router(cfg: config.Config) -> APIRouter:
             t = trays.get(pos) or {}
             hexa = t.get("color") or (res["colours"][tool] if tool < len(res["colours"]) else "#d7dbe2")
             return {"tool": tool, "bobine": pos + 1, "hex": hexa, "nom": t.get("name") or t.get("filament_name") or f"bobine {pos + 1}"}
+        kind = lambda t: res["types"][t] if t < len(res["types"]) else "PLA"   # noqa: E731
         return {"couche": layer, "maintenant": spool(res["tool"]), "restants": res["left"], "total": res["total"],
-                "suivants": [{**spool(n["tool"]), "couche": n["layer"], "min": n["min"]} for n in res["next"]]}
+                "suivants": [{**spool(n["tool"]), "couche": n["layer"], "min": n["min"]} for n in res["next"]],
+                "purge": [{**spool(p["tool"]), "reste": p["left"], "total": p["count"],
+                           "reste_g": round(stock.grams(p["left_m"], kind(p["tool"])), 1)} for p in res["purge"]]}
 
     @r.get("/models/{name}/coupe")
     async def gcode_section(name: str, couche: int = 1, face: bool = True) -> dict[str, Any]:

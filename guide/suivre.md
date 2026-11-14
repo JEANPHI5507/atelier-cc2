@@ -8,7 +8,8 @@
   confirmation). Au repos : « Mettre au repos » coupe chauffes, ventilateurs et lumière.
 - **Couleur en cours et à venir** : la bobine vraiment engagée dans le CANVAS, puis les prochains changements avec leur
   couche et le délai estimé (« Silk Or · couche 81 · dans 2 min »), et le nombre de changements restants. Quand une
-  couche contient plusieurs changements, la bobine engagée dit où en est l'impression dans la couche.
+  couche contient plusieurs changements, la bobine engagée dit où en est l'impression dans la couche. En dessous, les
+  **purges restantes par couleur** (« Silk Or 23 / 24 ») : combien de fois chaque bobine passera encore par la goulotte.
 - **Caméra** en direct, image par image (toujours la plus récente, même sur une connexion lente), avec la lumière.
 - **Couche par couche** : la pièce en 3D, en couleur ce qui est imprimé, en gris ce qui reste ; elle avance toute seule.
 - **Températures** (buse, plateau, caisson) avec des préréglages PLA, PETG, ABS et « Refroidir ».

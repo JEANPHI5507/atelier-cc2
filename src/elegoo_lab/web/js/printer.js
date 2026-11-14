@@ -69,7 +69,10 @@ async function colourPlan(busy, name) {
   const dot = c => `<span class="cn-dot" style="background:${esc(c.hex)}"></span>`;
   box.innerHTML = `<div class="cn-now">${dot(d.maintenant)}<div><small>Couleur en cours</small><b>${esc(d.maintenant.nom)}</b> <small style="display:inline">· bobine ${d.maintenant.bobine}</small></div></div>`
     + (d.suivants.length ? `<div class="cn-next">${d.suivants.map(n => `<div>${dot(n)}<div>${esc(n.nom)}<small>couche ${n.couche}${n.min != null ? ' · ' + cnWhen(n.min) : ''}</small></div></div>`).join('')}</div>` : '')
-    + `<div class="cn-foot">${d.restants ? `${d.restants} changement${d.restants > 1 ? 's' : ''} de couleur restant${d.restants > 1 ? 's' : ''} sur ${d.total}` : 'Plus de changement de couleur jusqu\'à la fin'}</div>`;
+    + `<div class="cn-foot">${d.restants ? `${d.restants} changement${d.restants > 1 ? 's' : ''} de couleur restant${d.restants > 1 ? 's' : ''} sur ${d.total}` : 'Plus de changement de couleur jusqu\'à la fin'}</div>`
+    // purges still to come, colour by colour (the bar: share of that colour's purges left)
+    + ((d.purge || []).some(p => p.total) ? `<div class="cn-purge"><small>Purges restantes, par couleur</small>${d.purge.filter(p => p.total).map(p =>
+      `<div>${dot(p)}<span>${esc(p.nom)}</span><b>${p.reste}</b><small>/ ${p.total}</small><i style="--w:${Math.round(100 * p.reste / p.total)}%"></i></div>`).join('')}</div>` : '');
   box.hidden = false;
 }
 

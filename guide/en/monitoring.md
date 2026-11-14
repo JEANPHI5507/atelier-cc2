@@ -8,7 +8,8 @@
   When idle: "Mettre au repos" (rest) turns heaters, fans and light off.
 - **Current and upcoming colour**: the spool actually engaged in the CANVAS, then the next changes with their layer and
   estimated delay ("Silk Or · couche 81 · dans 2 min", i.e. layer 81, in 2 min), and the number of changes left. When a
-  layer holds several changes, the engaged spool tells where the print is within the layer.
+  layer holds several changes, the engaged spool tells where the print is within the layer. Below, the **purges left by
+  colour** ("Silk Or 23 / 24"): how many more times each spool goes through the chute.
 - **Caméra**: live, picture by picture (always the latest, even on a slow connection), with the light.
 - **Couche par couche** (layer by layer): the part in 3D, printed in colour, the rest in grey; it moves on by itself.
 - **Températures** (nozzle, bed, chamber) with PLA, PETG, ABS presets and "Refroidir" (cool down).
