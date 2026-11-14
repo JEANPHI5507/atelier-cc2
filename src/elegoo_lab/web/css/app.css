@@ -282,13 +282,13 @@
      Two columns on a PC (the right one holds both groups), three on a wide screen, one on a phone. */
   .pv .side { display: grid; gap: 16px; min-width: 0; align-content: start; }
   @media (min-width: 1500px) {
-    .pv { max-width: 1800px; grid-template-columns: minmax(0, 1.5fr) minmax(300px, 1fr) minmax(300px, 1fr); }
+    .pv { max-width: none; grid-template-columns: minmax(0, 1.5fr) minmax(300px, 1fr) minmax(300px, 1fr); }   /* the whole screen */
     .pv .side { display: contents; }
   }
   .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px; min-width: 0; }
   .card-h { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
-  .pos { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; align-items: center; }
-  .pos-map { width: 100%; max-width: 220px; aspect-ratio: 272 / 286; }
+  .pos { display: grid; grid-template-columns: minmax(0, 300px) minmax(92px, 150px); gap: 22px; align-items: center; justify-content: center; }
+  .pos-map { width: 100%; aspect-ratio: 272 / 286; }
   .pos-bed { fill: var(--plate); stroke: var(--line-strong); }
   .pos-grid { stroke: var(--grid); stroke-width: .8; fill: none; }
   .pos-chute { fill: var(--bad); opacity: .55; }
@@ -298,6 +298,22 @@
   .pos-xyz { display: grid; gap: 8px; min-width: 92px; }
   .pos-xyz div { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
   .pos-xyz span { color: var(--faint); font-size: 12px; } .pos-xyz b { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .pos-xyz em { display: none; font-style: normal; font-size: 12px; color: var(--dim); }
+  /* in the layer view: the plate map at the bottom left, the figures at the top right, over the 3D */
+  .lv-wrap { position: relative; }
+  .lv-pos { position: absolute; inset: 10px; pointer-events: none; }
+  .lv-pos .pos { display: block; }
+  .lv-pos .pos-map { position: absolute; left: 0; bottom: 0; width: clamp(96px, 26%, 170px); padding: 6px; border-radius: 10px;
+                     background: var(--chip-bg); border: 1px solid var(--line); }
+  .lv-pos .pos-xyz { position: absolute; right: 0; top: 0; padding: 8px 12px; border-radius: 10px; background: var(--chip-bg);
+                     border: 1px solid var(--line); gap: 4px; }
+  .lv-pos .pos-xyz em { display: block; }
+  .lv-pos .pos-xyz b { font-size: 15px; }
+  .lv-wrap + .note { margin-top: 10px; }
+  @media (max-width: 600px) {   /* a phone's small view: the figures on one line, no map */
+    .lv-pos .pos-map, .lv-pos .pos-xyz em { display: none; }
+    .lv-pos .pos-xyz { display: flex; gap: 10px; padding: 4px 8px; } .lv-pos .pos-xyz b { font-size: 13px; }
+  }
   .card-h h3 { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--dim); }
   .ro { margin: 0 20px; }
   .banner { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 10px; background: var(--acc-soft); border: 1px solid var(--acc); font-size: 13.5px; }
@@ -359,9 +375,11 @@
     /* one column: what you check during a print first, settings you rarely touch last */
     .pv .col, .pv .side { display: contents; } .pv .o1 { order: 1; } .pv .o2 { order: 2; } .pv .late { order: 3; } }
 
-  @media (max-width: 1280px) { header { gap: 12px; } #printer-txt { max-width: 190px; overflow: hidden; text-overflow: ellipsis; } }
-  @media (max-width: 1100px) { #sim { display: none; } }
-  @media (max-width: 1180px) { #ai-open span, #phone-open span, #install span, #board-open span, .brand span { display: none; } }
+  /* the printer pill grew with the print's name and temperature: below 1440 px the buttons keep only their icon */
+  @media (max-width: 1440px) { header { gap: 12px; } #printer-txt { max-width: 190px; overflow: hidden; text-overflow: ellipsis; } }
+  @media (max-width: 1100px) { #sim { display: none; } #printer-temp { display: none; } #printer-txt { max-width: 150px; } }
+  @media (max-width: 1440px) { #ai-open span, #phone-open span, #install span, #board-open span { display: none; } }
+  @media (max-width: 1180px) { .brand span { display: none; } }
   @media (max-width: 1100px) { #lab { grid-template-columns: 250px minmax(0,1fr) 320px; } }
   @media (max-width: 860px) {
     header { gap: 10px; padding: 0 12px; } .brand span, #ai-open span, #printer-txt { display: none; }
@@ -674,7 +692,7 @@
   .make-kind.on { border-color: var(--acc); box-shadow: inset 0 0 0 1px var(--acc); background: var(--acc-soft); }
   .make-main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
   .make-view { position: sticky; top: 0; }
-  .mini-3d { height: 340px; border-radius: var(--r); background: radial-gradient(circle at 50% 40%, var(--stage-a), var(--stage-b)); border: 1px solid var(--line); overflow: hidden; }
+  .mini-3d { height: clamp(340px, 34vh, 560px); border-radius: var(--r); background: radial-gradient(circle at 50% 40%, var(--stage-a), var(--stage-b)); border: 1px solid var(--line); overflow: hidden; }
   .make-size { margin-top: 8px; text-align: center; font-weight: 600; font-size: 13px; } .make-size.bad { color: var(--bad); font-weight: 500; }
   .make-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 12px; }
   .make-fields .full { grid-column: 1 / -1; } .make-fields .switch { margin-bottom: 12px; }

@@ -13,7 +13,8 @@
 - **Couche par couche** (layer by layer): the part in 3D, printed in colour, the rest in grey; it moves on by itself.
 - **Températures** (nozzle, bed, chamber) with PLA, PETG, ABS presets and "Refroidir" (cool down).
 - **Position de la buse** (nozzle position): X, Y, Z in mm, every second, and the plate seen from above with the last
-  moves; "À la goulotte" (at the chute) when it goes to purge at a colour change.
+  moves; "À la goulotte" (at the chute) when it goes to purge at a colour change. When the "Couche par couche" (layer
+  by layer) view is there, it all shows over it, and an orange cone marks the nozzle on the part.
 - **Bobines CANVAS** (spools): colour, material, grams left, auto-refill. Clicking a spool corrects its weight, the
   weight of a full spool and its price per kilo.
 - **Fichiers sur l'imprimante** (files on the printer) and **Historique** (history), folded; "Interface avancée" opens

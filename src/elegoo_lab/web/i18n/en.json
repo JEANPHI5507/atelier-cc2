@@ -357,6 +357,7 @@
 "Effacer toutes les retouches de ce modèle ?": "Clear all touch-ups of this model?",
 "Effacer toutes les zones peintes (supports, couture) de ce modèle ?": "Clear every painted area (supports, seam) of this model?",
 "Elle ne peut pas commencer celle-ci maintenant.": "It can't start this one now.",
+"En couleur ce qui est imprimé, en gris ce qui reste ; le cône orange, c'est la buse (position envoyée chaque seconde par l'imprimante, en mm). Tourne avec un doigt, zoome en pinçant.": "In colour what is printed, in grey what is left; the orange cone is the nozzle (position sent every second by the printer, in mm). Turn with one finger, pinch to zoom.",
 "En couleur ce qui est imprimé, en gris ce qui reste. Tourne avec un doigt, zoome en pinçant.": "Printed in colour, what's left in grey. Rotate with a finger, pinch to zoom.",
 "En cours": "In progress",
 "En pause": "Paused",

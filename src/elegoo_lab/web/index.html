@@ -316,7 +316,7 @@
           </div>
           <div class="card o1" id="pv-pos" hidden>
             <div class="card-h"><h3>Position de la buse</h3><span class="note" id="pv-pos-where" style="margin:0"></span></div>
-            <div class="pos">
+            <div class="pos" id="pv-pos-box">
               <svg class="pos-map" id="pv-pos-map" viewBox="-8 -22 272 286" role="img" aria-label="Plateau vu de dessus, avant en bas">
                 <rect class="pos-bed" x="0" y="0" width="256" height="256" rx="6"/>
                 <path class="pos-grid" d="M64 0V256M128 0V256M192 0V256M0 64H256M0 128H256M0 192H256"/>
@@ -326,7 +326,7 @@
                 <circle class="pos-dot" id="pv-pos-dot" r="5" cx="-50" cy="-50"/>
                 <text class="pos-lbl" x="128" y="252" text-anchor="middle">avant</text>
               </svg>
-              <div class="pos-xyz"><div><span>X</span><b id="pv-pos-x">–</b></div><div><span>Y</span><b id="pv-pos-y">–</b></div><div><span>Z</span><b id="pv-pos-z">–</b></div></div>
+              <div class="pos-xyz"><em id="pv-pos-at"></em><div><span>X</span><b id="pv-pos-x">–</b></div><div><span>Y</span><b id="pv-pos-y">–</b></div><div><span>Z</span><b id="pv-pos-z">–</b></div></div>
             </div>
             <p class="note" style="margin:10px 0 0">Mise à jour chaque seconde par l'imprimante, en mm. En rouge, la goulotte où la buse purge à chaque changement de couleur.</p>
           </div>
@@ -337,8 +337,8 @@
           </div>
           <div class="card" id="pv-layers" hidden>
             <div class="card-h"><h3>Couche par couche</h3><span class="note" id="pv-lnote" style="margin:0"></span></div>
-            <div class="mini-3d" id="pv-3d"></div>
-            <p class="note">En couleur ce qui est imprimé, en gris ce qui reste. Tourne avec un doigt, zoome en pinçant.</p>
+            <div class="lv-wrap"><div class="mini-3d" id="pv-3d"></div><div class="lv-pos" id="pv-lv-pos"></div></div>
+            <p class="note">En couleur ce qui est imprimé, en gris ce qui reste ; le cône orange, c'est la buse (position envoyée chaque seconde par l'imprimante, en mm). Tourne avec un doigt, zoome en pinçant.</p>
           </div>
         </div>
         <div class="col c3">

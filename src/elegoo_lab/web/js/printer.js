@@ -147,16 +147,33 @@ async function pvStatus() {
   } catch { $('pv-state').textContent = 'Imprimante injoignable'; $('pv-pill').className = 'pill'; $('pv-pill-t').textContent = 'Hors ligne'; }
   if (pvOpen) pvTimer = setTimeout(pvStatus, BUSY.has(lastSt?.print_status ?? 0) ? 1000 : 2000);   // the CC2 sends its position once a second
 }
+// the nozzle in the layer view: an orange cone, its tip where the nozzle is (that view is centred on the plate)
+let tip = null;
+function nozzle3d([x, y, z], on) {
+  if (!lv) return;
+  if (!tip) {
+    tip = new THREE.Mesh(new THREE.ConeGeometry(1.8, 5, 24), new THREE.MeshBasicMaterial({ color: 0xff9f0a }));
+    tip.rotation.x = -Math.PI / 2;   // the cone's tip points down
+    lv.sc.add(tip);
+  }
+  tip.visible = !!on;
+  tip.position.set(x - 128, y - 128, z + 2.5);
+}
 // where the nozzle is: "x,y,z" in mm from the CC2 (its spelling: CurrenCoord), drawn on the plate seen from above
 const trail = [];
 function nozzleAt(coord, busy) {
   const xyz = String(coord || '').split(',').map(Number);
   $('pv-pos').hidden = xyz.length !== 3 || xyz.some(v => !Number.isFinite(v));
   if ($('pv-pos').hidden) return;
+  // shown over the layer view when it is there (the print's G-code is in the library), else in its own card
+  const inLayers = !$('pv-layers').hidden, box = $('pv-pos-box'), home = inLayers ? $('pv-lv-pos') : $('pv-pos');
+  if (box.parentElement !== home) home.append(box);
+  $('pv-pos').hidden = inLayers;
+  nozzle3d(xyz, inLayers);
   const [x, y, z] = xyz, inChute = x >= 246 && y <= 20, fmt = v => v.toLocaleString('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   $('pv-pos-x').textContent = fmt(x); $('pv-pos-y').textContent = fmt(y); $('pv-pos-z').textContent = fmt(z);
   // seen on the CC2: it purges in the front-right chute and wipes behind the plate (Y up to about 265)
-  $('pv-pos-where').textContent = inChute ? 'À la goulotte (purge)' : y > 256 ? 'Derrière le plateau (essuyage)'
+  $('pv-pos-where').textContent = $('pv-pos-at').textContent = inChute ? 'À la goulotte (purge)' : y > 256 ? 'Derrière le plateau (essuyage)'
     : busy ? 'Au-dessus du plateau' : 'À l\'arrêt';
   const px = Math.max(-6, Math.min(262, x)), py = 256 - Math.max(-6, Math.min(276, y));   // the front of the plate at the bottom
   const last = trail[trail.length - 1];
