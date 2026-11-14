@@ -1288,6 +1288,47 @@ def test_without_purge_turns_colour_changes_into_a_bare_switch(tmp_path):
     assert slicer._header(f)["colour changes"] == "2"   # the L0 line counts as before
 
 
+def test_a_failed_write_keeps_the_old_file(tmp_path, monkeypatch):
+    import os
+    f = tmp_path / "stock.json"
+    config.write_atomic(f, '{"a": 1}')
+    monkeypatch.setattr(os, "fsync", lambda fd: (_ for _ in ()).throw(OSError("disque plein")))
+    with pytest.raises(OSError):
+        config.write_atomic(f, '{"a": 2}')
+    assert f.read_text() == '{"a": 1}' and [p.name for p in tmp_path.iterdir()] == ["stock.json"]   # no leftover temp file
+
+
+def test_backup_copies_the_library_and_keeps_old_versions(tmp_path, monkeypatch):
+    """Real rsync and git; ssh is a stand-in that runs the "remote" side in a local folder."""
+    import os
+    import shutil
+    from elegoo_lab import sauvegarde
+    if not shutil.which("rsync"):
+        pytest.skip("rsync absent")
+    far, bin_ = tmp_path / "serveur", tmp_path / "bin"
+    far.mkdir(), bin_.mkdir()
+    (bin_ / "ssh").write_text(f'#!/bin/sh\nwhile [ "$1" = "-o" ]; do shift 2; done\nshift\ncd {far} && exec sh -c "$*"\n')
+    (bin_ / "ssh").chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bin_}:{os.environ['PATH']}")
+    (config.MODELS_DIR / "coeur.stl").write_text("v1")
+    config.CONFIG_FILE.write_text('[printer]\nhost = "x"\n')
+    assert sauvegarde.overdue().startswith("Aucune sauvegarde")
+    sauvegarde.run("serveur")
+    dest = far / sauvegarde.DEST
+    assert (dest / "models" / "coeur.stl").read_text() == "v1" and (dest / "config.toml").exists()
+    assert (dest / "elegoo.bundle").stat().st_size > 0 and sauvegarde.overdue() is None
+    assert sauvegarde.run("serveur", if_needed=True) == "sauvegarde du jour déjà faite"
+    (config.MODELS_DIR / "coeur.stl").write_text("v2")
+    os.utime(config.MODELS_DIR / "coeur.stl", (time.time() + 5,) * 2)   # rsync compares size and time: an edit an hour later
+    sauvegarde.run("serveur")
+    assert (dest / "models" / "coeur.stl").read_text() == "v2"
+    assert [p.read_text() for p in (dest / "anciens").glob("*/models/coeur.stl")] == ["v1"]   # the old version is kept
+    (bin_ / "ssh").write_text("#!/bin/sh\necho 'ssh: connect to host 192.168.1.48 port 22: No route to host' >&2\nexit 255\n")
+    with pytest.raises(RuntimeError, match="No route to host"):
+        sauvegarde.run("serveur")
+    assert sauvegarde.status()["erreur"].endswith("No route to host") and sauvegarde.overdue() is None   # yesterday's copy still counts
+
+
 def test_terminal_tells_only_what_changed(tmp_path, monkeypatch):
     from elegoo_lab import alerts
     monkeypatch.setattr(config, "MODELS_DIR", tmp_path)

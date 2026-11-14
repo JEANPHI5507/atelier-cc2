@@ -52,9 +52,7 @@ def save(data: dict[str, Any]) -> None:
     f.parent.mkdir(exist_ok=True)
     data["prints"] = dict(list(data["prints"].items())[-300:])
     data["history"] = data["history"][-300:]
-    tmp = f.with_suffix(".tmp")
-    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1))
-    tmp.replace(f)
+    config.write_atomic(f, json.dumps(data, ensure_ascii=False, indent=1))
 
 
 def grams(metres: float, material: str = "PLA") -> float:

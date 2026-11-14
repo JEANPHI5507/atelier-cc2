@@ -5,6 +5,7 @@ Printer settings (the actual Centauri Carbon 2), comfyui and dashboard sections.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import tomllib
 from dataclasses import dataclass
@@ -74,6 +75,26 @@ def level_each_print() -> bool:
     return True
 
 
+def write_atomic(path: Path, text: str, mode: int | None = None) -> None:
+    """Replace a file in one step: a power cut or a crash leaves the old content or the new one, never a
+    half-written or empty file (the library, spools, gallery and logs are the user's only copy)."""
+    import tempfile
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(text)
+            f.flush()
+            os.fsync(f.fileno())
+        if mode is not None:
+            os.chmod(tmp, mode)
+        os.replace(tmp, path)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.unlink(tmp)
+        raise
+
+
 def _toml_value(v: object) -> str:
     if isinstance(v, bool):
         return "true" if v else "false"
@@ -93,10 +114,7 @@ def save(section: str, **values: object) -> None:
         lines.append(f"[{name}]")
         lines += [f"{k} = {_toml_value(v)}" for k, v in table.items() if not isinstance(v, dict)]
         lines.append("")
-    tmp = CONFIG_FILE.with_suffix(".tmp")
-    tmp.write_text("\n".join(lines))
-    tmp.chmod(0o600)  # holds the printer access code
-    tmp.replace(CONFIG_FILE)
+    write_atomic(CONFIG_FILE, "\n".join(lines), mode=0o600)  # holds the printer access code
 
 
 def hunyuan_allowed() -> bool:

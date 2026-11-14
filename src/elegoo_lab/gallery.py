@@ -57,7 +57,7 @@ class Recorder:
         return cls(filename)
 
     def save(self) -> None:
-        (self.dir / "meta.json").write_text(json.dumps(self.meta, ensure_ascii=False, indent=1))
+        config.write_atomic(self.dir / "meta.json", json.dumps(self.meta, ensure_ascii=False, indent=1))
 
     def add_frame(self, jpeg: bytes) -> None:
         self.seen += 1
@@ -151,7 +151,7 @@ def update(entry_id: str, **values: Any) -> dict[str, Any]:
     d = _safe(entry_id)
     meta = json.loads((d / "meta.json").read_text())
     meta.update(values)
-    (d / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=1))
+    config.write_atomic(d / "meta.json", json.dumps(meta, ensure_ascii=False, indent=1))
     return meta
 
 

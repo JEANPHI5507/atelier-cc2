@@ -274,9 +274,7 @@ def lab_router(cfg: config.Config) -> APIRouter:
         return [n for n in q if isinstance(n, str) and (config.MODELS_DIR / n).exists()]   # deleted files drop out
 
     def _queue_save(q: list[str]) -> list[str]:
-        f = config.MODELS_DIR / ".queue.json"
-        f.parent.mkdir(exist_ok=True)
-        f.write_text(json.dumps(q, ensure_ascii=False))
+        config.write_atomic(config.MODELS_DIR / ".queue.json", json.dumps(q, ensure_ascii=False))
         return q
 
     @r.get("/queue")
@@ -995,7 +993,7 @@ def lab_router(cfg: config.Config) -> APIRouter:
     # generations survive a restart of the workshop: ComfyUI keeps computing, we pick the result up
     def save_jobs() -> None:
         recent = sorted(jobs.values(), key=lambda j: -j["started"])[:30]
-        JOBS_FILE.write_text(json.dumps(recent))
+        config.write_atomic(JOBS_FILE, json.dumps(recent))
 
     def queued(jid: str) -> Any:
         def mark(workflow: str, pid: str) -> None:

@@ -55,6 +55,7 @@ KINDS = {
     "camera": ("warn", "Caméra figée"),
     "entretien": ("warn", "Entretien à faire"),
     "rate": ("bad", "Raté détecté : impression mise en pause"),
+    "sauvegarde": ("warn", "Sauvegarde en retard"),
 }
 SURVEILLANCE = {"ia": True, "pause_auto": False, "sensibilite": 1.0, "timelapse": True}
 AI_EVERY_S = 10.0             # one analysed frame every 10 s, like Obico
@@ -213,11 +214,7 @@ class Watcher:
             return []
 
     def _save(self) -> None:
-        f = events_file()
-        f.parent.mkdir(exist_ok=True)
-        tmp = f.with_suffix(".tmp")
-        tmp.write_text(json.dumps(self.events[-KEEP:], ensure_ascii=False))
-        tmp.replace(f)
+        config.write_atomic(events_file(), json.dumps(self.events[-KEEP:], ensure_ascii=False))
 
     def emit(self, kind: str, detail: str = "", **extra: Any) -> dict[str, Any]:
         level, title = KINDS[kind]
@@ -311,6 +308,14 @@ class Watcher:
         if changed("codes", codes) and codes:
             from . import errors
             self.say(errors.sentence([int(c) for c in codes if c.isdigit()]) or f"Code {', '.join(codes)}", "bad")
+
+    def _backup_check(self) -> None:
+        """Once a day at most: say it when the library has not been copied elsewhere for days."""
+        from . import sauvegarde
+        msg = sauvegarde.overdue()
+        last = next((e for e in reversed(self.events) if e["kind"] == "sauvegarde"), None)
+        if msg and (not last or time.time() - last["t"] > 86400):
+            self.emit("sauvegarde", msg + " Vérifie que le serveur maison est allumé, ou lance `cc2 sauvegarde faire`.")
 
     # --- state machine -----------------------------------------------------
 
@@ -631,6 +636,8 @@ class Watcher:
                     await self._camera(st.print_info.current_layer if st.print_info else None)
                 if self.canvas and self.ticks % 12 == 0:   # about once a minute
                     await self._sync_canvas()
+                if self.ticks % 720 == 360:                # about once an hour, the first some 30 min after a start
+                    self._backup_check()
                 self.ticks += 1
             except asyncio.CancelledError:
                 raise

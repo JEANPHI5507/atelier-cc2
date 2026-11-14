@@ -42,9 +42,7 @@ def load_index() -> dict[str, dict[str, Any]]:
 
 
 def _save_index(idx: dict[str, Any]) -> None:
-    tmp = _index_file().with_suffix(".tmp")
-    tmp.write_text(json.dumps(idx, ensure_ascii=False, indent=1))
-    tmp.replace(_index_file())
+    config.write_atomic(_index_file(), json.dumps(idx, ensure_ascii=False, indent=1))
 
 
 def record(gcode: str, **facts: Any) -> None:

@@ -239,6 +239,57 @@ def service_remove() -> None:
     typer.echo("Démarrage automatique retiré. `cc2 dash` fonctionne toujours à la main.")
 
 
+backup = typer.Typer(help="Sauvegarde de la bibliothèque, des réglages et de l'historique git sur une autre machine (ssh).",
+                     no_args_is_help=True)
+app.add_typer(backup, name="sauvegarde")
+
+
+@backup.command("faire")
+def backup_run(
+    vers: Annotated[str, typer.Option(help="Machine de destination (un nom de ~/.ssh/config).")] = "Serveur-Maison",
+    si_besoin: Annotated[bool, typer.Option("--si-besoin", help="Seulement si la dernière date de plus de 20 h.")] = False,
+) -> None:
+    """Copie models/, config.toml et l'historique git vers ~/sauvegardes/atelier-cc2 de l'autre machine."""
+    from . import sauvegarde
+    try:
+        typer.echo(sauvegarde.run(vers, if_needed=si_besoin))
+    except RuntimeError as e:
+        typer.echo(f"Sauvegarde impossible : {e}", err=True)
+        raise typer.Exit(1) from None
+
+
+@backup.command("installer")
+def backup_install(
+    vers: Annotated[str, typer.Option(help="Machine de destination (un nom de ~/.ssh/config).")] = "Serveur-Maison",
+) -> None:
+    """Sauvegarde automatique : essai toutes les heures, une copie par jour, rattrapée dès que la machine répond."""
+    exe = Path(sys.executable).parent / "cc2"
+    UNIT_DIR.mkdir(parents=True, exist_ok=True)
+    (UNIT_DIR / "cc2-sauvegarde.service").write_text(
+        f"[Unit]\nDescription=Atelier CC2 - sauvegarde vers {vers}\n\n"
+        f"[Service]\nType=oneshot\nWorkingDirectory={config.ROOT}\nExecStart={exe} sauvegarde faire --vers {vers} --si-besoin\n"
+        "Nice=10\nIOSchedulingClass=idle\n")
+    (UNIT_DIR / "cc2-sauvegarde.timer").write_text(
+        "[Unit]\nDescription=Atelier CC2 - sauvegarde toutes les heures si besoin\n\n"
+        "[Timer]\nOnBootSec=10min\nOnUnitActiveSec=1h\nPersistent=true\n\n[Install]\nWantedBy=timers.target\n")
+    _systemctl("daemon-reload")
+    _systemctl("enable", "--now", "cc2-sauvegarde.timer")
+    typer.echo(f"Sauvegarde automatique installée vers {vers} (~/sauvegardes/atelier-cc2). "
+               "Suivi : `cc2 sauvegarde etat`.")
+
+
+@backup.command("etat")
+def backup_status() -> None:
+    """Date de la dernière sauvegarde réussie et dernière erreur."""
+    import time
+    from . import sauvegarde
+    s = sauvegarde.status()
+    fmt = lambda t: time.strftime("%d/%m/%Y %H:%M", time.localtime(t))   # noqa: E731
+    typer.echo(f"Dernière réussie : {fmt(s['ok']) + ' vers ' + s.get('vers', '?') if s.get('ok') else 'jamais'}")
+    if s.get("erreur"):
+        typer.echo(f"Dernier essai ({fmt(s['essai'])}) : {s['erreur']}")
+
+
 models = typer.Typer(help="Bibliothèque de modèles 3D (dossier models/).", no_args_is_help=True)
 app.add_typer(models, name="models")
 

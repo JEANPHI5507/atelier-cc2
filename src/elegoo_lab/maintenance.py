@@ -49,8 +49,7 @@ def _load() -> dict[str, Any]:
 
 
 def _save(data: dict[str, Any]) -> None:
-    _file().parent.mkdir(exist_ok=True)
-    _file().write_text(json.dumps(data, indent=1))
+    config.write_atomic(_file(), json.dumps(data, indent=1))
 
 
 def _hours_since(ts: int) -> float:
