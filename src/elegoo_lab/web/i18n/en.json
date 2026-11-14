@@ -228,6 +228,7 @@
 "Code d'accès refusé par MQTT ou firmware trop différent : vérifie le code, puis signale le message ci-dessus (le protocole de la CC2 n'est pas documenté officiellement).": "Access code refused by MQTT or firmware too different: check the code, then report the message above (the CC2's protocol isn't officially documented).",
 "Code d'accès requis": "Access code required",
 "Colonnes — surfaces planes en surplomb": "Columns — flat overhanging surfaces",
+"Combien de grammes restent sur cette bobine ?": "How many grams are left on this spool?",
 "ComfyUI injoignable sur": "ComfyUI unreachable at",
 "Commande refusée": "Command refused",
 "Comment c'est sorti ?": "How did it come out?",
@@ -339,6 +340,7 @@
 "Découpé en": "Cut into",
 "Découpée en pièces": "Cut into pieces",
 "Décris l'objet à générer": "Describe the object to generate",
+"Déjà entamée…": "Already started…",
 "Déjà envoyé sur l'imprimante": "Already sent to the printer",
 "Déjà prêt pour la CC2 : rien à changer": "Already ready for the CC2: nothing to change",
 "Démarrage": "Setup",
@@ -521,6 +523,7 @@
 "La couture : chaque couche commence au même endroit.": "The seam: every layer starts at the same place.",
 "La fermeture de la grille d'extraction a échoué": "Closing the exhaust grille failed",
 "La forme apparaît en transparence sur le modèle pendant que tu la règles. Position : depuis le centre du modèle, dans ses propres axes (Z vers le haut). Un nouveau fichier est créé, l'original reste intact.": "The shape shows see-through on the model while you set it. Position: from the model's centre, in its own axes (Z up). A new file is created, the original stays untouched.",
+"La même": "The same one",
 "La plaque qui reçoit les bacs, à poser au fond d'un tiroir.": "The baseplate that holds the bins, to put at the bottom of a drawer.",
 "La plus discrète": "The most discreet",
 "La prochaine fois : mode multicolore Équilibré (tour d'essuyage).": "Next time: Balanced multicolour mode (wipe tower).",
@@ -634,6 +637,7 @@
 "Nettoie le plateau au liquide vaisselle et rince (pas de doigts dessus) ; la prochaine fois : bordure et plateau plus chaud.": "Clean the plate with dish soap and rinse (no fingers on it); next time: brim and a hotter plate.",
 "Nettoyer et graisser les tiges X/Y, vérifier les courroies": "Clean and grease the X/Y rods, check the belts",
 "Nettoyer l'essuyeur et la goulotte de purge": "Clean the wiper and the purge chute",
+"Neuve": "New",
 "Nid d'abeille": "Honeycomb",
 "Niveler le plateau avant chaque impression": "Level the bed before each print",
 "Nivellement": "Levelling",
@@ -979,6 +983,7 @@
 "Une bobine intermédiaire est inutilisée : elle doit quand même être chargée.": "An intermediate spool is unused: it must still be loaded.",
 "Une couche vide a été détectée : la pièce a peut-être une partie détachée ou trop fine.": "An empty layer was detected: the part may have a detached or too thin section.",
 "Une impression est déjà en cours": "A print is already in progress",
+"Une neuve": "A new one",
 "Une nouvelle couleur (bobine suivante)": "A new colour (next spool)",
 "Une pause tombe au-dessus de la pièce ou sur la même couche qu'une autre : elle est ignorée.": "A pause falls above the part or on the same layer as another one: it is ignored.",
 "Une pièce sort du plateau : rapproche-la avant d'imprimer.": "A piece is off the plate: bring it back before printing.",
@@ -1351,6 +1356,10 @@
 "Colour {} ({} % of the model) has no close spool: it will come out in {} (spool {}). Load a spool of that colour to stay faithful."
 ],
 [
+"Bobine {} : {} reconnue, il reste environ {} g comme à son retrait. La même bobine ou une neuve ? Réponds dans l'onglet Imprimante.",
+"Spool {}: {} recognised, about {} g left as when it was taken out. The same spool or a new one? Answer in the Printer tab."
+],
+[
 "La couleur {} ({} % du modèle) n'a pas de bobine proche : elle sera imprimée en {} (bobine {}), la plus proche chargée.",
 "Colour {} ({} % of the model) has no close spool: it will be printed in {} (spool {}), the closest loaded."
 ],
@@ -1373,6 +1382,10 @@
 [
 "{}{}Attends que le plateau refroidisse avant de décoller la pièce : je te préviens quand il est sous {} °C.",
 "{}{}Wait for the plate to cool before removing the part: I'll let you know when it is below {} °C."
+],
+[
+"Bobine {} : comptée comme une bobine pleine. Neuve ou déjà entamée ? Réponds dans l'onglet Imprimante.",
+"Spool {}: counted as a full spool. New or already started? Answer in the Printer tab."
 ],
 [
 "Faces enregistrées : {} à soutenir, {} sans support, {} pour la couture. Prises en compte au tranchage.",
@@ -1511,6 +1524,10 @@
 "⚠ {} has no close spool: the closest is used."
 ],
 [
+"C'est la même qu'avant ({} restants) ou une neuve ?",
+"Is it the same one as before ({} left) or a new one?"
+],
+[
 "{} arêtes partagées par trop de faces (en orange)",
 "{} edges shared by too many faces (in orange)"
 ],
@@ -1533,6 +1550,10 @@
 [
 "({} petite(s) imprimée(s) avec les chevilles)",
 "({} small one(s) printed with the dowels)"
+],
+[
+"La même qu'avant ({} restants) ou une neuve ?",
+"The same one as before ({} left) or a new one?"
 ],
 [
 "la bobine {} n'est pas chargée dans le CANVAS",
@@ -1575,8 +1596,16 @@
 "Cuts at the thinnest places: {}"
 ],
 [
+"Bobine {} : {}, nouvelle pour l'atelier",
+"Spool {}: {}, new to the workshop"
+],
+[
 "ComfyUI injoignable sur {}. Renseigne",
 "ComfyUI unreachable at {}. Set"
+],
+[
+"Elle est neuve ({}) ou déjà entamée ?",
+"Is it new ({}) or already started?"
 ],
 [
 "Retour de ta dernière impression ({})",
@@ -1735,6 +1764,10 @@
 "ComfyUI unreachable at {}: {}"
 ],
 [
+"Neuve ({}) ou déjà entamée ?",
+"New ({}) or already started?"
+],
+[
 "Sur le plateau : {} × {} × {} mm",
 "On the plate: {} × {} × {} mm"
 ],
@@ -1819,6 +1852,10 @@
 "{}: {} °C outside {} to {} °C"
 ],
 [
+"Bobine {} : {}, nouvelle",
+"Spool {}: {}, new"
+],
+[
 "ComfyUI connecté ({}) {}",
 "ComfyUI connected ({}) {}"
 ],
@@ -1849,6 +1886,10 @@
 [
 "{} : terminée en {} min.",
 "{}: finished in {} min."
+],
+[
+"Bobine {} : {} reconnue",
+"Spool {}: {} recognised"
 ],
 [
 "aperçu impossible: {}",
@@ -1969,6 +2010,10 @@
 [
 "Pièce {} : {} mm",
 "Piece {}: {} mm"
+],
+[
+"Une neuve ({})",
+"A new one ({})"
 ],
 [
 "{} libres sur {}",

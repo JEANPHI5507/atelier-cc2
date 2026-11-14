@@ -842,9 +842,15 @@ def test_spool_stock_and_costs(tmp_path, monkeypatch):
     trays[1]["code"] = "R9"                                                          # another spool in tray 1
     assert [(t["tray"], t["remise"]) for t in stock.sync(trays)] == [(1, False)]
     assert stock.summary()["trays"][1]["restant_g"] == 1000
+    assert stock.summary()["trays"][1]["question"]["remise"] is False                # "new, or already started?"
     trays[1]["code"] = "R1"                                                          # the first one comes back
     assert [(t["tray"], t["remise"], t["restant_g"]) for t in stock.sync(trays)] == [(1, True, round(left))]
     assert stock.summary()["trays"][1]["restant_g"] == left
+    assert stock.summary()["trays"][1]["question"]["remise"] is True                 # "the same one, or a new one?"
+    stock.set_tray(1, nouvelle=True)                                                 # the user says: a new one
+    t1 = stock.summary()["trays"][1]
+    assert t1["restant_g"] == t1["poids_g"] and "question" not in t1
+    stock.set_tray(1, restant_g=left)
     stock.set_tray(0, restant_g=300)
     trays[0]["color"], trays[1]["color"] = trays[1]["color"], trays[0]["color"]   # two spools swap trays
     trays[0]["code"], trays[1]["code"] = "R1", "R0"

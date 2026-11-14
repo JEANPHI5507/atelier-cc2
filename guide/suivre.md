@@ -72,8 +72,8 @@ Chaque bobine du CANVAS a un stock (1 kg et 20 €/kg par défaut, modifiables).
 bobine, purge comprise. À la fin d'une impression (ou à l'arrêt, au prorata), le filament est retiré des bonnes bobines ;
 « bobine presque vide » sous 100 g. Une bobine retirée du CANVAS garde ce qu'il lui reste : remise plus tard, dans
 n'importe quel tiroir, elle reprend ce poids (alerte « Bobine remise »). Une bobine jamais vue (autre puce, couleur ou
-matière) repart pleine ; pour une neuve de la même couleur qu'une ancienne, appuie sur « Je viens de mettre une bobine
-neuve ». Le total du mois est affiché sous les bobines.
+matière) repart pleine. Dans les deux cas, l'onglet Imprimante (et la tablette) demande de confirmer : « La même » ou
+« Une neuve » pour une bobine reconnue, « Neuve » ou « Déjà entamée… » (le poids restant) pour une inconnue. Le total du mois est affiché sous les bobines.
 
 ## Le carnet d'entretien
 

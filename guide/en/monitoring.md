@@ -72,8 +72,8 @@ Each CANVAS spool has a stock (1 kg and €20/kg by default, editable). When sli
 included. At the end of a print (or when stopped, pro rata), the filament is taken off the right spools; "bobine presque
 vide" (spool almost empty) under 100 g. A spool taken out of the CANVAS keeps what is left on it: put back later, in
 any tray, it takes that weight again ("Bobine remise" alert). A spool never seen before (other chip, colour or material)
-starts full; for a new spool of the same colour as an old one, press "Je viens de mettre une bobine neuve" (I just put on
-a new spool). The month's total is shown under the spools.
+starts full. Either way the Printer tab (and the tablet) asks to confirm: "La même" (the same one) or "Une neuve" (a new
+one) for a recognised spool, "Neuve" (new) or "Déjà entamée…" (already started: the weight left) for an unknown one. The month's total is shown under the spools.
 
 ## The maintenance log
 

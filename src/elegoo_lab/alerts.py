@@ -624,9 +624,10 @@ class Watcher:
         for t in await asyncio.to_thread(stock.sync, spools.loaded(raw)):
             if t["remise"]:
                 self.emit("remise", f"Bobine {t['tray'] + 1} : {t['nom']} reconnue, il reste environ {t['restant_g']} g comme à son retrait. "
-                                    "Si c'est une bobine neuve, appuie sur « Je viens de mettre une bobine neuve » dans l'onglet Imprimante.")
+                                    "La même bobine ou une neuve ? Réponds dans l'onglet Imprimante.")
             else:
-                self.emit("bobine", f"Bobine {t['tray'] + 1} : comptée comme une bobine pleine. Corrige le poids dans l'onglet Imprimante si besoin.")
+                self.emit("bobine", f"Bobine {t['tray'] + 1} : comptée comme une bobine pleine. Neuve ou déjà entamée ? "
+                                    "Réponds dans l'onglet Imprimante.")
 
     async def _photo(self, ev: dict[str, Any]) -> None:
         try:

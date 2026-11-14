@@ -106,6 +106,9 @@
   .cn-next { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
   .cn-next > div { flex: 1 1 150px; min-width: 0; display: flex; gap: 8px; align-items: center; padding: 8px; border-radius: 12px; background: var(--raised); font-size: 14px; }
   .cn-next .cn-dot { width: 22px; height: 22px; border-width: 1px; }
+  .ask { padding: 10px 12px; margin-bottom: 10px; border-radius: 12px; background: var(--raised); border: 1px solid var(--acc); font-size: 15px; }
+  .ask small { display: block; color: var(--dim); font-size: 13px; margin: 2px 0 8px; }
+  .ask .btn { margin: 0 8px 0 0; padding: 8px 14px; font-size: 15px; }
   .cn-purge { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 15px; }
   .cn-purge > small { display: block; color: var(--faint); font-size: 13px; margin-bottom: 6px; }
   .cn-purge > div { display: flex; align-items: center; padding: 4px 0 8px; position: relative; }
@@ -154,7 +157,7 @@
     </div>
     <div class="under">
       <div class="card"><h3>Températures</h3><div class="temps" id="temps"></div></div>
-      <div class="card"><h3>Bobines <span id="refill"></span></h3><div class="spools" id="spools"></div></div>
+      <div class="card"><h3>Bobines <span id="refill"></span></h3><div id="ask"></div><div class="spools" id="spools"></div></div>
     </div>
   </div>
   <div class="side">

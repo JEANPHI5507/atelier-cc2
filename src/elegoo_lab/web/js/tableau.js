@@ -208,8 +208,27 @@
           + '<div class="n">T' + pos + ' · ' + esc(on ? (t.filament_type || t.type || '?') : 'vide') + '</div>'
           + (on && k ? '<div class="gauge' + (k.restant_g < st.low_g ? ' low' : '') + '"><i style="width:' + pct + '%"></i></div><div class="g">' + g(k.restant_g) + '</div>' : '<div class="g">' + esc(on ? t.filament_name || '' : '') + '</div>') + '</div>';
       }).join('') : '<p class="note">CANVAS non détecté</p>';
+      // a spool just put in: same one as before, or a new one? (the likeliest answer is already counted)
+      $('ask').innerHTML = (st ? st.trays : []).filter(function (k) { return k.question; }).map(function (k) {
+        var n = k.tray + 1, same = '<button class="btn" data-ask="' + k.tray + '" data-same="' + k.restant_g + '">';
+        return '<div class="ask"><b>Bobine ' + n + ' : ' + esc(k.nom) + (k.question.remise ? ' reconnue' : ', nouvelle') + '</b>'
+          + (k.question.remise ? '<small>La même qu\'avant (' + g(k.restant_g) + ' restants) ou une neuve ?</small>' + same + 'La même</button><button class="btn" data-ask="' + k.tray + '" data-new="1">Une neuve</button>'
+             : '<small>Neuve (' + g(k.poids_g) + ') ou déjà entamée ?</small>' + same + 'Neuve</button><button class="btn" data-ask="' + k.tray + '" data-left="1">Déjà entamée…</button>') + '</div>';
+      }).join('');
     });
   }
+  $('ask').addEventListener('click', function (ev) {
+    var b = ev.target.closest ? ev.target.closest('[data-ask]') : null, body;
+    if (!b) return;
+    if (b.getAttribute('data-new')) body = { nouvelle: true };
+    else if (b.getAttribute('data-left')) {
+      var v = parseFloat(String(window.prompt('Combien de grammes restent sur cette bobine ?', '') || '').replace(',', '.'));
+      if (!(v >= 0)) return;
+      body = { restant_g: v };
+    } else body = { restant_g: +b.getAttribute('data-same') };
+    post('/lab/api/bobines/' + b.getAttribute('data-ask'), body).then(function () { toast('Bobine mise à jour', '', 'ok'); spools(); })
+      .catch(function (e) { toast(e.message, '', 'bad'); });
+  });
 
   /* camera AI */
   function ai() {

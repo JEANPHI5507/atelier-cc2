@@ -187,6 +187,24 @@ function nozzleAt(coord, busy) {
 }
 
 let stockData = null, trayEdit = null;
+// a spool just put in: the workshop applied the likeliest weight and asks whether that is right
+function spoolQuestions(st, trays) {
+  const ask = (st?.trays || []).filter(k => k.question);
+  $('pv-ask').innerHTML = ask.map(k => {
+    const t = trays.find(x => x.pos === k.tray) || {}, n = k.tray + 1, dot = `<span class="cn-dot" style="background:${esc(t.colour || '#888')}"></span>`;
+    return k.question.remise
+      ? `<div class="ask">${dot}<div><b>Bobine ${n} : ${esc(k.nom)} reconnue</b><small>C'est la même qu'avant (${fmtG(k.restant_g)} restants) ou une neuve ?</small></div>
+         <button class="btn primary" data-ask="${k.tray}" data-same="${k.restant_g}">La même</button><button class="btn" data-ask="${k.tray}" data-new>Une neuve (${fmtG(k.poids_g)})</button></div>`
+      : `<div class="ask">${dot}<div><b>Bobine ${n} : ${esc(k.nom)}, nouvelle pour l'atelier</b><small>Elle est neuve (${fmtG(k.poids_g)}) ou déjà entamée ?</small></div>
+         <button class="btn primary" data-ask="${k.tray}" data-same="${k.restant_g}">Neuve</button><button class="btn" data-ask="${k.tray}" data-open>Déjà entamée…</button></div>`;
+  }).join('');
+}
+$('pv-ask').addEventListener('click', e => {
+  const b = e.target.closest('[data-ask]'); if (!b) return;
+  trayEdit = +b.dataset.ask;
+  if ('open' in b.dataset) return $('pv-trays').querySelector(`[data-tray="${trayEdit}"]`)?.click();   // type what is left
+  traySave('new' in b.dataset ? { nouvelle: true } : { restant_g: +b.dataset.same });
+});
 $('pv-trays').addEventListener('click', e => {
   const b = e.target.closest('[data-tray]'); if (!b || !stockData) return;
   const k = stockData.trays.find(x => x.tray === +b.dataset.tray); if (!k) return;
@@ -216,6 +234,7 @@ async function pvCanvas() {
       <div class="tt">${t.on ? esc(t.name) : 'Vide'}</div>
       ${t.on && k ? `<div class="gauge ${k.restant_g < st.low_g ? 'low' : ''}"><i style="width:${pct}%"></i></div><div class="tt"><b>${fmtG(k.restant_g)}</b> restants</div>` : ''}</button>`; }).join('')
       : '<div class="empty" style="grid-column:1/-1">CANVAS non détecté</div>';
+    spoolQuestions(st, trays.map(norm));
     $('pv-month').textContent = st ? `Ce mois : ${st.mois.impressions} impression${st.mois.impressions > 1 ? 's' : ''} · ${fmtG(st.mois.g)} · ${euro(st.mois.eur)}` : '';
   } catch { $('pv-trays').innerHTML = '<div class="empty" style="grid-column:1/-1">CANVAS injoignable</div>'; }
   if (pvOpen) setTimeout(pvCanvas, 10000);

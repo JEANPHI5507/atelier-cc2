@@ -7,7 +7,8 @@ print was stopped). Before a print starts, the workshop checks that every tray h
 
 A spool taken out of the CANVAS is set aside with what is left on it; when a spool of the same identity
 (RFID code, colour, material) comes back in any tray it takes that weight again. Any other spool is counted
-as a new full one; the user can correct the weight in the Imprimante tab. Kept in models/.bobines.json.
+as a new full one. Either way the tray keeps a ``question`` until the user says, in the Imprimante tab or on
+the tablet, whether it is that same spool or a new one (or types what is left). Kept in models/.bobines.json.
 """
 
 from __future__ import annotations
@@ -102,6 +103,8 @@ def sync(loaded: list[dict[str, Any]]) -> list[dict[str, Any]]:
             if back or cur["couleur"]:
                 changed.append({"tray": int(i), "remise": bool(back), "restant_g": round(cur["restant_g"]),
                                 "nom": t.get("filament_name") or ident[2]})
+                # the likeliest answer is applied; the page asks the user to confirm it (set_tray settles it)
+                cur["question"] = {"remise": bool(back), "t": int(time.time())}
             cur.update(code=ident[0], couleur=ident[1], matiere=ident[2], nom=t.get("filament_name") or ident[2])
         while len(aside) > 40:
             aside.pop(next(iter(aside)))
@@ -116,6 +119,7 @@ def set_tray(tray: int, *, restant_g: float | None = None, poids_g: float | None
     with _lock:
         data = load()
         cur = data["trays"][str(tray)]
+        cur.pop("question", None)   # any answer or correction settles "same spool or a new one?"
         if poids_g is not None:
             if not 50 <= poids_g <= 10000:
                 raise ValueError("poids de bobine entre 50 et 10 000 g")
