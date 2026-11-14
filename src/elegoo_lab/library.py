@@ -23,6 +23,7 @@ ALL_EXT = MESH_EXT | {".gcode"}
 TECHNICAL = re.compile(r"(?<!^calibration)(_canvas\.3mf|_partie\d+\.3mf|_chevilles\.stl|_petites_pieces\.3mf|_scaled\.stl)$", re.I)
 NAME_OK = re.compile(r"^[^/\\\x00-\x1f<>:\"|?*]{1,120}$")
 _lock = threading.Lock()
+GCODE_KEEP_DAYS = 30   # a printed G-code goes this long after its last print: its model stays, slicing again takes seconds
 _meta_cache: dict[tuple, dict[str, Any]] = {}
 
 
@@ -235,3 +236,20 @@ def cleanup() -> list[dict[str, Any]]:
             if idx.get("source"):          # we sliced it, and its model is gone
                 out.append({"name": e["name"], "size": e["size"], "raison": "son modèle a été supprimé"})
     return out
+
+
+def old_gcodes(keep: set[str] | frozenset[str] = frozenset(), days: int = GCODE_KEEP_DAYS) -> list[str]:
+    """G-codes printed (gallery) more than ``days`` ago and not sliced again since, whose model is still in the
+    library. Never one in ``keep`` (the queue, the print in progress), never one that was not printed yet, never
+    one without its model (made elsewhere, or model deleted): there it is the only copy."""
+    from . import gallery
+    limit = time.time() - days * 86400
+    last: dict[str, float] = {}
+    for e in gallery.entries():
+        f = e.get("fichier")
+        if f:
+            last[f] = max(last.get(f, 0), float("inf") if e.get("issue") == "en cours" else e.get("debut", 0))
+    return [e["name"] for e in listing()
+            if e["kind"] == "gcode" and e["name"] not in keep and e.get("source")
+            and e["name"] in last and last[e["name"]] < limit and e["mtime"] < limit]
+

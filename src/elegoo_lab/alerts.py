@@ -56,6 +56,7 @@ KINDS = {
     "entretien": ("warn", "Entretien à faire"),
     "rate": ("bad", "Raté détecté : impression mise en pause"),
     "sauvegarde": ("warn", "Sauvegarde en retard"),
+    "menage": ("info", "Anciens G-code effacés"),
 }
 SURVEILLANCE = {"ia": True, "pause_auto": False, "sensibilite": 1.0, "timelapse": True}
 AI_EVERY_S = 10.0             # one analysed frame every 10 s, like Obico
@@ -204,6 +205,7 @@ class Watcher:
         self.cooling: dict[str, Any] | None = None   # finished print waiting for a cold plate: {"name", "since", "bilan"}
         self.term: deque[dict[str, Any]] = deque(maxlen=TERM_KEEP)
         self.seen: dict[str, Any] = {}     # last values the terminal reported
+        self.cleaned = 0.0                 # last daily clean-up of old G-codes
 
     # --- journal -----------------------------------------------------------
 
@@ -315,7 +317,28 @@ class Watcher:
         msg = sauvegarde.overdue()
         last = next((e for e in reversed(self.events) if e["kind"] == "sauvegarde"), None)
         if msg and (not last or time.time() - last["t"] > 86400):
-            self.emit("sauvegarde", msg + " Vérifie que le serveur maison est allumé, ou lance `cc2 sauvegarde faire`.")
+            self.emit("sauvegarde", msg + " Branche le disque USB de sauvegarde : la copie se fait toute seule dans l'heure.")
+
+    async def _clean_gcodes(self) -> None:
+        """Once a day, while nothing prints: delete the G-codes printed more than 30 days ago (library.old_gcodes)."""
+        if self.prev not in IDLE or time.time() - self.cleaned < 86400:
+            return
+        from . import library
+        self.cleaned = time.time()
+        try:
+            queue = set(json.loads((config.MODELS_DIR / ".queue.json").read_text()))
+        except (OSError, ValueError, TypeError):
+            queue = set()
+        try:
+            names = await asyncio.to_thread(library.old_gcodes, queue | {self.filename})
+            gone = await asyncio.to_thread(library.delete, names) if names else []
+        except Exception as e:   # housekeeping never stops the watcher
+            log.warning("ménage des G-code : %s", e)
+            return
+        if gone:
+            self.emit("menage", f"{len(gone)} G-code imprimé{'s' if len(gone) > 1 else ''} il y a plus de "
+                      f"{library.GCODE_KEEP_DAYS} jours : {', '.join(gone)}. Les modèles restent dans la bibliothèque : "
+                      "retranche-les pour les réimprimer.")
 
     # --- state machine -----------------------------------------------------
 
@@ -638,6 +661,7 @@ class Watcher:
                     await self._sync_canvas()
                 if self.ticks % 720 == 360:                # about once an hour, the first some 30 min after a start
                     self._backup_check()
+                    await self._clean_gcodes()
                 self.ticks += 1
             except asyncio.CancelledError:
                 raise

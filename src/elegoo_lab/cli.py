@@ -239,17 +239,17 @@ def service_remove() -> None:
     typer.echo("Démarrage automatique retiré. `cc2 dash` fonctionne toujours à la main.")
 
 
-backup = typer.Typer(help="Sauvegarde de la bibliothèque, des réglages et de l'historique git sur une autre machine (ssh).",
+backup = typer.Typer(help="Sauvegarde de la bibliothèque, des réglages et de l'historique git sur un disque USB.",
                      no_args_is_help=True)
 app.add_typer(backup, name="sauvegarde")
 
 
 @backup.command("faire")
 def backup_run(
-    vers: Annotated[str, typer.Option(help="Machine de destination (un nom de ~/.ssh/config).")] = "Serveur-Maison",
+    vers: Annotated[Optional[str], typer.Option(help="Dossier d'un disque branché, ou machine ssh ; vide = le disque USB branché.")] = None,
     si_besoin: Annotated[bool, typer.Option("--si-besoin", help="Seulement si la dernière date de plus de 20 h.")] = False,
 ) -> None:
-    """Copie models/, config.toml et l'historique git vers ~/sauvegardes/atelier-cc2 de l'autre machine."""
+    """Copie models/, config.toml et l'historique git dans le dossier atelier-cc2 du disque USB branché."""
     from . import sauvegarde
     try:
         typer.echo(sauvegarde.run(vers, if_needed=si_besoin))
@@ -260,21 +260,23 @@ def backup_run(
 
 @backup.command("installer")
 def backup_install(
-    vers: Annotated[str, typer.Option(help="Machine de destination (un nom de ~/.ssh/config).")] = "Serveur-Maison",
+    vers: Annotated[Optional[str], typer.Option(help="Dossier d'un disque branché, ou machine ssh ; vide = le disque USB branché.")] = None,
 ) -> None:
-    """Sauvegarde automatique : essai toutes les heures, une copie par jour, rattrapée dès que la machine répond."""
+    """Sauvegarde automatique : essai toutes les heures, une copie par jour, rattrapée dès que le disque est branché."""
     exe = Path(sys.executable).parent / "cc2"
     UNIT_DIR.mkdir(parents=True, exist_ok=True)
     (UNIT_DIR / "cc2-sauvegarde.service").write_text(
-        f"[Unit]\nDescription=Atelier CC2 - sauvegarde vers {vers}\n\n"
-        f"[Service]\nType=oneshot\nWorkingDirectory={config.ROOT}\nExecStart={exe} sauvegarde faire --vers {vers} --si-besoin\n"
+        f"[Unit]\nDescription=Atelier CC2 - sauvegarde vers {vers or 'le disque USB'}\n\n"
+        f"[Service]\nType=oneshot\nWorkingDirectory={config.ROOT}\n"
+        f"ExecStart={exe} sauvegarde faire{f' --vers {vers}' if vers else ''} --si-besoin\n"
+        "SuccessExitStatus=1\n"   # an unplugged disk is not a failure of the service: the status file keeps the reason
         "Nice=10\nIOSchedulingClass=idle\n")
     (UNIT_DIR / "cc2-sauvegarde.timer").write_text(
         "[Unit]\nDescription=Atelier CC2 - sauvegarde toutes les heures si besoin\n\n"
         "[Timer]\nOnBootSec=10min\nOnUnitActiveSec=1h\nPersistent=true\n\n[Install]\nWantedBy=timers.target\n")
     _systemctl("daemon-reload")
     _systemctl("enable", "--now", "cc2-sauvegarde.timer")
-    typer.echo(f"Sauvegarde automatique installée vers {vers} (~/sauvegardes/atelier-cc2). "
+    typer.echo(f"Sauvegarde automatique installée vers {vers or 'le disque USB branché (dossier atelier-cc2)'}. "
                "Suivi : `cc2 sauvegarde etat`.")
 
 

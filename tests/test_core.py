@@ -1329,6 +1329,47 @@ def test_backup_copies_the_library_and_keeps_old_versions(tmp_path, monkeypatch)
     assert sauvegarde.status()["erreur"].endswith("No route to host") and sauvegarde.overdue() is None   # yesterday's copy still counts
 
 
+def test_backup_to_a_usb_disk_never_fills_the_pc_disk(tmp_path, monkeypatch):
+    import shutil
+    from elegoo_lab import sauvegarde
+    if not shutil.which("rsync"):
+        pytest.skip("rsync absent")
+    disk = tmp_path / "CLE"
+    disk.mkdir()
+    (config.MODELS_DIR / "coeur.stl").write_text("v1")
+    with pytest.raises(RuntimeError, match="non branché"):   # same disk as the library: an unplugged key's mount folder
+        sauvegarde.run(str(disk))
+    assert not any(disk.iterdir())
+    monkeypatch.setattr(sauvegarde, "_same_disk", lambda a, b: False)
+    sauvegarde.run(str(disk))
+    assert (disk / "atelier-cc2" / "models" / "coeur.stl").read_text() == "v1"
+    assert sauvegarde.status()["vers"] == str(disk / "atelier-cc2")
+
+
+def test_old_printed_gcodes_go_their_models_stay():
+    import json
+    import os
+    from elegoo_lab import library
+    lib, old = config.MODELS_DIR, time.time() - 40 * 86400
+    for m in ("coeur", "sapin", "etoile", "renne", "boule"):
+        (lib / f"{m}.stl").write_text("solid")
+    printed = {"coeur": old, "sapin": old, "etoile": time.time() - 86400, "lutin": old, "boule": old}
+    for g in [*printed, "renne"]:
+        f = lib / f"{g}_0.20mm_PLA.gcode"
+        f.write_text("; G-code\n")
+        os.utime(f, (old, old))
+    for i, (g, t) in enumerate(printed.items()):
+        d = lib / ".galerie" / f"2026{i}_{g}"
+        d.mkdir(parents=True)
+        (d / "meta.json").write_text(json.dumps({"id": d.name, "fichier": f"{g}_0.20mm_PLA.gcode", "debut": t,
+                                                 "issue": "en cours" if g == "boule" else "terminee"}))
+    gone = library.old_gcodes(keep={"sapin_0.20mm_PLA.gcode"})
+    # sapin: in the queue · etoile: printed yesterday · lutin: no model left · renne: never printed · boule: printing
+    assert gone == ["coeur_0.20mm_PLA.gcode"]
+    library.delete(gone)
+    assert not (lib / "coeur_0.20mm_PLA.gcode").exists() and (lib / "coeur.stl").exists()
+
+
 def test_terminal_tells_only_what_changed(tmp_path, monkeypatch):
     from elegoo_lab import alerts
     monkeypatch.setattr(config, "MODELS_DIR", tmp_path)
