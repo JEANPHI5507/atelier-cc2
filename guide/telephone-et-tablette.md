@@ -55,7 +55,7 @@ Une vieille tablette devient l'écran de l'imprimante : bouton **Tableau** dans 
 aussi en appli.
 
 - La **caméra** en grand, avec le nom de l'impression, la progression et l'état de l'IA.
-- L'**impression** : pourcentage, temps restant, heure de fin, couche, couleur en cours et prochaines couleurs.
+- L'**impression** : pourcentage, temps restant, heure de fin, couche, couleur en cours, prochaines couleurs et purges restantes par couleur (« 21 / 65 »).
 - La **coupe** : la pièce vue de face, les couches imprimées en couleur, et la couche en cours vue du dessus.
 - **Températures**, **bobines** du CANVAS, **alertes** en direct avec un son.
 - **Au repos** : la dernière impression (photo, durée, coût), le total du mois, l'entretien à faire.

@@ -67,7 +67,13 @@
         + (d.suivants.length ? '<div class="cn-next">' + d.suivants.slice(0, 3).map(function (n) {
             return '<div>' + dot(n) + '<div>' + esc(n.nom) + '<small>couche ' + n.couche + (n.min != null ? ' · ' + soon(n.min) : '') + '</small></div></div>';
           }).join('') + '</div>' : '')
-        + '<p class="note" style="margin-top:8px">' + (d.restants ? d.restants + ' changement' + (d.restants > 1 ? 's' : '') + ' de couleur restant' + (d.restants > 1 ? 's' : '') : 'Plus de changement de couleur') + '</p>';
+        + '<p class="note" style="margin-top:8px">' + (d.restants ? d.restants + ' changement' + (d.restants > 1 ? 's' : '') + ' de couleur restant' + (d.restants > 1 ? 's' : '') : 'Plus de changement de couleur') + '</p>'
+        // purges still to come, colour by colour ("21 / 65"); widths inline: old tablets lack CSS variables
+        + ((d.purge || []).filter(function (p) { return p.total; }).length ? '<div class="cn-purge"><small>Purges restantes, par couleur</small>'
+          + d.purge.filter(function (p) { return p.total; }).map(function (p) {
+            return '<div>' + dot(p) + '<span class="n">' + esc(p.nom) + '</span><b>' + p.reste + '</b><small> / ' + p.total + '</small>'
+              + '<i><i style="width:' + Math.round(100 * p.reste / p.total) + '%"></i></i></div>';
+          }).join('') + '</div>' : '');
       $('cn').hidden = false;
     }).catch(function () { $('cn').hidden = true; });
   }

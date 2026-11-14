@@ -57,7 +57,7 @@ An old tablet becomes the printer's screen: **Tableau** (dashboard) button in th
 `https://<workshop address>:8443/lab/tableau.html`. Same certificate and code as the phone; it installs as an app too.
 
 - The **camera**, large, with the print's name, progress and the AI's state.
-- The **print**: percentage, time left, end time, layer, current colour and upcoming colours.
+- The **print**: percentage, time left, end time, layer, current colour, upcoming colours and purges left by colour ("21 / 65").
 - The **cross-section**: the part seen from the front, printed layers in colour, and the current layer seen from above.
 - **Temperatures**, CANVAS **spools**, live **alerts** with a sound.
 - **When idle**: the last print (photo, duration, cost), the month's total, maintenance due.
