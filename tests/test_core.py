@@ -315,6 +315,18 @@ def test_drill_add_or_keep_a_shape():
     assert sorted(c["hex"] for c in colors.analyze(lib / cut["name"])["colours"]) == ["#007800", "#C80000"]   # no blend
 
 
+def test_pieces_placed_by_hand_stay_on_the_plate():
+    from elegoo_lab import colors
+    src = config.MODELS_DIR / "cube.stl"
+    trimesh.creation.box((20, 20, 20)).export(src)
+    out = config.MODELS_DIR / "c.3mf"
+    colors.to_canvas(src, out, {1: 1}, shift=(-60.0, 40.0))                         # moved, still on the plate
+    with pytest.raises(ValueError, match="sort du plateau"):
+        colors.to_canvas(src, out, {1: 1}, shift=(130.0, 0.0))
+    with pytest.raises(ValueError, match="coin avant droit"):                       # the CC2 does not print there
+        colors.to_canvas(src, out, {1: 1}, shift=(110.0, -110.0))
+
+
 def test_compact_preview_glb_is_face_for_face():
     import struct
     import numpy as np

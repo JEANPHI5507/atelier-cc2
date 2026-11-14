@@ -219,6 +219,7 @@ function setMove(on) {
   stage.style.cursor = mv.on ? 'grab' : '';
   if (mv.on) { camTo('top'); toast('Glisse une pièce pour la déplacer sur le plateau.'); }
 }
+const PLATE_EDGE = 123;   // half the CC2's 256 mm plate (centred on the viewer's origin), less a 5 mm margin
 const moved = () => sel?.name === mv.file && previewKey !== 'cut' && Object.values(mv.moves).some(d => d.some(Boolean));
 const shiftXY = () => { current.updateMatrixWorld(true); const c = new THREE.Box3().setFromObject(current).getCenter(new THREE.Vector3()); return [c.x, c.y]; };
 if (renderer) {
@@ -230,19 +231,29 @@ if (renderer) {
     const k = mv.ranges.findIndex(r => hit.faceIndex >= r.first && hit.faceIndex < r.first + r.count); if (k < 0) return;
     const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -hit.point.z), last = new THREE.Vector3();
     if (!ray.ray.intersectPlane(plane, last)) return;
-    mv.drag = { k, plane, last }; controls.enabled = false; dom.setPointerCapture(e.pointerId); stage.style.cursor = 'grabbing'; e.stopImmediatePropagation();
+    // the piece's footprint on the plate (world x, y), so a drag stops at the plate's edge instead of flying off it
+    // (seen tilted, a few pixels near the horizon are tens of centimetres)
+    const pos = m.geometry.attributes.position, r = mv.ranges[k], v = new THREE.Vector3(), box = new THREE.Box3();
+    for (let i = r.first * 3; i < (r.first + r.count) * 3; i++) box.expandByPoint(v.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld));
+    mv.drag = { k, plane, last, box, off: new THREE.Vector3() };
+    controls.enabled = false; dom.setPointerCapture(e.pointerId); stage.style.cursor = 'grabbing'; e.stopImmediatePropagation();
   }, true);
   dom.addEventListener('pointermove', e => {
     if (!mv.drag) return;
     aim(e); const w = new THREE.Vector3(); if (!ray.ray.intersectPlane(mv.drag.plane, w)) return;
-    const dw = w.clone().sub(mv.drag.last); mv.drag.last = w;
+    const D = mv.drag, want = D.off.clone().add(w.clone().sub(D.last)), edge = PLATE_EDGE;
+    D.last = w;
+    want.x = Math.min(edge - D.box.max.x, Math.max(-edge - D.box.min.x, want.x));   // keep it on the plate
+    want.y = Math.min(edge - D.box.max.y, Math.max(-edge - D.box.min.y, want.y)); want.z = 0;
+    const dw = want.clone().sub(D.off); D.off = want;
+    if (!dw.x && !dw.y) return;
     const m = pieceMesh(), inv = new THREE.Matrix3().setFromMatrix4(m.matrixWorld).invert(), l = dw.applyMatrix3(inv);
     const d = [l.x, -l.z, l.y], cur = mv.moves[mv.drag.k] || [0, 0, 0];
     mv.moves[mv.drag.k] = cur.map((v, i) => v + d[i]); shiftPiece(mv.drag.k, d);
   });
   const end = () => {
     if (!mv.drag) return; mv.drag = null; controls.enabled = true; stage.style.cursor = mv.on ? 'grab' : ''; vtoolsShow();
-    const b = new THREE.Box3().setFromObject(current); if (Math.max(Math.abs(b.min.x), Math.abs(b.max.x), Math.abs(b.min.y), Math.abs(b.max.y)) > 123) toast('Une pièce sort du plateau : rapproche-la avant d\'imprimer.');
+    const b = new THREE.Box3().setFromObject(current); if (Math.max(Math.abs(b.min.x), Math.abs(b.max.x), Math.abs(b.min.y), Math.abs(b.max.y)) > PLATE_EDGE + .5) toast('Une pièce sort du plateau : rapproche-la avant d\'imprimer.');
   };
   dom.addEventListener('pointerup', end); dom.addEventListener('pointercancel', end);
 }

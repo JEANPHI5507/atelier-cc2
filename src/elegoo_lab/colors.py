@@ -739,6 +739,13 @@ def to_canvas(path: Path, out: Path, mapping: dict[int, int], *, height_mm: floa
         offset = avoid_exclude(lo, hi, offset)
     elif any(lo[:2] + offset[:2] < 0) or any(hi[:2] + offset[:2] > mesh.BED_MM):
         raise ValueError("une pièce déplacée sort du plateau : rapproche-la")
+    else:   # pieces placed by hand: none may sit on the corner where the CC2 does not print
+        x0, y0, x1, y1 = EXCLUDE
+        for o in pr.objects:
+            v = np.vstack([p.vertices for p in o.parts])[:, :2] + offset[:2]
+            if ((v[:, 0] > x0) & (v[:, 1] < y1)).any():
+                raise ValueError("une pièce déplacée touche le coin avant droit du plateau, où la CC2 n'imprime pas : "
+                                 "éloigne-la de ce coin (en rouge dans la vue 3D)")
     tower = tower_spot(lo[:2] + offset[:2], hi[:2] + offset[:2]) if n > 1 else None
     threemf.write(pr, out, filaments=n, colours=slot_hex, offset=offset, flush=flush_matrix(slot_hex, smart_flush), tower=tower)
     return {"file": out.name, "filaments": n, "slot_colours": slot_hex, "simplified": simplified}

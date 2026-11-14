@@ -1244,6 +1244,7 @@
 "une comparaison est déjà en cours": "a comparison is already running",
 "une impression en pause : si le bouton de l'atelier ne répond pas, reprends depuis l'écran.": "a paused print: if the workshop's button doesn't respond, resume from the screen.",
 "une partie flotterait sans support": "a part would float without support",
+"une pièce déplacée touche le coin avant droit du plateau, où la CC2 n'imprime pas : éloigne-la de ce coin (en rouge dans la vue 3D)": "a moved piece touches the plate's front-right corner, where the CC2 does not print: move it away from that corner (red in the 3D view)",
 "une seule fois": "only once",
 "une échelle ne peut pas être nulle": "a scale can't be zero",
 "usage inconnu «": "unknown use “",
