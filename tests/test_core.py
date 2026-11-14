@@ -1288,6 +1288,29 @@ def test_without_purge_turns_colour_changes_into_a_bare_switch(tmp_path):
     assert slicer._header(f)["colour changes"] == "2"   # the L0 line counts as before
 
 
+def test_terminal_tells_only_what_changed(tmp_path, monkeypatch):
+    from elegoo_lab import alerts
+    monkeypatch.setattr(config, "MODELS_DIR", tmp_path)
+    monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "config.toml")
+    w = alerts.Watcher(lambda: None)
+    raw = {"TempOfNozzle": 25, "TempTargetNozzle": 0, "TempOfHotbed": 25, "TempTargetHotbed": 0,
+           "CurrenCoord": "0,0,0.2", "PrintInfo": {"CurrentLayer": 0, "TotalLayer": 362, "PrintSpeedPct": 100},
+           "_cc2": {"machine_status": 1, "sub_status": 0}}
+    w.narrate(raw, 0)
+    w.term.clear()
+    w.narrate(raw, 0)
+    assert not w.term                                   # nothing new, nothing said
+    raw = {**raw, "TempTargetNozzle": 230, "PrintInfo": {**raw["PrintInfo"], "CurrentLayer": 1, "PrintSpeedPct": 160}}
+    w.narrate(raw, 13)
+    w.narrate({**raw, "TempOfNozzle": 229}, 13)
+    w.narrate({**raw, "TempOfNozzle": 231}, 13)
+    texts = [l["text"] for l in w.term]
+    assert texts == ["État : impression", "Couche 1 / 362 · Z 0,20 mm", "Buse : consigne 230 °C", "Vitesse : 160 %",
+                     "Buse à 229 °C : consigne atteinte"]
+    w.emit("pause", "x.gcode")
+    assert w.term[-1]["level"] == "warn" and w.term[-1]["text"].startswith("Impression en pause")
+
+
 def test_toolchange_reprime_no_longer_drops_a_blob():
     from elegoo_lab import slicer
     g = (b"M6211 A1 L200 T1 Q220 R220 S220\nT1\nG1 E6 F600\n"          # start load: its push stays

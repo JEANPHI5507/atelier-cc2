@@ -1,6 +1,7 @@
 import { $, api, esc, evTime, nice, toast } from './core.js';
 import { loadGallery, openBilanById } from './gallery.js';
 import { info } from './lab.js';
+import { termPush } from './printer.js';
 
 /* follow-up and alerts */
 let evUnread = 0, evSound = true;
@@ -18,6 +19,7 @@ function beep(level) {
 }
 function startAlerts() {
   const es = new EventSource('/lab/api/events/stream');
+  es.addEventListener('ligne', m => termPush(JSON.parse(m.data)));
   es.addEventListener('alerte', m => {
     const e = JSON.parse(m.data);
     if (e.update) { if ($('ev').open) evLoad(); if (!$('gal').hidden) loadGallery(); return; }  // photo / gallery entry added

@@ -22,7 +22,7 @@ function openPrinter() {
   loadQueue();
   $('pv-ro').hidden = !!ctx.control;
   document.querySelectorAll('#pv [data-ctl]').forEach(el => el.disabled = !ctx.control);
-  openCamera(); pvStatus(); pvCanvas(); pvFiles(); svLoad(); mcLoad(); mtLoad();
+  openCamera(); pvStatus(); pvCanvas(); pvFiles(); svLoad(); mcLoad(); mtLoad(); termLoad();
 }
 /* camera: one whole picture at a time, the next asked once the last is shown (a slow phone gets fewer
    pictures, never late or frozen ones); paused while the page is hidden */
@@ -292,7 +292,31 @@ $('sv-sens').onchange = () => svSave({ sensibilite: +$('sv-sens').value });
 $('sv-dl').onclick = async () => { await api('/surveillance/modele', { method: 'POST' }).catch(e => toast(e.message, 'bad')); svLoad(); };
 
 
-export { closeCamera, lastSt, mcLoad, mtLoad, mtRender, openCamera, openPrinter, pollPrinter, pvCanvas, pvFiles, pvOpen, pvStatus, pvTimer, stockData, svLoad, svSave, svTimer, trayEdit, traySave };
+/* live terminal: everything the watcher sees and every order sent, as it happens */
+let termLines = [], termFrom = 0;
+try { termFrom = +localStorage.getItem('cc2-term-from') || 0; } catch {}
+const termRow = l => `<div class="tl ${esc(l.level)}"><time>${new Date(l.t * 1000).toLocaleTimeString('fr-FR')}</time><span>${esc(l.text.replace(/\S+?\.gcode\b/gi, nice))}</span></div>`;
+function termShown(l) { return l.t > termFrom && (l.level !== 'dim' || $('tm-dim').checked); }
+function termDraw() { const b = $('tm'); b.innerHTML = termLines.filter(termShown).map(termRow).join('') || '<div class="tl dim"><span>Rien pour l\'instant.</span></div>'; b.scrollTop = b.scrollHeight; }
+async function termLoad() { termLines = await api('/terminal').catch(() => termLines); termDraw(); }
+function termPush(l) {
+  termLines.push(l); if (termLines.length > 400) termLines.shift();
+  if (!termShown(l)) return;
+  const b = $('tm'), atEnd = b.scrollHeight - b.scrollTop - b.clientHeight < 40;   // reading higher up: don't jump
+  if (!b.querySelector('time')) b.innerHTML = '';
+  b.insertAdjacentHTML('beforeend', termRow(l));
+  while (b.childElementCount > 400) b.firstElementChild.remove();
+  if (atEnd) b.scrollTop = b.scrollHeight;
+}
+try { $('tm-dim').checked = localStorage.getItem('cc2-term-dim') === '1'; } catch {}
+$('tm-dim').onchange = () => { try { localStorage.setItem('cc2-term-dim', $('tm-dim').checked ? '1' : '0'); } catch {} termDraw(); };
+$('tm-clear').onclick = () => { termFrom = Date.now() / 1000; try { localStorage.setItem('cc2-term-from', termFrom); } catch {} termDraw(); };
+$('tm-copy').onclick = async () => {
+  const txt = termLines.filter(termShown).map(l => new Date(l.t * 1000).toLocaleTimeString('fr-FR') + '  ' + l.text).join('\n');
+  try { await navigator.clipboard.writeText(txt); toast('Terminal copié', 'ok'); } catch { toast('Copie impossible ici', 'bad'); }
+};
+
+export { termLoad, termPush, closeCamera, lastSt, mcLoad, mtLoad, mtRender, openCamera, openPrinter, pollPrinter, pvCanvas, pvFiles, pvOpen, pvStatus, pvTimer, stockData, svLoad, svSave, svTimer, trayEdit, traySave };
 
 /* print queue: shown when something waits; the next print starts by hand once the bed is cleared */
 let queue = [], queueBusy = true;

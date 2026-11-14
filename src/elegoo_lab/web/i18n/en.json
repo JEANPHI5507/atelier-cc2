@@ -1,5 +1,12 @@
 {
 "exact": {
+"Terminal": "Terminal",
+"Détails firmware": "Firmware details",
+"Copier": "Copy",
+"Effacer": "Clear",
+"Terminal copié": "Terminal copied",
+"Copie impossible ici": "Cannot copy here",
+"Tout ce qui se passe, en direct : états, couches, températures, commandes envoyées (→) et alertes.": "Everything that happens, live: states, layers, temperatures, orders sent (→) and alerts.",
 "Vitesse": "Speed",
 "Normal": "Normal",
 "Turbo": "Turbo",

@@ -1050,6 +1050,54 @@ def lab_router(cfg: config.Config) -> APIRouter:
     return r
 
 
+class CommandLog:
+    """Each order sent to the printer (pause, speed, temperature...) shows in the live terminal with its answer."""
+
+    LABELS = {"/print/start": "Lancement de l'impression", "/print/pause": "Pause", "/print/resume": "Reprise",
+              "/print/stop": "Arrêt de l'impression", "/print/speed": "Vitesse", "/print/fan": "Ventilateur",
+              "/print/temperature": "Température", "/canvas/refill": "Recharge auto CANVAS", "/light": "Lumière",
+              "/files/upload": "Envoi d'un fichier", "/files/delete": "Suppression d'un fichier"}
+
+    def __init__(self, app: Any) -> None:
+        self.app = app
+
+    async def __call__(self, scope: dict, receive: Any, send: Any) -> None:
+        path = scope.get("path", "")
+        label = self.LABELS.get(path.removeprefix("/lab/api")) if scope["type"] == "http" and scope["method"] == "POST" else None
+        if not label:
+            return await self.app(scope, receive, send)
+        body, status = b"", 0
+
+        async def rec() -> dict:
+            nonlocal body
+            m = await receive()
+            if len(body) < 2000:
+                body += m.get("body", b"")
+            return m
+
+        async def snd(m: dict) -> None:
+            nonlocal status
+            if m["type"] == "http.response.start":
+                status = m["status"]
+            await send(m)
+
+        try:
+            await self.app(scope, rec, snd)
+        finally:
+            w = getattr(scope["app"].state, "watcher", None) if scope.get("app") else None
+            if w is not None:
+                args = ""
+                with contextlib.suppress(ValueError, AttributeError):
+                    d = json.loads(body or b"{}")
+                    args = " ".join(f"{k}={({True: 'oui', False: 'non'}.get(v, v) if isinstance(v, bool) else v)}"
+                                    for k, v in d.items() if not isinstance(v, (dict, list)))[:120]
+                if not args:   # pycentauri takes most of its parameters in the query string
+                    args = scope.get("query_string", b"").decode()[:120].replace("&", " ")
+                ok = 200 <= status < 300
+                w.say(f"→ {label}{' (' + args + ')' if args else ''} : {'OK' if ok else f'refusé ({status})'}",
+                      "cmd" if ok else "bad")
+
+
 class SameOriginGuard:
     """Refuse state-changing requests that a browser sends on behalf of another site (CSRF).
 
@@ -1087,6 +1135,7 @@ def _add_alerts(app: FastAPI) -> None:
     from . import alerts
 
     inner = app.router.lifespan_context
+    start = len(app.router.routes)
 
     @asynccontextmanager
     async def lifespan(a: FastAPI):
@@ -1097,10 +1146,17 @@ def _add_alerts(app: FastAPI) -> None:
                                lambda: mgr.printer.pause(), lambda: mgr.printer.set_light(True),
                                lambda: mgr.printer.print_history())
             a.state.watcher = w
+            import logging
+            term = alerts.TermHandler(w)
+            for name in ("elegoo_lab", "pycentauri"):
+                logging.getLogger(name).addHandler(term)
+            w.say("Atelier démarré : je surveille l'imprimante.", "dim")
             task = asyncio.create_task(w.run(), name="cc2-alerts")
             try:
                 yield
             finally:
+                for name in ("elegoo_lab", "pycentauri"):
+                    logging.getLogger(name).removeHandler(term)
                 task.cancel()
                 with contextlib.suppress(asyncio.CancelledError, Exception):
                     await task
@@ -1125,9 +1181,14 @@ def _add_alerts(app: FastAPI) -> None:
             async for ev in w.stream():
                 if await request.is_disconnected():
                     break
-                yield {"event": "alerte", "data": json.dumps(ev, ensure_ascii=False)}
+                yield {"event": "ligne" if ev.get("ligne") else "alerte", "data": json.dumps(ev, ensure_ascii=False)}
 
         return EventSourceResponse(gen(), ping=20)
+
+    @app.get("/lab/api/terminal", include_in_schema=False)
+    def terminal(request: Request) -> list[dict[str, Any]]:
+        """The live terminal's lines so far (oldest first); new ones come on the events stream as "ligne"."""
+        return list(watcher(request).term)
 
     @app.get("/lab/api/galerie", include_in_schema=False)
     def galerie() -> list[dict[str, Any]]:
@@ -1223,8 +1284,9 @@ def _add_alerts(app: FastAPI) -> None:
             raise HTTPException(404, "Photo introuvable")
         return FileResponse(p, media_type="image/jpeg")
 
-    for _ in range(9):  # ahead of the /lab static mount
-        app.router.routes.insert(0, app.router.routes.pop())
+    added = app.router.routes[start:]   # ahead of the /lab static mount
+    del app.router.routes[start:]
+    app.router.routes[0:0] = added
 
 
 def create_app(*, enable_control: bool = False, lan: bool = False, port: int = 0,
@@ -1240,6 +1302,7 @@ def create_app(*, enable_control: bool = False, lan: bool = False, port: int = 0
                              mainboard_id=p.serial, access_code=p.access_code)
     config.MODELS_DIR.mkdir(exist_ok=True)
     from fastapi.middleware.gzip import GZipMiddleware
+    app.add_middleware(CommandLog)
     app.add_middleware(GZipMiddleware, minimum_size=4096)  # G-code paths and previews compress ~2.5x
     app.add_middleware(SameOriginGuard)
     if lan:

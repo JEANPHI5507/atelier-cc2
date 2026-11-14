@@ -14,6 +14,7 @@ import json
 import re
 import logging
 import time
+from collections import deque
 from typing import Any, AsyncIterator, Callable
 
 from . import config
@@ -62,6 +63,15 @@ COLD_BED_C = 35               # PLA lets go of the PEI plate by itself below thi
 COLD_WAIT_S = 3 * 3600        # stop waiting after this: the printer was switched off or the part already taken
 AI_STOP_PCT = 98              # last moves: the head parks, the finished part's fine details look like spaghetti
                               # (false alert at 99 % on 2026-11-11), and nothing could be saved that late anyway
+TERM_KEEP = 400               # lines of the live terminal kept in memory (not saved: it is a view of the moment)
+# print_status (pycentauri's CC1 code space, CC2-only 27-29) -> what the terminal says
+STATES = {0: "au repos", 1: "mise en origine des axes", 5: "mise en pause", 6: "en pause", 7: "arrêt en cours",
+          8: "arrêtée", 9: "impression terminée", 12: "reprise", 13: "impression", 14: "erreur",
+          15: "nivellement du plateau", 16: "préchauffage", 27: "changement de filament (CANVAS)",
+          28: "filament chargé", 29: "déchargement du filament"}
+FANS = {"ModelFan": "Ventilateur pièce", "AuxiliaryFan": "Ventilateur auxiliaire", "BoxFan": "Ventilateur caisson"}
+HEATERS = (("Buse", "TempOfNozzle", "TempTargetNozzle"), ("Plateau", "TempOfHotbed", "TempTargetHotbed"),
+           ("Caisson", "TempOfBox", "TempTargetBox"))
 
 
 def surveillance() -> dict[str, Any]:
@@ -147,6 +157,19 @@ async def send_ntfy(ev: dict[str, Any]) -> bool:
         return False
 
 
+class TermHandler(logging.Handler):
+    """Warnings of the workshop and of pycentauri go to the live terminal too."""
+
+    def __init__(self, watcher: "Watcher") -> None:
+        super().__init__(logging.WARNING)
+        self.watcher = watcher
+
+    def emit(self, record: logging.LogRecord) -> None:
+        with contextlib.suppress(Exception):
+            self.watcher.say(f"[{record.name.split('.')[-1]}] {record.getMessage()}",
+                             "bad" if record.levelno >= logging.ERROR else "warn")
+
+
 class Watcher:
     def __init__(self, status: Callable[[], Any], snapshot: Callable[[], Any] | None = None,
                  canvas: Callable[[], Any] | None = None, pause: Callable[[], Any] | None = None,
@@ -178,6 +201,8 @@ class Watcher:
         self.last_seen = time.time()
         self.lost = False
         self.cooling: dict[str, Any] | None = None   # finished print waiting for a cold plate: {"name", "since", "bilan"}
+        self.term: deque[dict[str, Any]] = deque(maxlen=TERM_KEEP)
+        self.seen: dict[str, Any] = {}     # last values the terminal reported
 
     # --- journal -----------------------------------------------------------
 
@@ -204,6 +229,7 @@ class Watcher:
         for q in list(self.subscribers):
             with contextlib.suppress(asyncio.QueueFull):
                 q.put_nowait(ev)
+        self.say(title + (f" : {detail}" if detail else ""), level if level != "info" else "alerte")
         if level != "info":
             with contextlib.suppress(RuntimeError):   # no event loop (CLI, tests): no phone push
                 asyncio.get_running_loop().create_task(self._ntfy(ev))
@@ -220,6 +246,71 @@ class Watcher:
                 yield await q.get()
         finally:
             self.subscribers.discard(q)
+
+    # --- terminal ----------------------------------------------------------
+
+    def say(self, text: str, level: str = "info") -> None:
+        """One line of the live terminal. level: info, dim (firmware detail), cmd (sent by the workshop),
+        alerte, ok, warn, bad."""
+        line = {"ligne": True, "t": round(time.time(), 1), "level": level, "text": text}
+        self.term.append(line)
+        for q in list(self.subscribers):
+            with contextlib.suppress(asyncio.QueueFull):
+                q.put_nowait(line)
+
+    def narrate(self, raw: dict[str, Any], ps: int) -> None:
+        """Turn one status reading into terminal lines: only what changed since the last one."""
+        seen, cc2, pi = self.seen, raw.get("_cc2", {}), raw.get("PrintInfo", {})
+
+        def changed(key: str, value: Any) -> bool:
+            old = seen.get(key, ...)
+            seen[key] = value
+            return old is not ... and old != value
+
+        first = not seen
+        if changed("ps", ps) or first:
+            self.say("État : " + STATES.get(ps, f"code {ps}"))
+        sub = (cc2.get("machine_status"), cc2.get("sub_status"))
+        if changed("sub", sub) or first:
+            self.say(f"Firmware : machine_status {sub[0]}, sub_status {sub[1]}", "dim")
+        name = pi.get("Filename") or ""
+        if (changed("file", name) or first) and name:
+            self.say(f"Fichier : {name}")
+        layer, total = pi.get("CurrentLayer"), pi.get("TotalLayer")
+        if (changed("layer", layer) or first) and layer and ps not in IDLE:
+            try:
+                z = float(str(raw.get("CurrenCoord", "")).split(",")[2])
+                where = f" · Z {z:.2f} mm".replace(".", ",")
+            except (IndexError, ValueError):
+                where = ""
+            left = cc2.get("remaining_time_sec")
+            self.say(f"Couche {layer}{f' / {total}' if total else ''}{where}"
+                     + (f" · reste {left // 3600} h {left % 3600 // 60:02d}" if isinstance(left, int) and left > 0 else ""))
+        for label, now_k, target_k in HEATERS:
+            now, target = raw.get(now_k), raw.get(target_k)
+            if changed(target_k, target) and target is not None:
+                self.say(f"{label} : consigne {round(target)} °C" if target else f"{label} : chauffe coupée")
+                seen[label] = bool(target)     # waiting for the heater to get there
+            if seen.get(label) and now is not None and abs(now - target) <= 2:
+                self.say(f"{label} à {round(now)} °C : consigne atteinte", "ok")
+                seen[label] = False
+        pct = pi.get("PrintSpeedPct")
+        if changed("speed", pct) and pct:
+            self.say(f"Vitesse : {pct} %")
+        for k, label in FANS.items():
+            v = round((raw.get("CurrentFanSpeed") or {}).get(k, 0) * 100 / 255)
+            old = seen.get(k)
+            if old is None or abs(v - old) >= 10 or (v == 0) != (old == 0):
+                if old is not None:
+                    self.say(f"{label} : {v} %", "dim")
+                seen[k] = v
+        light = (raw.get("LightStatus") or {}).get("SecondLight")
+        if changed("light", light):
+            self.say("Lumière " + ("allumée" if light else "éteinte"), "dim")
+        codes = [str(c) for c in cc2.get("exception_status") or []]
+        if changed("codes", codes) and codes:
+            from . import errors
+            self.say(errors.sentence([int(c) for c in codes if c.isdigit()]) or f"Code {', '.join(codes)}", "bad")
 
     # --- state machine -----------------------------------------------------
 
@@ -532,6 +623,8 @@ class Watcher:
                 if self.lost:
                     self.lost = False
                     self.emit("retrouvee")
+                with contextlib.suppress(Exception):   # the terminal is a view: it never stops the watcher
+                    self.narrate(st.raw or {}, st.print_status or 0)
                 self.observe(st.print_status or 0, st.progress or 0, st.filename or "", st.raw.get("_cc2", {}))
                 self.cool(st.temp_bed)
                 if self.prev not in IDLE:
@@ -541,7 +634,10 @@ class Watcher:
                 self.ticks += 1
             except asyncio.CancelledError:
                 raise
-            except Exception:
+            except Exception as e:
+                msg = f"Imprimante muette : {type(e).__name__} {e}".strip()
+                if not self.term or self.term[-1]["text"] != msg:
+                    self.say(msg, "warn")
                 if not self.lost and self.prev not in (None, *IDLE) and time.time() - self.last_seen > LOST_AFTER_S:
                     self.lost = True
                     self.emit("perdue", (f"{self.filename} : " if self.filename else "") + "plus de nouvelles depuis 1 min. Vérifie le Wi-Fi et l'alimentation.")
