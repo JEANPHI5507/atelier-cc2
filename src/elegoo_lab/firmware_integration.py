@@ -95,11 +95,7 @@ def get_blocked_commands_list() -> list[dict]:
     blocked = firmware_manager.get_blocked_commands()
 
     return [
-        {
-            "command": cmd,
-            "reason": reason,
-            "action": "Doit être faite sur l'écran de l'imprimante"
-        }
+        {"command": cmd, "reason": reason, "action": "Doit être faite sur l'écran de l'imprimante"}
         for cmd, reason in blocked.items()
     ]
 

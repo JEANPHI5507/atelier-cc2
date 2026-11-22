@@ -16,7 +16,7 @@ from . import config
 
 
 def _file():
-    return config.MODELS_DIR / ".mes_bobines.json"   # looked up each time: tests swap the library
+    return config.MODELS_DIR / ".mes_bobines.json"  # looked up each time: tests swap the library
 
 
 def load() -> dict[str, Any]:
@@ -35,4 +35,8 @@ def profiles() -> dict[str, dict[str, Any]]:
 def spools() -> list[dict[str, Any]]:
     """Spools whose profile exists: {"nom", "couleur", "matiere", "profil"}."""
     known = profiles()
-    return [b for b in load()["bobines"] if isinstance(b, dict) and b.get("profil") in known and b.get("couleur")]
+    return [
+        b
+        for b in load()["bobines"]
+        if isinstance(b, dict) and b.get("profil") in known and b.get("couleur")
+    ]

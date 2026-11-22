@@ -26,7 +26,12 @@ from .config import ROOT
 
 WORKFLOWS = ROOT / "workflows"
 MESH_EXT = {".glb", ".gltf", ".obj", ".stl", ".ply", ".3mf"}
-IMAGE_EXT = {".png", ".jpg", ".jpeg", ".webp"}  # final images (e.g. the figurine before 3D) go to references/
+IMAGE_EXT = {
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".webp",
+}  # final images (e.g. the figurine before 3D) go to references/
 
 
 class ComfyError(RuntimeError):
@@ -50,7 +55,11 @@ class Comfy:
         """Is this prompt still queued, running or in the history?"""
         try:
             q = self.http.get("/queue").json()
-            if any(item[1] == pid for key in ("queue_running", "queue_pending") for item in q.get(key, [])):
+            if any(
+                item[1] == pid
+                for key in ("queue_running", "queue_pending")
+                for item in q.get(key, [])
+            ):
                 return True
             return bool(self.http.get(f"/history/{pid}").json().get(pid))
         except (httpx.HTTPError, ValueError, IndexError):
@@ -63,7 +72,9 @@ class Comfy:
 
     def upload_image(self, path: Path) -> str:
         with path.open("rb") as f:
-            r = self.http.post("/upload/image", files={"image": (path.name, f)}, data={"overwrite": "true"})
+            r = self.http.post(
+                "/upload/image", files={"image": (path.name, f)}, data={"overwrite": "true"}
+            )
         r.raise_for_status()
         return r.json()["name"]  # type: ignore[no-any-return]
 
@@ -82,7 +93,9 @@ class Comfy:
             if entry:
                 status = entry.get("status", {})
                 if status.get("status_str") == "error":
-                    raise ComfyError(f"échec ComfyUI: {json.dumps(status.get('messages', [])[-1:])[:500]}")
+                    raise ComfyError(
+                        f"échec ComfyUI: {json.dumps(status.get('messages', [])[-1:])[:500]}"
+                    )
                 if status.get("completed") or entry.get("outputs"):
                     return entry["outputs"]  # type: ignore[no-any-return]
             time.sleep(poll)
@@ -100,7 +113,10 @@ class Comfy:
                     is_image = ext in IMAGE_EXT and it.get("type") == "output"  # skip temp previews
                     if ext not in MESH_EXT and not is_image:
                         continue
-                    r = self.http.get("/view", params={k: it.get(k, "") for k in ("filename", "subfolder", "type")})
+                    r = self.http.get(
+                        "/view",
+                        params={k: it.get(k, "") for k in ("filename", "subfolder", "type")},
+                    )
                     r.raise_for_status()
                     folder = dest / "references" if is_image else dest
                     folder.mkdir(exist_ok=True)
@@ -114,7 +130,9 @@ def load_workflow(name: str) -> tuple[dict[str, Any], dict[str, list[str]]]:
     wf, mp = WORKFLOWS / f"{name}.json", WORKFLOWS / f"{name}.map.json"
     if not wf.exists() or not mp.exists():
         have = sorted(p.stem for p in WORKFLOWS.glob("*.json") if not p.stem.endswith(".map"))
-        raise ComfyError(f"workflow '{name}' introuvable (workflows/{name}.json + .map.json). Disponibles: {have or 'aucun'}")
+        raise ComfyError(
+            f"workflow '{name}' introuvable (workflows/{name}.json + .map.json). Disponibles: {have or 'aucun'}"
+        )
     return json.loads(wf.read_text()), json.loads(mp.read_text())
 
 
@@ -133,7 +151,9 @@ def generate(
 
     def put(key: str, value: Any) -> None:
         if key not in mp:
-            raise ComfyError(f"le workflow '{workflow}' n'a pas d'entrée '{key}' dans son .map.json")
+            raise ComfyError(
+                f"le workflow '{workflow}' n'a pas d'entrée '{key}' dans son .map.json"
+            )
         node, field = mp[key]
         wf[node]["inputs"][field] = value
 
@@ -153,12 +173,21 @@ def generate(
     return _finish(comfy, workflow, mp, pid, dest, seed, on_queued)
 
 
-def _finish(comfy: Comfy, workflow: str, mp: dict[str, Any], pid: str, dest: Path, seed: int | None,
-            on_queued: Callable[[str, str], None] | None) -> list[Path]:
+def _finish(
+    comfy: Comfy,
+    workflow: str,
+    mp: dict[str, Any],
+    pid: str,
+    dest: Path,
+    seed: int | None,
+    on_queued: Callable[[str, str], None] | None,
+) -> list[Path]:
     outputs = comfy.wait(pid)
     files = comfy.download_outputs(outputs, dest, time.strftime("%Y%m%d-%H%M%S"))
     if not files:
-        raise ComfyError("workflow terminé mais aucun fichier en sortie (vérifie le nœud SaveGLB / SaveImage)")
+        raise ComfyError(
+            "workflow terminé mais aucun fichier en sortie (vérifie le nœud SaveGLB / SaveImage)"
+        )
     nxt = mp.get("next")
     if nxt:
         # chained stage (e.g. figurine image -> TRELLIS.2): free the GPU between both, one graph
@@ -171,10 +200,18 @@ def _finish(comfy: Comfy, workflow: str, mp: dict[str, Any], pid: str, dest: Pat
     return files
 
 
-def resume(comfy: Comfy, workflow: str, pid: str, dest: Path, *,
-           on_queued: Callable[[str, str], None] | None = None) -> list[Path]:
+def resume(
+    comfy: Comfy,
+    workflow: str,
+    pid: str,
+    dest: Path,
+    *,
+    on_queued: Callable[[str, str], None] | None = None,
+) -> list[Path]:
     """Pick up a generation queued before the workshop restarted."""
     if not comfy.known(pid):
-        raise ComfyError("génération introuvable dans ComfyUI (redémarré entre-temps ?) : relance-la")
+        raise ComfyError(
+            "génération introuvable dans ComfyUI (redémarré entre-temps ?) : relance-la"
+        )
     _, mp = load_workflow(workflow)
     return _finish(comfy, workflow, mp, pid, dest, None, on_queued)

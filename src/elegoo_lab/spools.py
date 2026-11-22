@@ -16,13 +16,27 @@ from scipy.optimize import linear_sum_assignment
 from . import catalog, colors, slicer
 
 HEX = re.compile(r"#[0-9A-Fa-f]{6}")
-FAR_DE = 25.0   # beyond this ΔE the closest spool is visibly another colour
-LOW_TEMP = {"PLA", "PLA+", "PLA-CF", "TPU"}   # materials printed around 190-230 °C
+FAR_DE = 25.0  # beyond this ΔE the closest spool is visibly another colour
+LOW_TEMP = {"PLA", "PLA+", "PLA-CF", "TPU"}  # materials printed around 190-230 °C
 # the printer's colour palette is coarse (pure red is ΔE 33 from a Christmas red): a typed-in spool is
 # one of the user's own when that one is near enough and clearly nearer than the next one
 OWN_DE, OWN_RATIO = 50.0, 1.5
 # a spool the printer names with one of these is an Elegoo variant, not one of the user's own
-VARIANTS = {"BASIC", "MATTE", "GALAXY", "GLOW", "MARBLE", "PRO", "SPARKLE", "TRANSLUCENT", "TRANSLUCENT2", "WOOD", "CF", "RAPID", "HF"}
+VARIANTS = {
+    "BASIC",
+    "MATTE",
+    "GALAXY",
+    "GLOW",
+    "MARBLE",
+    "PRO",
+    "SPARKLE",
+    "TRANSLUCENT",
+    "TRANSLUCENT2",
+    "WOOD",
+    "CF",
+    "RAPID",
+    "HF",
+}
 
 
 def loaded(canvas: dict[str, Any]) -> list[dict[str, Any]]:
@@ -37,12 +51,24 @@ def loaded(canvas: dict[str, Any]) -> list[dict[str, Any]]:
     for unit in info.get("canvas_list", []) or []:
         for pos, t in enumerate(unit.get("tray_list", []) or []):
             colour = str(t.get("filament_color") or t.get("color") or "").strip()
-            if t.get("status") not in (1, 2) or not HEX.fullmatch(colour):  # printer data: never trust it into the page
+            if t.get("status") not in (1, 2) or not HEX.fullmatch(
+                colour
+            ):  # printer data: never trust it into the page
                 continue
-            out.append(own({**t, "pos": pos, "tray_id": int(t.get("tray_id", pos)), "canvas_id": int(unit.get("canvas_id", 0)),
-                            "color": colour.upper(), "filament_name": str(t.get("filament_name") or "")[:40],
-                            "type": str(t.get("filament_type") or t.get("type") or "PLA")[:16],
-                            "code": str(t.get("filament_code") or t.get("code") or "")[:32]}))
+            out.append(
+                own(
+                    {
+                        **t,
+                        "pos": pos,
+                        "tray_id": int(t.get("tray_id", pos)),
+                        "canvas_id": int(unit.get("canvas_id", 0)),
+                        "color": colour.upper(),
+                        "filament_name": str(t.get("filament_name") or "")[:40],
+                        "type": str(t.get("filament_type") or t.get("type") or "PLA")[:16],
+                        "code": str(t.get("filament_code") or t.get("code") or "")[:32],
+                    }
+                )
+            )
     return out
 
 
@@ -52,19 +78,32 @@ def own(tray: dict[str, Any], mine: list[dict[str, Any]] | None = None) -> dict[
     Same material family and the closest colour (OWN_DE, OWN_RATIO); ``printer_color`` keeps what the
     printer said. Trays named as another Elegoo variant (Matte, Galaxy...) are left alone."""
     mine = catalog.spools() if mine is None else mine
-    words = set(re.split(r"[\s\-_]+", f"{tray.get('type', '')} {tray.get('filament_name', '')}".upper()))
+    words = set(
+        re.split(r"[\s\-_]+", f"{tray.get('type', '')} {tray.get('filament_name', '')}".upper())
+    )
     family = re.split(r"[\s\-_]+", str(tray.get("type") or "PLA").upper())[0]
-    cands = [b for b in mine if str(b.get("matiere") or "PLA").upper() == family and HEX.fullmatch(str(b["couleur"]))]
+    cands = [
+        b
+        for b in mine
+        if str(b.get("matiere") or "PLA").upper() == family and HEX.fullmatch(str(b["couleur"]))
+    ]
     if not cands or words & VARIANTS:
         return tray
-    lab = colors._to_lab(np.array([colors._rgb(tray["color"])] + [colors._rgb(b["couleur"]) for b in cands]))
+    lab = colors._to_lab(
+        np.array([colors._rgb(tray["color"])] + [colors._rgb(b["couleur"]) for b in cands])
+    )
     de = np.linalg.norm(lab[1:] - lab[0], axis=1)
     i, *rest = np.argsort(de)
     if de[i] > OWN_DE or (rest and de[rest[0]] < OWN_RATIO * de[i]):
         return tray
     b = cands[i]
-    return {**tray, "printer_color": tray["color"], "color": b["couleur"].upper(), "profile": b["profil"],
-            "filament_name": str(b.get("nom") or b["profil"])[:40]}
+    return {
+        **tray,
+        "printer_color": tray["color"],
+        "color": b["couleur"].upper(),
+        "profile": b["profil"],
+        "filament_name": str(b.get("nom") or b["profil"])[:40],
+    }
 
 
 def filament_for(tray: dict[str, Any]) -> str:
@@ -75,7 +114,11 @@ def filament_for(tray: dict[str, Any]) -> str:
     material = str(tray.get("type") or "PLA").strip().upper()
     name = f"{tray.get('filament_name') or ''} {tray.get('brand') or ''}".upper()
     same = [k for k in known if k.split()[0].upper() == material]
-    variants = sorted((k for k in same if " " in k and all(w.upper() in name for w in k.split()[1:])), key=len, reverse=True)
+    variants = sorted(
+        (k for k in same if " " in k and all(w.upper() in name for w in k.split()[1:])),
+        key=len,
+        reverse=True,
+    )
     if variants:
         return variants[0]
     if any(k.upper() == material for k in known):
@@ -83,14 +126,22 @@ def filament_for(tray: dict[str, Any]) -> str:
     return "PLA" if material.startswith("PLA") else (same[0] if same else "PLA")
 
 
-def single(colour: dict[str, Any], trays: list[dict[str, Any]], *, coloured: bool,
-           active: int | None = None) -> dict[str, Any]:
+def single(
+    colour: dict[str, Any],
+    trays: list[dict[str, Any]],
+    *,
+    coloured: bool,
+    active: int | None = None,
+) -> dict[str, Any]:
     """Spool for a one-colour model, in the same shape as match(). The model slices as T0 whatever the
     spool, so ``slot`` stays 1 and ``tray_pos`` says which spool feeds it: the closest colour when the
-    model has one, else the spool already in the head (``active`` = its tray_id), else the first one."""
+    model has one, else the spool already in the head (``active`` = its tray_id), else the first one.
+    """
     if not trays:
         raise ValueError("aucune bobine chargée dans le CANVAS")
-    lab = colors._to_lab(np.array([colors._rgb(colour["hex"])] + [colors._rgb(t["color"]) for t in trays]))
+    lab = colors._to_lab(
+        np.array([colors._rgb(colour["hex"])] + [colors._rgb(t["color"]) for t in trays])
+    )
     de = np.linalg.norm(lab[1:] - lab[0], axis=1)
     if coloured:
         i = int(np.argmin(de))
@@ -99,12 +150,30 @@ def single(colour: dict[str, Any], trays: list[dict[str, Any]], *, coloured: boo
     t, d = trays[i], float(de[i])
     warnings = []
     if coloured and d > FAR_DE:
-        warnings.append(f"La couleur {colour['hex']} du modèle n'a pas de bobine proche : il sortira en "
-                        f"{t.get('filament_name') or t['color']} (bobine {t['pos'] + 1}).")
-    return {"mapping": {colour["index"]: 1}, "filaments": [filament_for(t)], "warnings": warnings,
-            "details": [{"index": colour["index"], "hex": colour["hex"], "share": colour["share"], "slot": 1, "tray_pos": t["pos"],
-                         "tray_hex": t["color"], "tray_name": t.get("filament_name") or t.get("type"), "de": round(d, 1)}],
-            "slot_colours": {1: t["color"]}, "unused": [], "single": {"pos": t["pos"], "tray_id": t["tray_id"]}}
+        warnings.append(
+            f"La couleur {colour['hex']} du modèle n'a pas de bobine proche : il sortira en "
+            f"{t.get('filament_name') or t['color']} (bobine {t['pos'] + 1})."
+        )
+    return {
+        "mapping": {colour["index"]: 1},
+        "filaments": [filament_for(t)],
+        "warnings": warnings,
+        "details": [
+            {
+                "index": colour["index"],
+                "hex": colour["hex"],
+                "share": colour["share"],
+                "slot": 1,
+                "tray_pos": t["pos"],
+                "tray_hex": t["color"],
+                "tray_name": t.get("filament_name") or t.get("type"),
+                "de": round(d, 1),
+            }
+        ],
+        "slot_colours": {1: t["color"]},
+        "unused": [],
+        "single": {"pos": t["pos"], "tray_id": t["tray_id"]},
+    }
 
 
 def far_colours(model_colours: list[dict[str, Any]], trays: list[dict[str, Any]]) -> list[str]:
@@ -118,8 +187,10 @@ def far_colours(model_colours: list[dict[str, Any]], trays: list[dict[str, Any]]
     for c, row in zip(model_colours, de, strict=False):
         t = trays[int(row.argmin())]
         if row.min() > FAR_DE and c["share"] >= 2:
-            out.append(f"La couleur {c['hex']} ({c['share']:.0f} % du modèle) n'a pas de bobine proche : elle sera "
-                       f"imprimée en {t.get('filament_name') or t['color']} (bobine {t['pos'] + 1}), la plus proche chargée.")
+            out.append(
+                f"La couleur {c['hex']} ({c['share']:.0f} % du modèle) n'a pas de bobine proche : elle sera "
+                f"imprimée en {t.get('filament_name') or t['color']} (bobine {t['pos'] + 1}), la plus proche chargée."
+            )
     return out
 
 
@@ -136,13 +207,13 @@ def match(model_colours: list[dict[str, Any]], trays: list[dict[str, Any]]) -> d
     tc = np.array([colors._rgb(t["color"]) for t in trays])
     de = np.linalg.norm(colors._to_lab(mc)[:, None] - colors._to_lab(tc)[None], axis=2)
 
-    order = np.argsort([-c["share"] for c in model_colours])   # biggest areas choose first
+    order = np.argsort([-c["share"] for c in model_colours])  # biggest areas choose first
     pick = {}
     head = order[: len(trays)]
     rows, cols = linear_sum_assignment(de[head])
     for r, c in zip(rows, cols, strict=False):
         pick[int(head[r])] = int(c)
-    for i in order[len(trays):]:                               # more colours than spools: share the nearest
+    for i in order[len(trays) :]:  # more colours than spools: share the nearest
         pick[int(i)] = int(np.argmin(de[i]))
 
     mapping, details, warnings = {}, [], []
@@ -151,42 +222,81 @@ def match(model_colours: list[dict[str, Any]], trays: list[dict[str, Any]]) -> d
         slot = t["pos"] + 1
         mapping[c["index"]] = slot
         d = float(de[i, pick[i]])
-        details.append({"index": c["index"], "hex": c["hex"], "share": c["share"], "slot": slot, "tray_pos": t["pos"],
-                        "tray_hex": t["color"], "tray_name": t.get("filament_name") or t.get("type"), "de": round(d, 1)})
+        details.append(
+            {
+                "index": c["index"],
+                "hex": c["hex"],
+                "share": c["share"],
+                "slot": slot,
+                "tray_pos": t["pos"],
+                "tray_hex": t["color"],
+                "tray_name": t.get("filament_name") or t.get("type"),
+                "de": round(d, 1),
+            }
+        )
         if d > FAR_DE and c["share"] >= 2:
-            warnings.append(f"La couleur {c['hex']} ({c['share']:.0f} % du modèle) n'a pas de bobine proche : elle sortira en "
-                            f"{t.get('filament_name') or t['color']} (bobine {slot}). Charge une bobine de cette couleur pour être fidèle.")
+            warnings.append(
+                f"La couleur {c['hex']} ({c['share']:.0f} % du modèle) n'a pas de bobine proche : elle sortira en "
+                f"{t.get('filament_name') or t['color']} (bobine {slot}). Charge une bobine de cette couleur pour être fidèle."
+            )
 
     by_slot = {t["pos"] + 1: t for t in trays}
     top = max(mapping.values())
     filaments = [filament_for(by_slot[s]) if s in by_slot else "PLA" for s in range(1, top + 1)]
     missing = [s for s in range(1, top + 1) if s not in by_slot]
     if missing:
-        warnings.append("Bobine(s) vide(s) à des emplacements intermédiaires : " + ", ".join(str(s) for s in missing)
-                        + ". Le tranchage les compte, l'impression ne les utilisera pas.")
+        warnings.append(
+            "Bobine(s) vide(s) à des emplacements intermédiaires : "
+            + ", ".join(str(s) for s in missing)
+            + ". Le tranchage les compte, l'impression ne les utilisera pas."
+        )
     used = {by_slot[s]["type"].upper() for s in set(mapping.values()) if s in by_slot}
     if used & LOW_TEMP and used - LOW_TEMP:
-        warnings.append(f"Matières aux températures incompatibles dans le même modèle ({', '.join(sorted(used))}) : "
-                        "le slicer refusera. Garde une seule famille (ex. tout en PLA).")
+        warnings.append(
+            f"Matières aux températures incompatibles dans le même modèle ({', '.join(sorted(used))}) : "
+            "le slicer refusera. Garde une seule famille (ex. tout en PLA)."
+        )
     unused = [t for t in trays if t["pos"] + 1 not in set(mapping.values())]
-    return {"mapping": mapping, "filaments": filaments, "details": details, "warnings": warnings,
-            "slot_colours": {s: by_slot[s]["color"] for s in by_slot},
-            "unused": [{"slot": t["pos"] + 1, "hex": t["color"], "name": t.get("filament_name")} for t in unused]}
+    return {
+        "mapping": mapping,
+        "filaments": filaments,
+        "details": details,
+        "warnings": warnings,
+        "slot_colours": {s: by_slot[s]["color"] for s in by_slot},
+        "unused": [
+            {"slot": t["pos"] + 1, "hex": t["color"], "name": t.get("filament_name")}
+            for t in unused
+        ],
+    }
 
 
 # share of the model's solid volume that actually gets extruded, per usage: walls, infill, brim and
 # supports counted in, calibrations from the workshop's own slices (Décoratif measured at ~28 %)
-FILL = {"decoratif": 0.30, "detaille": 0.32, "rapide": 0.40, "turbo": 0.45, "profil": 0.55, "fonctionnel": 0.95}
+FILL = {
+    "decoratif": 0.30,
+    "detaille": 0.32,
+    "rapide": 0.40,
+    "turbo": 0.45,
+    "profil": 0.55,
+    "fonctionnel": 0.95,
+}
 
 
-def needs(volume_cm3: float | None, colours: list[dict[str, Any]], usage: str = "decoratif",
-          material: str = "PLA", mapping: dict[int, int] | None = None,
-          filaments: list[str] | None = None) -> dict[int, int]:
+def needs(
+    volume_cm3: float | None,
+    colours: list[dict[str, Any]],
+    usage: str = "decoratif",
+    material: str = "PLA",
+    mapping: dict[int, int] | None = None,
+    filaments: list[str] | None = None,
+) -> dict[int, int]:
     """Grams each colour should need, judged before any slicing: the model's solid volume × the usage's
     fill share (as corrected by the workshop's own real slices) × the colour's share of the surface,
     in grams rounded to 5 g (one metre of 1.75 mm filament ≈ 2.4 cm³). ``mapping`` + ``filaments`` give
-    each colour's own material; {} when the volume is unknown (open mesh): no estimate, not a wrong one."""
+    each colour's own material; {} when the volume is unknown (open mesh): no estimate, not a wrong one.
+    """
     from . import stock
+
     if not volume_cm3:
         return {}
     fill = FILL.get(usage, 0.55) * stock.fill_factor(usage)
@@ -194,7 +304,7 @@ def needs(volume_cm3: float | None, colours: list[dict[str, Any]], usage: str = 
     out = {}
     for c in colours:
         slot = mapping.get(c["index"], 1)
-        mater = (filaments[slot - 1] if filaments and slot <= len(filaments) else material)
+        mater = filaments[slot - 1] if filaments and slot <= len(filaments) else material
         g = volume_cm3 * fill * stock.DENSITY.get(mater.split()[0].upper(), 1.24) * c["share"] / 100
         out[c["index"]] = max(5, round(g / 5) * 5)
     return out

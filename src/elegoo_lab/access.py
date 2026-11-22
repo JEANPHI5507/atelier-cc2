@@ -20,14 +20,26 @@ from . import config
 SESSION_DAYS = 30
 COOKIE = "cc2_session"
 MAX_FAILS, FAIL_WINDOW_S = 5, 300
-PUBLIC = ("/lab/login.html", "/lab/api/login", "/lab/vendor/", "/lab/icons/", "/lab/manifest.webmanifest",
-          "/lab/sw.js", "/lab/offline.html", "/lab/tableau.webmanifest", "/lab/ca.crt", "/favicon",
-          "/lab/js/i18n.js", "/lab/i18n/")   # the login page in English too
+PUBLIC = (
+    "/lab/login.html",
+    "/lab/api/login",
+    "/lab/vendor/",
+    "/lab/icons/",
+    "/lab/manifest.webmanifest",
+    "/lab/sw.js",
+    "/lab/offline.html",
+    "/lab/tableau.webmanifest",
+    "/lab/ca.crt",
+    "/favicon",
+    "/lab/js/i18n.js",
+    "/lab/i18n/",
+)  # the login page in English too
 
 
 def _settings() -> dict[str, Any]:
     if config.CONFIG_FILE.exists():
         import tomllib
+
         return tomllib.loads(config.CONFIG_FILE.read_text()).get("acces", {})  # type: ignore[no-any-return]
     return {}
 
@@ -49,17 +61,23 @@ def set_code(code: str) -> None:
     if not (code.isdigit() and 4 <= len(code) <= 12):
         raise ValueError("le code d'accès doit faire 4 à 12 chiffres")
     salt = secrets.token_hex(16)
-    config.save("acces", code_hash=_hash(code, salt), salt=salt, secret=secrets.token_hex(32))  # new secret: old sessions end
+    config.save(
+        "acces", code_hash=_hash(code, salt), salt=salt, secret=secrets.token_hex(32)
+    )  # new secret: old sessions end
 
 
 def check_code(code: str) -> bool:
     s = _settings()
-    return bool(s.get("code_hash")) and hmac.compare_digest(_hash(str(code), s["salt"]), s["code_hash"])
+    return bool(s.get("code_hash")) and hmac.compare_digest(
+        _hash(str(code), s["salt"]), s["code_hash"]
+    )
 
 
 def make_session() -> str:
     exp = int(time.time()) + SESSION_DAYS * 86400
-    sig = hmac.new(bytes.fromhex(_settings()["secret"]), str(exp).encode(), hashlib.sha256).hexdigest()
+    sig = hmac.new(
+        bytes.fromhex(_settings()["secret"]), str(exp).encode(), hashlib.sha256
+    ).hexdigest()
     return f"{exp}.{sig}"
 
 
@@ -92,10 +110,13 @@ def tailscale() -> dict[str, str] | None:
     """This PC on the user's Tailscale network (reachable from anywhere by their own devices), if it is up."""
     import shutil
     import subprocess
+
     if not shutil.which("tailscale"):
         return None
     try:
-        r = subprocess.run(["tailscale", "status", "--json"], capture_output=True, text=True, timeout=5)
+        r = subprocess.run(
+            ["tailscale", "status", "--json"], capture_output=True, text=True, timeout=5
+        )
         me = json.loads(r.stdout)["Self"]
     except (OSError, subprocess.SubprocessError, ValueError, KeyError):
         return None
@@ -110,7 +131,9 @@ class Gate:
 
     def __init__(self, app: Any, https_port: int = 0) -> None:
         self.app = app
-        self.https_port = https_port   # set: plain HTTP from the network only hands out the certificate
+        self.https_port = (
+            https_port  # set: plain HTTP from the network only hands out the certificate
+        )
         self.fails: dict[str, list[float]] = {}
 
     def too_many(self, ip: str) -> bool:
@@ -123,10 +146,17 @@ class Gate:
             return await self.app(scope, receive, send)  # type: ignore[no-any-return]
         ip = (scope.get("client") or ("", 0))[0]
         path = scope.get("path", "")
-        if self.https_port and scope.get("scheme") in ("http", "ws") and not is_local(ip) and path != "/lab/ca.crt":
+        if (
+            self.https_port
+            and scope.get("scheme") in ("http", "ws")
+            and not is_local(ip)
+            and path != "/lab/ca.crt"
+        ):
             host = next((v.decode() for k, v in scope.get("headers", []) if k == b"host"), lan_ip())
             host = host.rsplit(":", 1)[0] if not host.endswith("]") else host
-            return await _reply(send, 307, b"", [(b"location", f"https://{host}:{self.https_port}{path}".encode())])
+            return await _reply(
+                send, 307, b"", [(b"location", f"https://{host}:{self.https_port}{path}".encode())]
+            )
         if is_local(ip) or path.startswith(PUBLIC):
             if path == "/lab/api/login" and scope.get("method") == "POST":
                 return await self._login(scope, receive, send, ip)
@@ -142,15 +172,40 @@ class Gate:
             return await self.app(scope, receive, send)  # type: ignore[no-any-return]
         if scope["type"] == "websocket":
             return await send({"type": "websocket.close", "code": 4401})  # type: ignore[no-any-return]
-        if scope["type"] == "http" and scope.get("method") == "GET" and not path.startswith(("/lab/api", "/api", "/status", "/events", "/stream", "/snapshot", "/canvas", "/files", "/history")):
+        if (
+            scope["type"] == "http"
+            and scope.get("method") == "GET"
+            and not path.startswith(
+                (
+                    "/lab/api",
+                    "/api",
+                    "/status",
+                    "/events",
+                    "/stream",
+                    "/snapshot",
+                    "/canvas",
+                    "/files",
+                    "/history",
+                )
+            )
+        ):
             return await _reply(send, 303, b"", [(b"location", b"/lab/login.html")])
-        await _reply(send, 401, json.dumps({"detail": "Code d'accès requis"}).encode(), [(b"content-type", b"application/json")])
+        await _reply(
+            send,
+            401,
+            json.dumps({"detail": "Code d'accès requis"}).encode(),
+            [(b"content-type", b"application/json")],
+        )
         return None
 
     async def _login(self, scope: dict, receive: Any, send: Any, ip: str) -> None:
         if self.too_many(ip):
-            return await _reply(send, 429, json.dumps({"detail": "Trop d'essais : attends 5 minutes."}).encode(),
-                                [(b"content-type", b"application/json")])
+            return await _reply(
+                send,
+                429,
+                json.dumps({"detail": "Trop d'essais : attends 5 minutes."}).encode(),
+                [(b"content-type", b"application/json")],
+            )
         body = b""
         while True:
             msg = await receive()
@@ -163,14 +218,30 @@ class Gate:
             code = ""
         if not check_code(code):
             self.fails.setdefault(ip, []).append(time.time())
-            return await _reply(send, 403, json.dumps({"detail": "Code incorrect"}).encode(), [(b"content-type", b"application/json")])
+            return await _reply(
+                send,
+                403,
+                json.dumps({"detail": "Code incorrect"}).encode(),
+                [(b"content-type", b"application/json")],
+            )
         cookie = f"{COOKIE}={make_session()}; Max-Age={SESSION_DAYS * 86400}; Path=/; HttpOnly; SameSite=Strict"
         if scope.get("scheme") == "https":
             cookie += "; Secure"
-        await _reply(send, 200, b'{"ok": true}', [(b"content-type", b"application/json"), (b"set-cookie", cookie.encode())])
+        await _reply(
+            send,
+            200,
+            b'{"ok": true}',
+            [(b"content-type", b"application/json"), (b"set-cookie", cookie.encode())],
+        )
         return None
 
 
 async def _reply(send: Any, status: int, body: bytes, headers: list[tuple[bytes, bytes]]) -> None:
-    await send({"type": "http.response.start", "status": status, "headers": [(b"content-length", str(len(body)).encode()), *headers]})
+    await send(
+        {
+            "type": "http.response.start",
+            "status": status,
+            "headers": [(b"content-length", str(len(body)).encode()), *headers],
+        }
+    )
     await send({"type": "http.response.body", "body": body})

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import trimesh
 
@@ -24,6 +24,7 @@ def step_to_glb(src: Path) -> Path:
     out = src.with_suffix(".glb")
     try:
         import cascadio
+
         cascadio.step_to_glb(str(src), str(out))
     except Exception as e:
         out.unlink(missing_ok=True)
@@ -37,7 +38,11 @@ def size_text(size, dec: int = 0) -> str:
     """A size for the user, each side named in the same order everywhere (across, front to back, up)."""
     x, y, z = (f"{float(v):.{dec}f}".replace(".", ",") for v in list(size)[:3])
     return f"largeur {x} × profondeur {y} × hauteur {z} mm"
-UNITLESS_MM = 3.0  # AI generators (TRELLIS, Hunyuan) output ~1-unit meshes: below this, no real unit
+
+
+UNITLESS_MM = (
+    3.0  # AI generators (TRELLIS, Hunyuan) output ~1-unit meshes: below this, no real unit
+)
 UNITLESS_EXT = {".glb", ".gltf", ".obj", ".ply"}  # never STL/3MF: those come from CAD/slicers in mm
 DEFAULT_AI_HEIGHT_MM = 60.0
 
@@ -67,14 +72,25 @@ def _info(path: Path) -> dict[str, Any]:
     if path.suffix.lower() == ".3mf":
         # trimesh misplaces parts of OrcaSlicer/Bambu projects (component transforms); use our reader
         from . import threemf
-        parts = [trimesh.Trimesh(p.vertices, p.faces, process=False) for o in threemf.read(path).objects for p in o.parts]
-        m = trimesh.util.concatenate(parts)
+
+        parts = [
+            trimesh.Trimesh(p.vertices, p.faces, process=False)
+            for o in threemf.read(path).objects
+            for p in o.parts
+        ]
+        m = cast("trimesh.Trimesh", trimesh.util.concatenate(parts))
         x, y, z = (float(v) for v in m.extents)
         tight = all(p.is_watertight for p in parts)
-        return {"file": path.name, "triangles": int(len(m.faces)), "size_mm": [round(x, 2), round(y, 2), round(z, 2)],  # type: ignore[attr-defined]
-                "watertight": tight, "volume_cm3": round(sum(float(p.volume) for p in parts) / 1000, 2) if tight else None,
-                "fits_bed": max(x, y, z) <= BED_MM, "objects": len(parts),
-                "unitless": False}
+        return {
+            "file": path.name,
+            "triangles": int(len(m.faces)),
+            "size_mm": [round(x, 2), round(y, 2), round(z, 2)],
+            "watertight": tight,
+            "volume_cm3": round(sum(float(p.volume) for p in parts) / 1000, 2) if tight else None,
+            "fits_bed": max(x, y, z) <= BED_MM,
+            "objects": len(parts),
+            "unitless": False,
+        }
     m = load(path)
     if path.suffix.lower() in {".glb", ".gltf"}:  # glTF is Y-up; report printer axes (Z-up)
         m.apply_transform(trimesh.transformations.rotation_matrix(3.141592653589793 / 2, [1, 0, 0]))
@@ -90,7 +106,9 @@ def _info(path: Path) -> dict[str, Any]:
     }
 
 
-def prepare(src: Path, dst: Path, *, height_mm: float | None = None, fix: bool = True) -> dict[str, Any]:
+def prepare(
+    src: Path, dst: Path, *, height_mm: float | None = None, fix: bool = True
+) -> dict[str, Any]:
     """Convert to ``dst`` (format by extension), rest it on Z=0, centre on the bed.
 
     ``height_mm`` rescales uniformly so the model is that tall (AI-generated

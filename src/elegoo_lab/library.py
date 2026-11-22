@@ -20,10 +20,13 @@ from . import config
 
 MESH_EXT = {".stl", ".3mf", ".obj", ".glb", ".gltf", ".ply"}
 ALL_EXT = MESH_EXT | {".gcode"}
-TECHNICAL = re.compile(r"(?<!^calibration)(_canvas\.3mf|_partie\d+\.3mf|_chevilles\.stl|_petites_pieces\.3mf|_scaled\.stl)$", re.I)
+TECHNICAL = re.compile(
+    r"(?<!^calibration)(_canvas\.3mf|_partie\d+\.3mf|_chevilles\.stl|_petites_pieces\.3mf|_scaled\.stl)$",
+    re.I,
+)
 NAME_OK = re.compile(r"^[^/\\\x00-\x1f<>:\"|?*]{1,120}$")
 _lock = threading.Lock()
-GCODE_KEEP_DAYS = 30   # a printed G-code goes this long after its last print: its model stays, slicing again takes seconds
+GCODE_KEEP_DAYS = 30  # a printed G-code goes this long after its last print: its model stays, slicing again takes seconds
 _meta_cache: dict[tuple, dict[str, Any]] = {}
 
 
@@ -84,15 +87,24 @@ def _header_meta(path: Path) -> dict[str, Any]:
     def one(k: str) -> str | None:
         m = re.search(rf"^; {re.escape(k)} = (.*)$", text, re.M)
         return m.group(1).strip() if m else None
-    cols = [c for c in re.split(r"[;,]", one("filament_colour") or "") if re.fullmatch(r"#[0-9A-Fa-f]{6}", c.strip())]
+
+    cols = [
+        c
+        for c in re.split(r"[;,]", one("filament_colour") or "")
+        if re.fullmatch(r"#[0-9A-Fa-f]{6}", c.strip())
+    ]
     used = [float(x) for x in re.findall(r"[\d.]+", one("filament used [mm]") or "")]
     if used and len(used) == len(cols):
         cols = [c for c, u in zip(cols, used, strict=False) if u > 0]
     g = one("total filament used [g]")
-    meta = {"temps": one("estimated printing time (normal mode)"), "couches": one("total layer number"),
-            "g": float(g) if g and re.fullmatch(r"[\d.]+", g) else None,
-            "couleurs": [c.upper() for c in cols][:8], "qualite": re.sub(r"^cc2lab ", "", (one("print_settings_id") or "").split(" @")[0]) or None,
-            "vignette": "; thumbnail begin" in text}
+    meta = {
+        "temps": one("estimated printing time (normal mode)"),
+        "couches": one("total layer number"),
+        "g": float(g) if g and re.fullmatch(r"[\d.]+", g) else None,
+        "couleurs": [c.upper() for c in cols][:8],
+        "qualite": re.sub(r"^cc2lab ", "", (one("print_settings_id") or "").split(" @")[0]) or None,
+        "vignette": "; thumbnail begin" in text,
+    }
     _meta_cache[key] = meta
     while len(_meta_cache) > 500:
         _meta_cache.pop(next(iter(_meta_cache)))
@@ -114,8 +126,13 @@ def listing() -> list[dict[str, Any]]:
     out = []
     for p in sorted(files, key=lambda p: -p.stat().st_mtime):
         st = p.stat()
-        e: dict[str, Any] = {"name": p.name, "size": st.st_size, "mtime": st.st_mtime, "ext": p.suffix.lower()[1:],
-                             "kind": kind(p.name)}
+        e: dict[str, Any] = {
+            "name": p.name,
+            "size": st.st_size,
+            "mtime": st.st_mtime,
+            "ext": p.suffix.lower()[1:],
+            "kind": kind(p.name),
+        }
         if e["kind"] == "gcode":
             rec = idx.get(p.name, {})
             e.update({**_header_meta(p), **{k: v for k, v in rec.items() if v is not None}})
@@ -141,22 +158,31 @@ def thumbnail(name: str) -> bytes | None:
         with p.open("rb") as f:
             head = f.read(400_000).decode("ascii", "ignore")
         m = re.search(r"; thumbnail begin \d+x\d+ \d+\n(.*?)\n; thumbnail end", head, re.S)
-        if not m:            # older or foreign G-code: show the model it was made from
-            models = [q.name for q in config.MODELS_DIR.iterdir() if q.is_file() and kind(q.name) == "modele"]
+        if not m:  # older or foreign G-code: show the model it was made from
+            models = [
+                q.name
+                for q in config.MODELS_DIR.iterdir()
+                if q.is_file() and kind(q.name) == "modele"
+            ]
             src = load_index().get(p.name, {}).get("source") or _guess_source(p.name, models)
             return thumbnail(src) if src and (config.MODELS_DIR / src).is_file() else None
         try:
-            return base64.b64decode("".join(line.lstrip("; ").strip() for line in m.group(1).splitlines()))
+            return base64.b64decode(
+                "".join(line.lstrip("; ").strip() for line in m.group(1).splitlines())
+            )
         except ValueError:
             return None
     st = p.stat()
-    cache = _thumbs() / (hashlib.sha256(f"{p.name}:{st.st_mtime_ns}:{st.st_size}".encode()).hexdigest()[:20] + ".png")
+    cache = _thumbs() / (
+        hashlib.sha256(f"{p.name}:{st.st_mtime_ns}:{st.st_size}".encode()).hexdigest()[:20] + ".png"
+    )
     if cache.exists():
         return cache.read_bytes()
     import numpy as np
 
     from . import colors
     from . import thumbnail as th
+
     v, f, slots, slot_hex = colors.solid(p, {})  # type: ignore[assignment]
     rgb = np.array([colors._rgb(slot_hex[int(s) - 1]) for s in slots]) if slot_hex else np.full((len(f), 3), 190.0)  # type: ignore[arg-type]
     png = th.render(v, f, rgb, size=144)  # type: ignore[arg-type]
@@ -165,7 +191,7 @@ def thumbnail(name: str) -> bytes | None:
     return png
 
 
-SIDECARS = (".retouches", ".repairs", ".marques")    # small files kept beside a model, named after it
+SIDECARS = (".retouches", ".repairs", ".marques")  # small files kept beside a model, named after it
 
 
 def rename(old: str, new: str) -> str:
@@ -192,7 +218,7 @@ def rename(old: str, new: str) -> str:
                 if guess:
                     idx.setdefault(n, {})["source"] = guess
         src.rename(dest)
-        for folder in SIDECARS:                                   # hand retouching / repair report follow their model
+        for folder in SIDECARS:  # hand retouching / repair report follow their model
             side = src.parent / folder / (src.name + ".json")
             if side.is_file():
                 side.rename(side.with_name(dest.name + ".json"))
@@ -201,8 +227,9 @@ def rename(old: str, new: str) -> str:
         for rec in idx.values():
             if rec.get("source") == old:
                 rec["source"] = new
-        if src.suffix.lower() == ".gcode":       # keep spool usage known under the new name
+        if src.suffix.lower() == ".gcode":  # keep spool usage known under the new name
             from . import stock
+
             data = stock.load()
             if old in data["prints"]:
                 data["prints"][new] = data["prints"].pop(old)
@@ -232,26 +259,45 @@ def cleanup() -> list[dict[str, Any]]:
     out = []
     for e in listing():
         if e["kind"] == "technique":
-            out.append({"name": e["name"], "size": e["size"], "raison": "fichier technique (conversion couleur, pièce découpée)"})
+            out.append(
+                {
+                    "name": e["name"],
+                    "size": e["size"],
+                    "raison": "fichier technique (conversion couleur, pièce découpée)",
+                }
+            )
         elif e["kind"] == "gcode" and not e.get("source"):
             idx = load_index().get(e["name"], {})
-            if idx.get("source"):          # we sliced it, and its model is gone
-                out.append({"name": e["name"], "size": e["size"], "raison": "son modèle a été supprimé"})
+            if idx.get("source"):  # we sliced it, and its model is gone
+                out.append(
+                    {"name": e["name"], "size": e["size"], "raison": "son modèle a été supprimé"}
+                )
     return out
 
 
-def old_gcodes(keep: set[str] | frozenset[str] = frozenset(), days: int = GCODE_KEEP_DAYS) -> list[str]:
+def old_gcodes(
+    keep: set[str] | frozenset[str] = frozenset(), days: int = GCODE_KEEP_DAYS
+) -> list[str]:
     """G-codes printed (gallery) more than ``days`` ago and not sliced again since, whose model is still in the
     library. Never one in ``keep`` (the queue, the print in progress), never one that was not printed yet, never
     one without its model (made elsewhere, or model deleted): there it is the only copy."""
     from . import gallery
+
     limit = time.time() - days * 86400
     last: dict[str, float] = {}
     for e in gallery.entries():
         f = e.get("fichier")
         if f:
-            last[f] = max(last.get(f, 0), float("inf") if e.get("issue") == "en cours" else e.get("debut", 0))
-    return [e["name"] for e in listing()
-            if e["kind"] == "gcode" and e["name"] not in keep and e.get("source")
-            and e["name"] in last and last[e["name"]] < limit and e["mtime"] < limit]
-
+            last[f] = max(
+                last.get(f, 0), float("inf") if e.get("issue") == "en cours" else e.get("debut", 0)
+            )
+    return [
+        e["name"]
+        for e in listing()
+        if e["kind"] == "gcode"
+        and e["name"] not in keep
+        and e.get("source")
+        and e["name"] in last
+        and last[e["name"]] < limit
+        and e["mtime"] < limit
+    ]

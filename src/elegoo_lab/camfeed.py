@@ -19,9 +19,9 @@ from typing import Any
 log = logging.getLogger(__name__)
 
 SOI, EOI = b"\xff\xd8", b"\xff\xd9"
-MAX_BUF = 4 << 20        # a stream with no picture end in 4 MB is not a camera: start over
-IDLE_STOP_S = 30.0       # nobody looking for this long: stop reading
-WAIT_S = 3.0             # how long a page's request waits for a new picture
+MAX_BUF = 4 << 20  # a stream with no picture end in 4 MB is not a camera: start over
+IDLE_STOP_S = 30.0  # nobody looking for this long: stop reading
+WAIT_S = 3.0  # how long a page's request waits for a new picture
 
 
 class CameraFeed:
@@ -29,8 +29,8 @@ class CameraFeed:
         self.cam = broadcaster
         self.frame: bytes | None = None
         self.seq = 0
-        self.at = 0.0                      # when the last picture came
-        self.asked = 0.0                   # when a page last asked
+        self.at = 0.0  # when the last picture came
+        self.asked = 0.0  # when a page last asked
         self.new = asyncio.Condition()
         self.task: asyncio.Task | None = None
 
@@ -47,17 +47,17 @@ class CameraFeed:
                 async for chunk in chunks:
                     buf += chunk
                     while (a := buf.find(SOI)) >= 0 and (b := buf.find(EOI, a + 2)) >= 0:
-                        await self._publish(buf[a:b + 2])
-                        buf = buf[b + 2:]
+                        await self._publish(buf[a : b + 2])
+                        buf = buf[b + 2 :]
                     if len(buf) > MAX_BUF:
                         buf = b""
                     if time.time() - self.asked > IDLE_STOP_S:
                         with contextlib.suppress(Exception):
-                            await chunks.aclose()   # leave the shared relay: the printer keeps one connection
+                            await chunks.aclose()  # leave the shared relay: the printer keeps one connection
                         return
             except asyncio.CancelledError:
                 raise
-            except Exception as e:      # camera away (printer off, LAN mode off): try again shortly
+            except Exception as e:  # camera away (printer off, LAN mode off): try again shortly
                 log.info("caméra: %s", e)
             await asyncio.sleep(2)
 

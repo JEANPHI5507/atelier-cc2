@@ -18,7 +18,9 @@ SIZE = 144
 MAX_FACES = 60000  # enough for 144 px; bigger meshes are sampled (largest faces first)
 
 
-def largest(v: np.ndarray, f: np.ndarray, rgb: np.ndarray, most: int = MAX_FACES) -> tuple[np.ndarray, np.ndarray]:
+def largest(
+    v: np.ndarray, f: np.ndarray, rgb: np.ndarray, most: int = MAX_FACES
+) -> tuple[np.ndarray, np.ndarray]:
     """The faces ``render`` keeps of a big mesh: the same however it is turned, so a caller drawing one mesh
     several ways samples it once."""
     if len(f) <= most:
@@ -29,7 +31,9 @@ def largest(v: np.ndarray, f: np.ndarray, rgb: np.ndarray, most: int = MAX_FACES
     return f[keep], rgb[keep]
 
 
-def render(v: np.ndarray, f: np.ndarray, rgb: np.ndarray, size: int = SIZE, most: int = MAX_FACES) -> bytes:
+def render(
+    v: np.ndarray, f: np.ndarray, rgb: np.ndarray, size: int = SIZE, most: int = MAX_FACES
+) -> bytes:
     """PNG of a Z-up mesh seen from the front-left, 30° above; ``rgb`` = one colour per face; at most ``most``
     faces drawn (each one is a Python call)."""
     # big flat faces (a label's plate) sort badly against small nearby ones (its letters):
@@ -37,14 +41,18 @@ def render(v: np.ndarray, f: np.ndarray, rgb: np.ndarray, size: int = SIZE, most
     span = float(np.ptp(v, axis=0).max()) or 1.0
     edges = np.linalg.norm(v[f][:, [1, 2, 0]] - v[f], axis=2).max(axis=1)
     if (edges > span / 25).any() and len(f) < MAX_FACES:
-        v, f, idx = trimesh.remesh.subdivide_to_size(v, f, max_edge=span / 25, max_iter=8, return_index=True)
+        v, f, idx = trimesh.remesh.subdivide_to_size(
+            v, f, max_edge=span / 25, max_iter=8, return_index=True
+        )
         rgb = rgb[idx]
     f, rgb = largest(v, f, rgb, most)
     c = v.mean(axis=0)
     yaw, pitch = np.radians(-35), np.radians(28)
     ry = np.array([[np.cos(yaw), -np.sin(yaw), 0], [np.sin(yaw), np.cos(yaw), 0], [0, 0, 1]])
-    rx = np.array([[1, 0, 0], [0, np.cos(pitch), -np.sin(pitch)], [0, np.sin(pitch), np.cos(pitch)]])
-    p = (v - c) @ (rx @ ry).T             # x right, y depth (away), z up
+    rx = np.array(
+        [[1, 0, 0], [0, np.cos(pitch), -np.sin(pitch)], [0, np.sin(pitch), np.cos(pitch)]]
+    )
+    p = (v - c) @ (rx @ ry).T  # x right, y depth (away), z up
     t = p[f]
     n = np.cross(t[:, 1] - t[:, 0], t[:, 2] - t[:, 0])
     n /= np.linalg.norm(n, axis=1, keepdims=True) + 1e-12
@@ -68,10 +76,13 @@ def render(v: np.ndarray, f: np.ndarray, rgb: np.ndarray, size: int = SIZE, most
 def inject(gcode: Path, png: bytes, size: int = SIZE) -> None:
     """Insert (or replace) the thumbnail block right after the G-code header."""
     b64 = base64.b64encode(png).decode()
-    lines = [b64[i:i + 78] for i in range(0, len(b64), 78)]
-    block = ("\n; THUMBNAIL_BLOCK_START\n;\n"
-             f"; thumbnail begin {size}x{size} {len(b64)}\n" + "".join(f"; {ln}\n" for ln in lines)
-             + "; thumbnail end\n;\n; THUMBNAIL_BLOCK_END\n")
+    lines = [b64[i : i + 78] for i in range(0, len(b64), 78)]
+    block = (
+        "\n; THUMBNAIL_BLOCK_START\n;\n"
+        f"; thumbnail begin {size}x{size} {len(b64)}\n"
+        + "".join(f"; {ln}\n" for ln in lines)
+        + "; thumbnail end\n;\n; THUMBNAIL_BLOCK_END\n"
+    )
     text = gcode.read_text(errors="ignore")
     if "; THUMBNAIL_BLOCK_START" in text:
         a = text.index("\n; THUMBNAIL_BLOCK_START")

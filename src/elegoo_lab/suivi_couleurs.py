@@ -25,10 +25,10 @@ def _scan(path: str, _mtime: float) -> dict[str, Any]:
     layer, remain = 0, None
     first_tool = None
     changes: list = []
-    remain_at = [None]   # remain_at[i]: minutes left when layer i starts
+    remain_at = [None]  # remain_at[i]: minutes left when layer i starts
     colours: list[str] = []
     types: list[str] = []
-    purges = []   # (layer, tool, mm): every change that pushes filament into the chute
+    purges = []  # (layer, tool, mm): every change that pushes filament into the chute
     with open(path, errors="ignore") as f:
         for line in f:
             c = line[:1]
@@ -43,16 +43,32 @@ def _scan(path: str, _mtime: float) -> dict[str, Any]:
             elif c == "M":
                 if line.startswith("M6211") and (m := _TOOL.search(line)):
                     t = int(m.group(1))
-                    if (n := _LEN.search(line)) and float(n.group(1)) > 0:   # L0: the tool already loaded, no purge
-                        purges.append((layer, t, max(float(n.group(1)), slicer.FLUSH_FLOOR_MM) + slicer.FLUSH_EXTRA_MM))
+                    if (n := _LEN.search(line)) and float(
+                        n.group(1)
+                    ) > 0:  # L0: the tool already loaded, no purge
+                        purges.append(
+                            (
+                                layer,
+                                t,
+                                max(float(n.group(1)), slicer.FLUSH_FLOOR_MM)
+                                + slicer.FLUSH_EXTRA_MM,
+                            )
+                        )
                     if layer == 0:
                         first_tool = t
                     elif not changes or changes[-1][1] != t:
                         changes.append((layer, t, remain))
                 elif line.startswith("M73 P") and (m := _REMAIN.match(line)):
                     remain = int(m.group(1))
-    return {"first": first_tool if first_tool is not None else 0, "changes": changes, "purges": purges,
-            "remain_at": remain_at, "colours": colours, "types": types, "layers": layer}
+    return {
+        "first": first_tool if first_tool is not None else 0,
+        "changes": changes,
+        "purges": purges,
+        "remain_at": remain_at,
+        "colours": colours,
+        "types": types,
+        "layers": layer,
+    }
 
 
 def plan(path: Path, layer: int, active: int | None = None, upcoming: int = 4) -> dict[str, Any]:
@@ -69,14 +85,20 @@ def plan(path: Path, layer: int, active: int | None = None, upcoming: int = 4) -
         by_gcode = t
     here = [c for c in d["changes"] if c[0] == layer]
     later = [c for c in d["changes"] if c[0] > layer]
-    done_here = next((i + 1 for i, c in enumerate(here) if c[1] == active), 0) if active is not None else len(here)
+    done_here = (
+        next((i + 1 for i, c in enumerate(here) if c[1] == active), 0)
+        if active is not None
+        else len(here)
+    )
     ahead = here[done_here:] + later
     now = active if active is not None else by_gcode
     r_now = d["remain_at"][min(layer, len(d["remain_at"]) - 1)]
     # purge still to come per tool, counted the way slicer.firmware_purge_m counts it for the whole print
     here_p = [p for p in d["purges"] if p[0] == layer]
-    todo = here_p[min(done_here, len(here_p)):] + [p for p in d["purges"] if p[0] > layer]
-    purge: dict[int, list[float]] = {}   # tool -> [metres left, metres in all, purges left, purges in all]
+    todo = here_p[min(done_here, len(here_p)) :] + [p for p in d["purges"] if p[0] > layer]
+    purge: dict[int, list[float]] = (
+        {}
+    )  # tool -> [metres left, metres in all, purges left, purges in all]
     for _, t, mm in d["purges"]:
         q = purge.setdefault(t, [0.0, 0.0, 0, 0])
         q[1] += mm / 1000
@@ -84,9 +106,23 @@ def plan(path: Path, layer: int, active: int | None = None, upcoming: int = 4) -
     for _, t, mm in todo:
         purge[t][0] += mm / 1000
         purge[t][2] += 1
-    return {"tool": now, "colours": d["colours"], "types": d["types"], "layers": d["layers"], "left": len(ahead),
-            "total": len(d["changes"]),
-            "purge": [{"tool": t, "left": n, "count": c, "left_m": round(a, 3), "total_m": round(b, 3)}
-                      for t, (a, b, n, c) in sorted(purge.items())],
-            "next": [{"layer": li, "tool": t,
-                      "min": max(0, r_now - r) if r_now is not None and r is not None else None} for li, t, r in ahead[:upcoming]]}
+    return {
+        "tool": now,
+        "colours": d["colours"],
+        "types": d["types"],
+        "layers": d["layers"],
+        "left": len(ahead),
+        "total": len(d["changes"]),
+        "purge": [
+            {"tool": t, "left": n, "count": c, "left_m": round(a, 3), "total_m": round(b, 3)}
+            for t, (a, b, n, c) in sorted(purge.items())
+        ],
+        "next": [
+            {
+                "layer": li,
+                "tool": t,
+                "min": max(0, r_now - r) if r_now is not None and r is not None else None,
+            }
+            for li, t, r in ahead[:upcoming]
+        ],
+    }

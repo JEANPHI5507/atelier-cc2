@@ -15,13 +15,15 @@ from typing import Any
 
 from . import config
 
-MAX_FRAMES = 900          # beyond this, every other frame is dropped (a 3000-layer print stays a short video)
+MAX_FRAMES = (
+    900  # beyond this, every other frame is dropped (a 3000-layer print stays a short video)
+)
 FPS = 24
-KEEP = 200                # entries
+KEEP = 200  # entries
 
 
 def root() -> Path:
-    return config.MODELS_DIR / ".galerie"   # looked up each time: tests swap the library
+    return config.MODELS_DIR / ".galerie"  # looked up each time: tests swap the library
 
 
 def _safe(entry_id: str) -> Path:
@@ -36,14 +38,22 @@ class Recorder:
 
     def __init__(self, filename: str, meta: dict[str, Any] | None = None) -> None:
         if meta is None:
-            stem = "".join(c if c.isalnum() or c in "-_." else "_" for c in Path(filename).stem)[:60] or "impression"
-            meta = {"id": time.strftime("%Y%m%d-%H%M%S") + "_" + stem, "fichier": Path(filename).name,
-                    "debut": int(time.time()), "issue": "en cours", "alertes": []}
+            stem = (
+                "".join(c if c.isalnum() or c in "-_." else "_" for c in Path(filename).stem)[:60]
+                or "impression"
+            )
+            meta = {
+                "id": time.strftime("%Y%m%d-%H%M%S") + "_" + stem,
+                "fichier": Path(filename).name,
+                "debut": int(time.time()),
+                "issue": "en cours",
+                "alertes": [],
+            }
         self.id = meta["id"]
         self.dir = root() / self.id
         (self.dir / "frames").mkdir(parents=True, exist_ok=True)
         self.frames = len(list((self.dir / "frames").glob("f*.jpg")))
-        self.step = 1          # keep 1 frame out of `step`
+        self.step = 1  # keep 1 frame out of `step`
         self.seen = self.frames
         self.meta = meta
         self.save()
@@ -57,7 +67,9 @@ class Recorder:
         return cls(filename)
 
     def save(self) -> None:
-        config.write_atomic(self.dir / "meta.json", json.dumps(self.meta, ensure_ascii=False, indent=1))
+        config.write_atomic(
+            self.dir / "meta.json", json.dumps(self.meta, ensure_ascii=False, indent=1)
+        )
 
     def add_frame(self, jpeg: bytes) -> None:
         self.seen += 1
@@ -65,7 +77,7 @@ class Recorder:
             return
         self.frames += 1
         (self.dir / "frames" / f"f{self.frames:05d}.jpg").write_bytes(jpeg)
-        if self.frames >= MAX_FRAMES:       # thin out: keep every other frame, then record half as often
+        if self.frames >= MAX_FRAMES:  # thin out: keep every other frame, then record half as often
             kept = sorted((self.dir / "frames").glob("f*.jpg"))
             for i, f in enumerate(kept):
                 if i % 2:
@@ -87,9 +99,30 @@ class Recorder:
         frames = self.dir / "frames"
         if self.frames >= 8 and shutil.which("ffmpeg"):
             out = self.dir / "timelapse.mp4"
-            r = subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-framerate", str(FPS), "-i", str(frames / "f%05d.jpg"),
-                                "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2", "-c:v", "libx264", "-pix_fmt", "yuv420p",
-                                "-movflags", "+faststart", str(out)], capture_output=True, text=True, timeout=600)
+            r = subprocess.run(
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-loglevel",
+                    "error",
+                    "-framerate",
+                    str(FPS),
+                    "-i",
+                    str(frames / "f%05d.jpg"),
+                    "-vf",
+                    "scale=trunc(iw/2)*2:trunc(ih/2)*2",
+                    "-c:v",
+                    "libx264",
+                    "-pix_fmt",
+                    "yuv420p",
+                    "-movflags",
+                    "+faststart",
+                    str(out),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=600,
+            )
             if r.returncode == 0:
                 self.meta["video"] = out.name
         last = sorted(frames.glob("f*.jpg"))
@@ -113,10 +146,14 @@ def close_stale(ids: list[str]) -> int:
     for meta in entries():
         if meta["id"] in ids and meta.get("issue") == "en cours":
             d = root() / meta["id"]
-            last = max((p.stat().st_mtime for p in d.rglob("*") if p.is_file()), default=meta["debut"])
+            last = max(
+                (p.stat().st_mtime for p in d.rglob("*") if p.is_file()), default=meta["debut"]
+            )
             rec = Recorder(meta["fichier"], meta)
             rec.finish("interrompue")
-            rec.meta.update(fin=int(last), duree_s=int(last) - meta["debut"])   # when it was last seen, not now
+            rec.meta.update(
+                fin=int(last), duree_s=int(last) - meta["debut"]
+            )  # when it was last seen, not now
             rec.save()
             n += 1
     return n

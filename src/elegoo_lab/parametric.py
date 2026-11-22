@@ -22,7 +22,9 @@ from fontTools.ttLib import TTFont
 from . import colorize, config, mesh, threemf
 
 FONT = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
-SCRIPT_FONT = Path("/usr/share/fonts/opentype/urw-base35/Z003-MediumItalic.otf")   # handwriting (URW, free)
+SCRIPT_FONT = Path(
+    "/usr/share/fonts/opentype/urw-base35/Z003-MediumItalic.otf"
+)  # handwriting (URW, free)
 
 
 @dataclass(frozen=True)
@@ -33,20 +35,25 @@ class Param:
     lo: float | None = None
     hi: float | None = None
     unit: str = "mm"
-    kind: str = "number"      # number | int | text | bool | choice | image
-    options: tuple[tuple[str, str], ...] = ()   # choice: (value, label)
+    kind: str = "number"  # number | int | text | bool | choice | image
+    options: tuple[tuple[str, str], ...] = ()  # choice: (value, label)
 
 
-Part = tuple[str, mf.Manifold, int]   # (name, solid, filament slot)
+Part = tuple[str, mf.Manifold, int]  # (name, solid, filament slot)
 
 
 # --- helpers -----------------------------------------------------------------------------
+
 
 def _rounded(w: float, d: float, r: float) -> mf.CrossSection:
     r = max(0.0, min(r, w / 2 - 0.01, d / 2 - 0.01))
     if r <= 0:
         return mf.CrossSection.square([w, d])
-    return mf.CrossSection.square([w - 2 * r, d - 2 * r]).translate([r, r]).offset(r, mf.JoinType.Round, 2, 48)
+    return (
+        mf.CrossSection.square([w - 2 * r, d - 2 * r])
+        .translate([r, r])
+        .offset(r, mf.JoinType.Round, 2, 48)
+    )
 
 
 class _FlatPen(BasePen):
@@ -58,30 +65,35 @@ class _FlatPen(BasePen):
         self.cur: list[tuple[float, float]] = []
         self.steps = steps
 
-    def _moveTo(self, p: tuple[float, float]) -> None:   # noqa: N802 - fontTools Pen API
+    def _moveTo(self, p: tuple[float, float]) -> None:  # noqa: N802 - fontTools Pen API
         self.cur = [p]
 
-    def _lineTo(self, p: tuple[float, float]) -> None:   # noqa: N802 - fontTools Pen API
+    def _lineTo(self, p: tuple[float, float]) -> None:  # noqa: N802 - fontTools Pen API
         self.cur.append(p)
 
-    def _curveToOne(self, p1: Any, p2: Any, p3: Any) -> None:   # noqa: N802 - fontTools Pen API
+    def _curveToOne(self, p1: Any, p2: Any, p3: Any) -> None:  # noqa: N802 - fontTools Pen API
         p0 = np.array(self.cur[-1])
         for t in np.linspace(0, 1, self.steps + 1)[1:]:
-            pt = (1 - t) ** 3 * p0 + 3 * (1 - t) ** 2 * t * np.array(p1) + 3 * (1 - t) * t ** 2 * np.array(p2) + t ** 3 * np.array(p3)
+            pt = (
+                (1 - t) ** 3 * p0
+                + 3 * (1 - t) ** 2 * t * np.array(p1)
+                + 3 * (1 - t) * t**2 * np.array(p2)
+                + t**3 * np.array(p3)
+            )
             self.cur.append(tuple(pt))
 
-    def _qCurveToOne(self, p1: Any, p2: Any) -> None:   # noqa: N802 - fontTools Pen API
+    def _qCurveToOne(self, p1: Any, p2: Any) -> None:  # noqa: N802 - fontTools Pen API
         p0 = np.array(self.cur[-1])
         for t in np.linspace(0, 1, self.steps + 1)[1:]:
-            pt = (1 - t) ** 2 * p0 + 2 * (1 - t) * t * np.array(p1) + t ** 2 * np.array(p2)
+            pt = (1 - t) ** 2 * p0 + 2 * (1 - t) * t * np.array(p1) + t**2 * np.array(p2)
             self.cur.append(tuple(pt))
 
-    def _closePath(self) -> None:   # noqa: N802 - fontTools Pen API
+    def _closePath(self) -> None:  # noqa: N802 - fontTools Pen API
         if len(self.cur) >= 3:
             self.contours.append(self.cur)
         self.cur = []
 
-    _endPath = _closePath   # noqa: N815 - fontTools Pen API
+    _endPath = _closePath  # noqa: N815 - fontTools Pen API
 
 
 def text_section(text: str, height: float, font_file: Path = FONT) -> mf.CrossSection:
@@ -110,18 +122,33 @@ def text_section(text: str, height: float, font_file: Path = FONT) -> mf.CrossSe
 
 # --- generators ---------------------------------------------------------------------------
 
-def box(longueur: float, largeur: float, hauteur: float, paroi: float, jeu: float, rayon: float) -> list[Part]:
+
+def box(
+    longueur: float, largeur: float, hauteur: float, paroi: float, jeu: float, rayon: float
+) -> list[Part]:
     outer = _rounded(longueur, largeur, rayon)
-    inner = _rounded(longueur - 2 * paroi, largeur - 2 * paroi, max(0, rayon - paroi)).translate([paroi, paroi])
+    inner = _rounded(longueur - 2 * paroi, largeur - 2 * paroi, max(0, rayon - paroi)).translate(
+        [paroi, paroi]
+    )
     body = outer.extrude(hauteur) - inner.extrude(hauteur).translate([0, 0, paroi])
     lip_h = min(6.0, hauteur / 3)
-    lip_out = _rounded(longueur - 2 * (paroi + jeu), largeur - 2 * (paroi + jeu), max(0, rayon - paroi - jeu)).translate([paroi + jeu, paroi + jeu])
-    lip_in = _rounded(longueur - 2 * (2 * paroi + jeu), largeur - 2 * (2 * paroi + jeu), max(0, rayon - 2 * paroi - jeu)).translate([2 * paroi + jeu] * 2)
-    lid = outer.extrude(paroi) + (lip_out.extrude(lip_h) - lip_in.extrude(lip_h)).translate([0, 0, paroi])
+    lip_out = _rounded(
+        longueur - 2 * (paroi + jeu), largeur - 2 * (paroi + jeu), max(0, rayon - paroi - jeu)
+    ).translate([paroi + jeu, paroi + jeu])
+    lip_in = _rounded(
+        longueur - 2 * (2 * paroi + jeu),
+        largeur - 2 * (2 * paroi + jeu),
+        max(0, rayon - 2 * paroi - jeu),
+    ).translate([2 * paroi + jeu] * 2)
+    lid = outer.extrude(paroi) + (lip_out.extrude(lip_h) - lip_in.extrude(lip_h)).translate(
+        [0, 0, paroi]
+    )
     return [("boite", body, 1), ("couvercle", lid.translate([0, largeur + 10, 0]), 1)]
 
 
-def label(texte: str, taille_texte: float, epaisseur: float, relief: float, marge: float, trou: bool) -> list[Part]:
+def label(
+    texte: str, taille_texte: float, epaisseur: float, relief: float, marge: float, trou: bool
+) -> list[Part]:
     if not texte.strip():
         raise ValueError("écris un texte pour l'étiquette")
     letters = text_section(texte.strip(), taille_texte)
@@ -132,12 +159,16 @@ def label(texte: str, taille_texte: float, epaisseur: float, relief: float, marg
     shift = [marge - x0 + (hole_d + marge if trou else 0), marge - y0]
     plate = _rounded(w, d, min(4.0, d / 4)).extrude(epaisseur)
     if trou:
-        plate = plate - mf.Manifold.cylinder(epaisseur * 3, hole_d / 2, hole_d / 2, 40).translate([marge + hole_d / 2, d / 2, -epaisseur])
+        plate = plate - mf.Manifold.cylinder(epaisseur * 3, hole_d / 2, hole_d / 2, 40).translate(
+            [marge + hole_d / 2, d / 2, -epaisseur]
+        )
     text = letters.translate(shift).extrude(relief).translate([0, 0, epaisseur])
     return [("plaque", plate, 1), ("texte", text, 2)]
 
 
-def hook(largeur: float, hauteur: float, profondeur: float, epaisseur: float, vis: float) -> list[Part]:
+def hook(
+    largeur: float, hauteur: float, profondeur: float, epaisseur: float, vis: float
+) -> list[Part]:
     back = mf.Manifold.cube([largeur, epaisseur, hauteur])
     arm = mf.Manifold.cube([largeur, profondeur, epaisseur])
     tip_h = min(15.0, hauteur / 3)
@@ -145,22 +176,38 @@ def hook(largeur: float, hauteur: float, profondeur: float, epaisseur: float, vi
     part = back + arm + tip
     for z in (hauteur * 0.45, hauteur * 0.8):  # two countersunk screw holes in the back plate
         hole = mf.Manifold.cylinder(epaisseur * 3, vis / 2, vis / 2, 40)
-        sink = mf.Manifold.cylinder(vis * 0.6, vis / 2, vis, 40).translate([0, 0, epaisseur * 3 - vis * 0.6])
+        sink = mf.Manifold.cylinder(vis * 0.6, vis / 2, vis, 40).translate(
+            [0, 0, epaisseur * 3 - vis * 0.6]
+        )
         both = (hole + sink).rotate([-90, 0, 0]).translate([largeur / 2, epaisseur * 2.0, z])
         part = part - both
     return [("crochet", part, 1)]
 
 
-def organiser(longueur: float, largeur: float, hauteur: float, cases_x: int, cases_y: int,
-              paroi: float, fond: float, rayon: float) -> list[Part]:
+def organiser(
+    longueur: float,
+    largeur: float,
+    hauteur: float,
+    cases_x: int,
+    cases_y: int,
+    paroi: float,
+    fond: float,
+    rayon: float,
+) -> list[Part]:
     nx, ny = int(cases_x), int(cases_y)
     cw = (longueur - (nx + 1) * paroi) / nx
     cd = (largeur - (ny + 1) * paroi) / ny
     if cw < 5 or cd < 5:
         raise ValueError("compartiments trop petits : moins de cases ou une boîte plus grande")
     solid = _rounded(longueur, largeur, rayon).extrude(hauteur)
-    cells = [_rounded(cw, cd, max(0.5, rayon - paroi)).translate([paroi + i * (cw + paroi), paroi + j * (cd + paroi)])
-             .extrude(hauteur).translate([0, 0, fond]) for i in range(nx) for j in range(ny)]
+    cells = [
+        _rounded(cw, cd, max(0.5, rayon - paroi))
+        .translate([paroi + i * (cw + paroi), paroi + j * (cd + paroi)])
+        .extrude(hauteur)
+        .translate([0, 0, fond])
+        for i in range(nx)
+        for j in range(ny)
+    ]
     return [("organiseur", solid - mf.Manifold.batch_boolean(cells, mf.OpType.Add), 1)]
 
 
@@ -173,69 +220,214 @@ class Kind:
     build: Callable[..., list[Part]]
 
 
-KINDS = {k.key: k for k in [
-    Kind("boite", "Boîte avec couvercle", "Le couvercle s'emboîte grâce à une lèvre ; le jeu règle le serrage.", [
-        Param("longueur", "Longueur", 80, 20, 240), Param("largeur", "Largeur", 60, 20, 240), Param("hauteur", "Hauteur", 40, 10, 200),
-        Param("paroi", "Épaisseur des parois", 2.0, 1.2, 6), Param("jeu", "Jeu du couvercle", 0.2, 0.05, 0.6),
-        Param("rayon", "Rayon des coins", 4, 0, 20)], box),
-    Kind("etiquette", "Étiquette en relief (2 couleurs)", "Texte en relief d'une autre couleur : prénom, porte, bocal…", [
-        Param("texte", "Texte (retour à la ligne possible)", "Atelier", kind="text"),
-        Param("taille_texte", "Hauteur des lettres", 10, 4, 60), Param("epaisseur", "Épaisseur de la plaque", 2.0, 1.2, 6),
-        Param("relief", "Relief du texte", 1.0, 0.4, 4), Param("marge", "Marge autour du texte", 4, 1, 20),
-        Param("trou", "Trou pour l'accrocher", True, kind="bool")], label),
-    Kind("crochet", "Crochet mural", "Deux trous fraisés pour vis ; à imprimer debout, dos à plat.", [
-        Param("largeur", "Largeur", 20, 8, 80), Param("hauteur", "Hauteur du dos", 60, 25, 200),
-        Param("profondeur", "Profondeur du crochet", 30, 10, 120), Param("epaisseur", "Épaisseur", 5, 3, 15),
-        Param("vis", "Diamètre de vis", 4, 2.5, 8)], hook),
-    Kind("organiseur", "Organiseur à compartiments", "Pour tiroir ou bureau : nombre de cases réglable.", [
-        Param("longueur", "Longueur", 150, 30, 240), Param("largeur", "Largeur", 100, 30, 240), Param("hauteur", "Hauteur", 40, 10, 150),
-        Param("cases_x", "Cases en longueur", 3, 1, 12, "", "int"), Param("cases_y", "Cases en largeur", 2, 1, 12, "", "int"),
-        Param("paroi", "Épaisseur des cloisons", 1.6, 1.0, 5), Param("fond", "Épaisseur du fond", 1.2, 0.8, 5),
-        Param("rayon", "Rayon des coins", 3, 0, 15)], organiser),
-]}
+KINDS = {
+    k.key: k
+    for k in [
+        Kind(
+            "boite",
+            "Boîte avec couvercle",
+            "Le couvercle s'emboîte grâce à une lèvre ; le jeu règle le serrage.",
+            [
+                Param("longueur", "Longueur", 80, 20, 240),
+                Param("largeur", "Largeur", 60, 20, 240),
+                Param("hauteur", "Hauteur", 40, 10, 200),
+                Param("paroi", "Épaisseur des parois", 2.0, 1.2, 6),
+                Param("jeu", "Jeu du couvercle", 0.2, 0.05, 0.6),
+                Param("rayon", "Rayon des coins", 4, 0, 20),
+            ],
+            box,
+        ),
+        Kind(
+            "etiquette",
+            "Étiquette en relief (2 couleurs)",
+            "Texte en relief d'une autre couleur : prénom, porte, bocal…",
+            [
+                Param("texte", "Texte (retour à la ligne possible)", "Atelier", kind="text"),
+                Param("taille_texte", "Hauteur des lettres", 10, 4, 60),
+                Param("epaisseur", "Épaisseur de la plaque", 2.0, 1.2, 6),
+                Param("relief", "Relief du texte", 1.0, 0.4, 4),
+                Param("marge", "Marge autour du texte", 4, 1, 20),
+                Param("trou", "Trou pour l'accrocher", True, kind="bool"),
+            ],
+            label,
+        ),
+        Kind(
+            "crochet",
+            "Crochet mural",
+            "Deux trous fraisés pour vis ; à imprimer debout, dos à plat.",
+            [
+                Param("largeur", "Largeur", 20, 8, 80),
+                Param("hauteur", "Hauteur du dos", 60, 25, 200),
+                Param("profondeur", "Profondeur du crochet", 30, 10, 120),
+                Param("epaisseur", "Épaisseur", 5, 3, 15),
+                Param("vis", "Diamètre de vis", 4, 2.5, 8),
+            ],
+            hook,
+        ),
+        Kind(
+            "organiseur",
+            "Organiseur à compartiments",
+            "Pour tiroir ou bureau : nombre de cases réglable.",
+            [
+                Param("longueur", "Longueur", 150, 30, 240),
+                Param("largeur", "Largeur", 100, 30, 240),
+                Param("hauteur", "Hauteur", 40, 10, 150),
+                Param("cases_x", "Cases en longueur", 3, 1, 12, "", "int"),
+                Param("cases_y", "Cases en largeur", 2, 1, 12, "", "int"),
+                Param("paroi", "Épaisseur des cloisons", 1.6, 1.0, 5),
+                Param("fond", "Épaisseur du fond", 1.2, 0.8, 5),
+                Param("rayon", "Rayon des coins", 3, 0, 15),
+            ],
+            organiser,
+        ),
+    ]
+}
 
 
 def _more() -> list[Kind]:
     from . import parametric_more as pm
+
     sizes = tuple((k, k) for k in pm.METRIC)
     return [
-        Kind("gridfinity", "Bac Gridfinity", "Rangement modulaire standard (grille de 42 mm) : bacs empilables, cases, aimants.", [
-            Param("cases_x", "Largeur (cases de 42 mm)", 2, 1, 5, "", "int"), Param("cases_y", "Profondeur (cases)", 1, 1, 5, "", "int"),
-            Param("hauteur_u", "Hauteur (unités de 7 mm)", 6, 2, 15, "", "int"),
-            Param("compartiments_x", "Compartiments en largeur", 1, 1, 8, "", "int"), Param("compartiments_y", "Compartiments en profondeur", 1, 1, 8, "", "int"),
-            Param("aimants", "Trous pour aimants 6 × 2 mm", False, kind="bool"), Param("empilable", "Lèvre pour empiler", True, kind="bool")], pm.gridfinity_bin),
-        Kind("gridfinity_base", "Plaque Gridfinity", "La plaque qui reçoit les bacs, à poser au fond d'un tiroir.", [
-            Param("cases_x", "Largeur (cases de 42 mm)", 4, 1, 5, "", "int"), Param("cases_y", "Profondeur (cases)", 3, 1, 5, "", "int"),
-            Param("aimants", "Trous pour aimants 6 × 2 mm", False, kind="bool")], pm.gridfinity_base),
-        Kind("support", "Support de téléphone", "Pour téléphone ou tablette, incliné, avec passage du câble de charge.", [
-            Param("largeur", "Largeur", 70, 40, 200), Param("angle", "Inclinaison", 65, 45, 80, "°"),
-            Param("epaisseur_appareil", "Épaisseur de l'appareil (coque comprise)", 12, 6, 30),
-            Param("hauteur", "Hauteur du dossier", 90, 50, 180), Param("passage_cable", "Passage pour le câble", True, kind="bool")], pm.phone_stand),
-        Kind("range_cables", "Range-câbles", "Peigne de bureau : les câbles se clipsent par le dessus.", [
-            Param("nombre", "Nombre de câbles", 5, 1, 15, "", "int"), Param("diametre", "Diamètre des câbles", 5, 2, 15),
-            Param("profondeur", "Profondeur", 15, 8, 40), Param("paroi", "Épaisseur", 2.0, 1.2, 5),
-            Param("vis", "Pattes pour vis (sinon adhésif)", False, kind="bool")], pm.cable_comb),
-        Kind("visserie", "Vis, écrou, rondelle, entretoise", "Filetage métrique ISO de M3 à M10 ; le jeu compense le plastique.", [
-            Param("piece", "Pièce", "vis", kind="choice", options=(("vis", "Vis tête hexagonale"), ("ecrou", "Écrou"), ("rondelle", "Rondelle"), ("entretoise", "Entretoise"))),
-            Param("taille", "Taille", "M8", kind="choice", options=sizes), Param("longueur", "Longueur (vis, entretoise)", 20, 4, 120),
-            Param("jeu", "Jeu d'impression", 0.15, 0, 0.5)], pm.hardware),
-        Kind("engrenage", "Engrenage droit", "Denture en développante, module et nombre de dents au choix.", [
-            Param("dents", "Nombre de dents", 20, 8, 120, "", "int"), Param("module", "Module (taille des dents)", 2.0, 0.5, 5),
-            Param("epaisseur", "Épaisseur", 8, 2, 40), Param("alesage", "Alésage (trou central)", 5, 0, 40),
-            Param("angle_pression", "Angle de pression", 20, 14.5, 25, "°")], pm.gear),
-        Kind("porte_cles", "Porte-clés prénom (2 couleurs)", "Le contour suit les lettres ; le prénom ressort d'une autre couleur.", [
-            Param("texte", "Prénom", "Léa", kind="text"),
-            Param("police", "Écriture", "simple", kind="choice", options=(("simple", "Simple"), ("manuscrite", "Manuscrite"))),
-            Param("taille_texte", "Hauteur des lettres", 14, 6, 40), Param("epaisseur", "Épaisseur", 3, 1.6, 6),
-            Param("relief", "Relief du prénom", 1.2, 0.4, 3)], pm.keychain),
-        Kind("decoration_noel", "Décoration de Noël prénom", "Boule, étoile ou sapin à suspendre, prénom d'une autre couleur.", [
-            Param("forme", "Forme", "boule", kind="choice", options=(("boule", "Boule"), ("etoile", "Étoile"), ("sapin", "Sapin"))),
-            Param("texte", "Prénom", "Noël", kind="text"), Param("diametre", "Taille", 70, 40, 150),
-            Param("epaisseur", "Épaisseur", 3, 1.6, 6), Param("relief", "Relief du prénom", 1.2, 0.4, 3)], pm.ornament),
-        Kind("lithophanie", "Lithophanie photo", "Ta photo en relief : elle apparaît devant une lampe. Impression debout, remplissage 100 %.", [
-            Param("photo", "Photo", "", kind="image"), Param("largeur", "Largeur", 100, 40, 200),
-            Param("epaisseur_min", "Épaisseur claire", 0.8, 0.4, 2), Param("epaisseur_max", "Épaisseur foncée", 3.0, 1.5, 6),
-            Param("cadre", "Cadre", 3, 0, 10)], pm.lithophane),
+        Kind(
+            "gridfinity",
+            "Bac Gridfinity",
+            "Rangement modulaire standard (grille de 42 mm) : bacs empilables, cases, aimants.",
+            [
+                Param("cases_x", "Largeur (cases de 42 mm)", 2, 1, 5, "", "int"),
+                Param("cases_y", "Profondeur (cases)", 1, 1, 5, "", "int"),
+                Param("hauteur_u", "Hauteur (unités de 7 mm)", 6, 2, 15, "", "int"),
+                Param("compartiments_x", "Compartiments en largeur", 1, 1, 8, "", "int"),
+                Param("compartiments_y", "Compartiments en profondeur", 1, 1, 8, "", "int"),
+                Param("aimants", "Trous pour aimants 6 × 2 mm", False, kind="bool"),
+                Param("empilable", "Lèvre pour empiler", True, kind="bool"),
+            ],
+            pm.gridfinity_bin,
+        ),
+        Kind(
+            "gridfinity_base",
+            "Plaque Gridfinity",
+            "La plaque qui reçoit les bacs, à poser au fond d'un tiroir.",
+            [
+                Param("cases_x", "Largeur (cases de 42 mm)", 4, 1, 5, "", "int"),
+                Param("cases_y", "Profondeur (cases)", 3, 1, 5, "", "int"),
+                Param("aimants", "Trous pour aimants 6 × 2 mm", False, kind="bool"),
+            ],
+            pm.gridfinity_base,
+        ),
+        Kind(
+            "support",
+            "Support de téléphone",
+            "Pour téléphone ou tablette, incliné, avec passage du câble de charge.",
+            [
+                Param("largeur", "Largeur", 70, 40, 200),
+                Param("angle", "Inclinaison", 65, 45, 80, "°"),
+                Param("epaisseur_appareil", "Épaisseur de l'appareil (coque comprise)", 12, 6, 30),
+                Param("hauteur", "Hauteur du dossier", 90, 50, 180),
+                Param("passage_cable", "Passage pour le câble", True, kind="bool"),
+            ],
+            pm.phone_stand,
+        ),
+        Kind(
+            "range_cables",
+            "Range-câbles",
+            "Peigne de bureau : les câbles se clipsent par le dessus.",
+            [
+                Param("nombre", "Nombre de câbles", 5, 1, 15, "", "int"),
+                Param("diametre", "Diamètre des câbles", 5, 2, 15),
+                Param("profondeur", "Profondeur", 15, 8, 40),
+                Param("paroi", "Épaisseur", 2.0, 1.2, 5),
+                Param("vis", "Pattes pour vis (sinon adhésif)", False, kind="bool"),
+            ],
+            pm.cable_comb,
+        ),
+        Kind(
+            "visserie",
+            "Vis, écrou, rondelle, entretoise",
+            "Filetage métrique ISO de M3 à M10 ; le jeu compense le plastique.",
+            [
+                Param(
+                    "piece",
+                    "Pièce",
+                    "vis",
+                    kind="choice",
+                    options=(
+                        ("vis", "Vis tête hexagonale"),
+                        ("ecrou", "Écrou"),
+                        ("rondelle", "Rondelle"),
+                        ("entretoise", "Entretoise"),
+                    ),
+                ),
+                Param("taille", "Taille", "M8", kind="choice", options=sizes),
+                Param("longueur", "Longueur (vis, entretoise)", 20, 4, 120),
+                Param("jeu", "Jeu d'impression", 0.15, 0, 0.5),
+            ],
+            pm.hardware,
+        ),
+        Kind(
+            "engrenage",
+            "Engrenage droit",
+            "Denture en développante, module et nombre de dents au choix.",
+            [
+                Param("dents", "Nombre de dents", 20, 8, 120, "", "int"),
+                Param("module", "Module (taille des dents)", 2.0, 0.5, 5),
+                Param("epaisseur", "Épaisseur", 8, 2, 40),
+                Param("alesage", "Alésage (trou central)", 5, 0, 40),
+                Param("angle_pression", "Angle de pression", 20, 14.5, 25, "°"),
+            ],
+            pm.gear,
+        ),
+        Kind(
+            "porte_cles",
+            "Porte-clés prénom (2 couleurs)",
+            "Le contour suit les lettres ; le prénom ressort d'une autre couleur.",
+            [
+                Param("texte", "Prénom", "Léa", kind="text"),
+                Param(
+                    "police",
+                    "Écriture",
+                    "simple",
+                    kind="choice",
+                    options=(("simple", "Simple"), ("manuscrite", "Manuscrite")),
+                ),
+                Param("taille_texte", "Hauteur des lettres", 14, 6, 40),
+                Param("epaisseur", "Épaisseur", 3, 1.6, 6),
+                Param("relief", "Relief du prénom", 1.2, 0.4, 3),
+            ],
+            pm.keychain,
+        ),
+        Kind(
+            "decoration_noel",
+            "Décoration de Noël prénom",
+            "Boule, étoile ou sapin à suspendre, prénom d'une autre couleur.",
+            [
+                Param(
+                    "forme",
+                    "Forme",
+                    "boule",
+                    kind="choice",
+                    options=(("boule", "Boule"), ("etoile", "Étoile"), ("sapin", "Sapin")),
+                ),
+                Param("texte", "Prénom", "Noël", kind="text"),
+                Param("diametre", "Taille", 70, 40, 150),
+                Param("epaisseur", "Épaisseur", 3, 1.6, 6),
+                Param("relief", "Relief du prénom", 1.2, 0.4, 3),
+            ],
+            pm.ornament,
+        ),
+        Kind(
+            "lithophanie",
+            "Lithophanie photo",
+            "Ta photo en relief : elle apparaît devant une lampe. Impression debout, remplissage 100 %.",
+            [
+                Param("photo", "Photo", "", kind="image"),
+                Param("largeur", "Largeur", 100, 40, 200),
+                Param("epaisseur_min", "Épaisseur claire", 0.8, 0.4, 2),
+                Param("epaisseur_max", "Épaisseur foncée", 3.0, 1.5, 6),
+                Param("cadre", "Cadre", 3, 0, 10),
+            ],
+            pm.lithophane,
+        ),
     ]
 
 
@@ -243,8 +435,15 @@ KINDS.update({k.key: k for k in _more()})
 
 
 def catalogue() -> list[dict[str, Any]]:
-    return [{"key": k.key, "title": k.title, "description": k.description,
-             "params": [p.__dict__ for p in k.params]} for k in KINDS.values()]
+    return [
+        {
+            "key": k.key,
+            "title": k.title,
+            "description": k.description,
+            "params": [p.__dict__ for p in k.params],
+        }
+        for k in KINDS.values()
+    ]
 
 
 def _clean(kind: Kind, values: dict[str, Any]) -> dict[str, Any]:
@@ -270,7 +469,9 @@ def _clean(kind: Kind, values: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
-def _build(key: str, values: dict[str, Any]) -> tuple[Kind, dict[str, Any], list, np.ndarray, np.ndarray]:
+def _build(
+    key: str, values: dict[str, Any]
+) -> tuple[Kind, dict[str, Any], list, np.ndarray, np.ndarray]:
     """The part's meshes: (kind, cleaned values, [(name, vertices, faces, slot)], min corner, max corner)."""
     kind = KINDS.get(key)
     if kind is None:
@@ -294,20 +495,32 @@ def preview(key: str, values: dict[str, Any]) -> tuple[bytes, list[float]]:
     import trimesh
 
     from .parametric_more import PREVIEW
+
     tok = PREVIEW.set(True)
     try:
         _, _, objects, lo, hi = _build(key, values)
     finally:
         PREVIEW.reset(tok)
     # the spools loaded in the CANVAS when the page knows them ("_couleurs", slot 1 first), else the workshop's palette
-    given = list(values.get("_couleurs") or [])[:len(colorize.PALETTE)]
-    palette = [c if isinstance(c, str) and re.fullmatch(r"#[0-9A-Fa-f]{6}", c) else colorize.PALETTE[i]
-               for i, c in enumerate(given)] + colorize.PALETTE[len(given):]   # an empty slot keeps its place
+    given = list(values.get("_couleurs") or [])[: len(colorize.PALETTE)]
+    palette = [
+        c if isinstance(c, str) and re.fullmatch(r"#[0-9A-Fa-f]{6}", c) else colorize.PALETTE[i]
+        for i, c in enumerate(given)
+    ] + colorize.PALETTE[
+        len(given) :
+    ]  # an empty slot keeps its place
     scene = trimesh.Scene()
     for nm, v, f, slot in objects:
-        rgb = tuple(int(palette[slot - 1].lstrip("#")[i:i + 2], 16) for i in (0, 2, 4))
-        scene.add_geometry(trimesh.Trimesh(v - [(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, lo[2]], f, process=False,
-                                           face_colors=[*rgb, 255]), node_name=nm)
+        rgb = tuple(int(palette[slot - 1].lstrip("#")[i : i + 2], 16) for i in (0, 2, 4))
+        scene.add_geometry(
+            trimesh.Trimesh(
+                v - [(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, lo[2]],
+                f,
+                process=False,
+                face_colors=[*rgb, 255],
+            ),
+            node_name=nm,
+        )
     return scene.export(file_type="glb"), [round(float(x), 1) for x in hi - lo]
 
 
@@ -320,11 +533,26 @@ def create(key: str, values: dict[str, Any], name: str | None = None) -> Path:
     offset = np.array([128 - (lo[0] + hi[0]) / 2, 128 - (lo[1] + hi[1]) / 2, -lo[2]])
     # parts that touch (the label's text on its plate) must be one object; separate pieces stay apart
     if key == "etiquette":
-        project = threemf.Project([threemf.Object(kind.title, [threemf.Part(nm, v, f, sl) for nm, v, f, sl in objects])], [])
+        project = threemf.Project(
+            [threemf.Object(kind.title, [threemf.Part(nm, v, f, sl) for nm, v, f, sl in objects])],
+            [],
+        )
     else:
-        project = threemf.Project([threemf.Object(nm, [threemf.Part(nm, v, f, sl)]) for nm, v, f, sl in objects], [])
-    stem = name or (re.sub(r"[^\w-]+", "_", str(args.get("texte", "")).strip())[:24] if key == "etiquette" else "") or key
-    out = config.MODELS_DIR / f"{key}_{stem}.3mf" if stem != key else config.MODELS_DIR / f"{key}.3mf"
+        project = threemf.Project(
+            [threemf.Object(nm, [threemf.Part(nm, v, f, sl)]) for nm, v, f, sl in objects], []
+        )
+    stem = (
+        name
+        or (
+            re.sub(r"[^\w-]+", "_", str(args.get("texte", "")).strip())[:24]
+            if key == "etiquette"
+            else ""
+        )
+        or key
+    )
+    out = (
+        config.MODELS_DIR / f"{key}_{stem}.3mf" if stem != key else config.MODELS_DIR / f"{key}.3mf"
+    )
     k = 1
     while out.exists():
         k += 1

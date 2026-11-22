@@ -15,7 +15,7 @@ import numpy as np
 
 from . import colorize, colors, config, threemf
 
-GAP_MM = 10.0       # between two models on the plate
+GAP_MM = 10.0  # between two models on the plate
 MAX_MODELS = 6
 
 
@@ -43,7 +43,9 @@ def combine(paths: list[Path], out: Path | None = None) -> dict[str, Any]:
             used = sorted({p.extruder for o in pr.objects for p in o.parts})
             remap = {}
             for e in used:
-                hexc = (pr.colours[e - 1] if e - 1 < len(pr.colours) else colorize.PALETTE[(e - 1) % 4]).upper()
+                hexc = (
+                    pr.colours[e - 1] if e - 1 < len(pr.colours) else colorize.PALETTE[(e - 1) % 4]
+                ).upper()
                 if hexc not in colours:
                     colours.append(hexc)
                 remap[e] = colours.index(hexc) + 1
@@ -54,12 +56,18 @@ def combine(paths: list[Path], out: Path | None = None) -> dict[str, Any]:
                         if code:
                             for s in colors.paint_states(code):
                                 if s and s not in remap:
-                                    hexc = (pr.colours[s - 1] if s - 1 < len(pr.colours) else colorize.PALETTE[(s - 1) % 4]).upper()
+                                    hexc = (
+                                        pr.colours[s - 1]
+                                        if s - 1 < len(pr.colours)
+                                        else colorize.PALETTE[(s - 1) % 4]
+                                    ).upper()
                                     if hexc not in colours:
                                         colours.append(hexc)
                                     remap[s] = colours.index(hexc) + 1
             if len(colours) > colors.MAX_SLOTS:
-                raise ValueError(f"ces modèles ont {len(colours)} couleurs en tout : la CC2 n'a que 4 bobines")
+                raise ValueError(
+                    f"ces modèles ont {len(colours)} couleurs en tout : la CC2 n'a que 4 bobines"
+                )
             parts = [p for o in pr.objects for p in o.parts]
             allv = np.vstack([p.vertices for p in parts])
             lo, hi = allv.min(0), allv.max(0)
@@ -72,10 +80,14 @@ def combine(paths: list[Path], out: Path | None = None) -> dict[str, Any]:
                     p.extruder = remap.get(p.extruder, 1)
                     if p.paint:
                         p.paint = [colors.remap_paint(c, remap) if c else None for c in p.paint]
-                objects.append(threemf.Object(path.stem if single else f"{path.stem} · {o.name}", o.parts))
+                objects.append(
+                    threemf.Object(path.stem if single else f"{path.stem} · {o.name}", o.parts)
+                )
     width = x - GAP_MM
-    if width > 246:     # the plate less the CC2's forbidden front-right corner
-        raise ValueError(f"côte à côte, ces modèles font {width:.0f} mm de large : trop pour le plateau, réduis-en un d'abord")
+    if width > 246:  # the plate less the CC2's forbidden front-right corner
+        raise ValueError(
+            f"côte à côte, ces modèles font {width:.0f} mm de large : trop pour le plateau, réduis-en un d'abord"
+        )
     if out is None:
         stem = " + ".join(p.stem for p in paths)[:80]
         out = config.MODELS_DIR / f"{stem}.3mf"
@@ -83,13 +95,28 @@ def combine(paths: list[Path], out: Path | None = None) -> dict[str, Any]:
         while out.exists():
             out = config.MODELS_DIR / f"{stem} ({k}).3mf"
             k += 1
-    threemf.write(threemf.Project(objects, colours), out, filaments=len(colours), colours=colours,
-                  flush=colors.flush_matrix(colours))
-    return {"name": out.name, "pieces": len(objects), "colours": colours, "width_mm": round(width, 1)}
+    threemf.write(
+        threemf.Project(objects, colours),
+        out,
+        filaments=len(colours),
+        colours=colours,
+        flush=colors.flush_matrix(colours),
+    )
+    return {
+        "name": out.name,
+        "pieces": len(objects),
+        "colours": colours,
+        "width_mm": round(width, 1),
+    }
 
 
-def remove(path: Path, index: int, *, moves: dict[int, tuple[float, float, float]] | None = None,
-           scales: dict[int, float] | None = None) -> dict[str, Any]:
+def remove(
+    path: Path,
+    index: int,
+    *,
+    moves: dict[int, tuple[float, float, float]] | None = None,
+    scales: dict[int, float] | None = None,
+) -> dict[str, Any]:
     """Write a new plate model without object ``index``; the original is never touched.
 
     ``moves``/``scales`` are the viewer's placements (object index -> translation in mm / size
@@ -100,15 +127,21 @@ def remove(path: Path, index: int, *, moves: dict[int, tuple[float, float, float
         if not 0 <= index < len(pr.objects):
             raise ValueError("cette pièce n'est pas sur ce plateau")
         if len(pr.objects) < 2:
-            raise ValueError("cette pièce est seule : supprime le modèle entier depuis la bibliothèque")
+            raise ValueError(
+                "cette pièce est seule : supprime le modèle entier depuis la bibliothèque"
+            )
         gone = pr.objects.pop(index)
 
-        for k, d in (moves or {}).items():   # the pieces the user already moved, minus the deleted one
+        for k, d in (
+            moves or {}
+        ).items():  # the pieces the user already moved, minus the deleted one
             j = k if k < index else k - 1
             if k != index and 0 <= j < len(pr.objects):
                 for p in pr.objects[j].parts:
                     p.vertices = p.vertices + np.asarray(d, float)
-        for k, f in (scales or {}).items():  # resized about its foot (same rule as the slicer): stays put
+        for k, f in (
+            scales or {}
+        ).items():  # resized about its foot (same rule as the slicer): stays put
             j = k if k < index else k - 1
             if k != index and 0 <= j < len(pr.objects) and f != 1:
                 v = np.vstack([p.vertices for p in pr.objects[j].parts])
@@ -122,14 +155,19 @@ def remove(path: Path, index: int, *, moves: dict[int, tuple[float, float, float
         remap: dict[int, int] = {}
 
         def colour_of(e: int) -> None:
-            hexc = (pr.colours[e - 1] if e - 1 < len(pr.colours) else colorize.PALETTE[(e - 1) % 4]).upper()
+            hexc = (
+                pr.colours[e - 1] if e - 1 < len(pr.colours) else colorize.PALETTE[(e - 1) % 4]
+            ).upper()
             if hexc not in colours:
                 colours.append(hexc)
             remap[e] = colours.index(hexc) + 1
 
         for o in pr.objects:
             for p in o.parts:
-                for e in sorted({p.extruder} | {s for c in p.paint or [] if c for s in colors.paint_states(c)} - {0}):
+                for e in sorted(
+                    {p.extruder}
+                    | {s for c in p.paint or [] if c for s in colors.paint_states(c)} - {0}
+                ):
                     if e not in remap:
                         colour_of(e)
         for o in pr.objects:
@@ -145,6 +183,11 @@ def remove(path: Path, index: int, *, moves: dict[int, tuple[float, float, float
         while out.exists():
             out = config.MODELS_DIR / f"{stem} ({k}).3mf"
             k += 1
-        threemf.write(threemf.Project(pr.objects, colours), out, filaments=len(colours), colours=colours,
-                      flush=colors.flush_matrix(colours))
+        threemf.write(
+            threemf.Project(pr.objects, colours),
+            out,
+            filaments=len(colours),
+            colours=colours,
+            flush=colors.flush_matrix(colours),
+        )
     return {"name": out.name, "piece": label, "pieces": len(pr.objects), "colours": colours}

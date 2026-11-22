@@ -63,7 +63,11 @@ DEFAULT_DOWEL_PLAY_MM = 0.15
 def dowel_play() -> float:
     """Radial play of dowel holes in cut pieces ([assemblage] jeu_mm), tuned with the dowel test piece."""
     if CONFIG_FILE.exists():
-        return float(tomllib.loads(CONFIG_FILE.read_text()).get("assemblage", {}).get("jeu_mm", DEFAULT_DOWEL_PLAY_MM))
+        return float(
+            tomllib.loads(CONFIG_FILE.read_text())
+            .get("assemblage", {})
+            .get("jeu_mm", DEFAULT_DOWEL_PLAY_MM)
+        )
     return DEFAULT_DOWEL_PLAY_MM
 
 
@@ -72,7 +76,9 @@ def level_each_print() -> bool:
     without it the CC2 firmware levels the whole bed itself before the print (seen on the printer, 2026-11-09).
     ``[tranchage] niveler = false`` comments the line out."""
     if CONFIG_FILE.exists():
-        return bool(tomllib.loads(CONFIG_FILE.read_text()).get("tranchage", {}).get("niveler", True))
+        return bool(
+            tomllib.loads(CONFIG_FILE.read_text()).get("tranchage", {}).get("niveler", True)
+        )
     return True
 
 
@@ -80,6 +86,7 @@ def write_atomic(path: Path, text: str, mode: int | None = None) -> None:
     """Replace a file in one step: a power cut or a crash leaves the old content or the new one, never a
     half-written or empty file (the library, spools, gallery and logs are the user's only copy)."""
     import tempfile
+
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
     try:
@@ -108,7 +115,10 @@ def save(section: str, **values: object) -> None:
     """Update keys of one section of config.toml, keeping every other setting."""
     raw = tomllib.loads(CONFIG_FILE.read_text()) if CONFIG_FILE.exists() else {}
     raw.setdefault(section, {}).update(values)
-    lines = ["# Atelier Centauri Carbon 2 — réglages (modifiables aussi depuis l'onglet Démarrage)", ""]
+    lines = [
+        "# Atelier Centauri Carbon 2 — réglages (modifiables aussi depuis l'onglet Démarrage)",
+        "",
+    ]
     for name, table in raw.items():
         if not isinstance(table, dict):
             continue

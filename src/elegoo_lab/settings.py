@@ -20,40 +20,107 @@ DEFAULT_PLATE = "pei_texture"
 
 CHOICES: dict[str, tuple[str, str, dict[str, tuple[str, str]]]] = {
     # name: (orca key, label, {value: (orca value, label)})
-    "motif": ("sparse_infill_pattern", "Motif de remplissage", {
-        "lignes": ("rectilinear", "Lignes (rapide)"), "grille": ("grid", "Grille"), "gyroide": ("gyroid", "Gyroïde (solide dans tous les sens)"),
-        "nid_abeille": ("honeycomb", "Nid d'abeille"), "cubique": ("cubic", "Cubique"), "eclair": ("lightning", "Éclair (le plus léger, décoratif)"),
-        "triangles": ("triangles", "Triangles")}),
-    "couture": ("seam_position", "Couture (point de départ de chaque couche)", {
-        "alignee": ("aligned", "Alignée"), "proche": ("nearest", "La plus discrète"), "arriere": ("back", "À l'arrière"),
-        "aleatoire": ("random", "Aléatoire (pas de ligne visible)")}),
-    "motif_dessus": ("top_surface_pattern", "Motif de la face du dessus", {
-        "lignes_regulieres": ("monotonicline", "Lignes régulières"), "monotone": ("monotonic", "Lignes dans un seul sens"),
-        "lignes": ("rectilinear", "Lignes (aller-retour)"), "concentrique": ("concentric", "Concentrique (suit le contour)"),
-        "spirale": ("octagramspiral", "Spirale étoilée"), "hilbert": ("hilbertcurve", "Courbe de Hilbert (labyrinthe)"),
-        "cordes": ("archimedeanchords", "Cordes d'Archimède (cercles)")}),
-    "paroi_dessus": ("only_one_wall_top", "Une seule paroi sur le dessus (dessus plus net)", {
-        "oui": ("1", "Oui"), "non": ("0", "Non")}),
-    "paroi_precise": ("precise_outer_wall", "Paroi extérieure précise (cotes justes, pièces qui s'emboîtent)", {
-        "oui": ("1", "Oui"), "non": ("0", "Non")}),
+    "motif": (
+        "sparse_infill_pattern",
+        "Motif de remplissage",
+        {
+            "lignes": ("rectilinear", "Lignes (rapide)"),
+            "grille": ("grid", "Grille"),
+            "gyroide": ("gyroid", "Gyroïde (solide dans tous les sens)"),
+            "nid_abeille": ("honeycomb", "Nid d'abeille"),
+            "cubique": ("cubic", "Cubique"),
+            "eclair": ("lightning", "Éclair (le plus léger, décoratif)"),
+            "triangles": ("triangles", "Triangles"),
+        },
+    ),
+    "couture": (
+        "seam_position",
+        "Couture (point de départ de chaque couche)",
+        {
+            "alignee": ("aligned", "Alignée"),
+            "proche": ("nearest", "La plus discrète"),
+            "arriere": ("back", "À l'arrière"),
+            "aleatoire": ("random", "Aléatoire (pas de ligne visible)"),
+        },
+    ),
+    "motif_dessus": (
+        "top_surface_pattern",
+        "Motif de la face du dessus",
+        {
+            "lignes_regulieres": ("monotonicline", "Lignes régulières"),
+            "monotone": ("monotonic", "Lignes dans un seul sens"),
+            "lignes": ("rectilinear", "Lignes (aller-retour)"),
+            "concentrique": ("concentric", "Concentrique (suit le contour)"),
+            "spirale": ("octagramspiral", "Spirale étoilée"),
+            "hilbert": ("hilbertcurve", "Courbe de Hilbert (labyrinthe)"),
+            "cordes": ("archimedeanchords", "Cordes d'Archimède (cercles)"),
+        },
+    ),
+    "paroi_dessus": (
+        "only_one_wall_top",
+        "Une seule paroi sur le dessus (dessus plus net)",
+        {"oui": ("1", "Oui"), "non": ("0", "Non")},
+    ),
+    "paroi_precise": (
+        "precise_outer_wall",
+        "Paroi extérieure précise (cotes justes, pièces qui s'emboîtent)",
+        {"oui": ("1", "Oui"), "non": ("0", "Non")},
+    ),
     # no OrcaSlicer key: printprep writes height ranges into the model (couches.py)
-    "couches": ("", "Hauteur de couche variable", {
-        "auto": ("auto", "Automatique (plus fines là où les pentes se voient, rien si la pièce est droite)"),
-        "non": ("", "Non (même hauteur partout)"), "pentes": ("pentes", "Plus fines sur les pentes (dômes et arrondis plus lisses)"),
-        "rapide": ("rapide", "Fines sur les pentes, épaisses sur les parois droites")}),
-    "lissage": ("ironing_type", "Lissage du dessus", {
-        "non": ("no ironing", "Non"), "dessus": ("top", "Toutes les faces du dessus"), "dernier": ("topmost", "Seulement la face la plus haute")}),
-    "peau": ("fuzzy_skin", "Texture « peau » (aspect granuleux)", {
-        "non": ("none", "Non"), "exterieur": ("external", "Parois extérieures"), "partout": ("all", "Toutes les parois")}),
-    "bordure": ("brim_type", "Bordure d'adhérence", {
-        "auto": ("auto_brim", "Automatique"), "non": ("no_brim", "Aucune"), "exterieure": ("outer_only", "Autour de la pièce"),
-        "oreilles": ("brim_ears", "Oreilles aux angles")}),
+    "couches": (
+        "",
+        "Hauteur de couche variable",
+        {
+            "auto": (
+                "auto",
+                "Automatique (plus fines là où les pentes se voient, rien si la pièce est droite)",
+            ),
+            "non": ("", "Non (même hauteur partout)"),
+            "pentes": ("pentes", "Plus fines sur les pentes (dômes et arrondis plus lisses)"),
+            "rapide": ("rapide", "Fines sur les pentes, épaisses sur les parois droites"),
+        },
+    ),
+    "lissage": (
+        "ironing_type",
+        "Lissage du dessus",
+        {
+            "non": ("no ironing", "Non"),
+            "dessus": ("top", "Toutes les faces du dessus"),
+            "dernier": ("topmost", "Seulement la face la plus haute"),
+        },
+    ),
+    "peau": (
+        "fuzzy_skin",
+        "Texture « peau » (aspect granuleux)",
+        {
+            "non": ("none", "Non"),
+            "exterieur": ("external", "Parois extérieures"),
+            "partout": ("all", "Toutes les parois"),
+        },
+    ),
+    "bordure": (
+        "brim_type",
+        "Bordure d'adhérence",
+        {
+            "auto": ("auto_brim", "Automatique"),
+            "non": ("no_brim", "Aucune"),
+            "exterieure": ("outer_only", "Autour de la pièce"),
+            "oreilles": ("brim_ears", "Oreilles aux angles"),
+        },
+    ),
     # print one piece entirely before the next: same colours group together, so a plate of pieces
     # pays one change per colour instead of one change per layer (printprep guards what fits)
-    "ordre": ("print_sequence", "Ordre d'impression", {
-        "couche": ("by layer", "Couche par couche (toutes les pièces avancent ensemble)"),
-        "suite": ("by object", "Pièce par pièce (les mêmes couleurs ensemble, bien moins de changements ; pièces espacées et basses)"),
-    }),
+    "ordre": (
+        "print_sequence",
+        "Ordre d'impression",
+        {
+            "couche": ("by layer", "Couche par couche (toutes les pièces avancent ensemble)"),
+            "suite": (
+                "by object",
+                "Pièce par pièce (les mêmes couleurs ensemble, bien moins de changements ; pièces espacées et basses)",
+            ),
+        },
+    ),
 }
 NUMBERS: dict[str, tuple[str, str, float, float, str]] = {
     # name: (orca key, label, min, max, unit)
@@ -69,29 +136,76 @@ FIL_NUMBERS: dict[str, tuple[str, str, float, float, str]] = {
     "avance_pression": ("pressure_advance", "Pressure advance (tour de calibration)", 0, 0.2, ""),
     "debit": ("filament_flow_ratio", "Débit (tour de calibration, 1 = 100 %)", 0.8, 1.2, ""),
 }
-TEMPS: dict[str, tuple[str, float, float]] = {"temp_buse": ("Température buse", 170, 300), "temp_plateau": ("Température plateau", 0, 110)}
+TEMPS: dict[str, tuple[str, float, float]] = {
+    "temp_buse": ("Température buse", 170, 300),
+    "temp_plateau": ("Température plateau", 0, 110),
+}
 
 
 def spec(quality: str = slicer.DEFAULT_QUALITY) -> dict[str, Any]:
     """What the UI shows: every option with its allowed values and the CC2 profile default."""
     proc = slicer._flat(f"{quality} @Elegoo CC2 {slicer.DEFAULT_NOZZLE} nozzle")
     fil = slicer._flat("Elegoo PLA @ECC2")
-    rev = {name: {orca: v for v, (orca, _) in opts.items()} for name, (_, _, opts) in CHOICES.items()}
+    rev = {
+        name: {orca: v for v, (orca, _) in opts.items()} for name, (_, _, opts) in CHOICES.items()
+    }
     return {
-        "plates": [{"value": k, "label": lab} for k, (_, _, lab) in PLATES.items()], "default_plate": DEFAULT_PLATE,
-        "choices": [{"name": n, "label": lab, "default": rev[n].get(str(proc.get(key)), next(iter(opts))),
-                     "options": [{"value": v, "label": label} for v, (_, label) in opts.items()]} for n, (key, lab, opts) in CHOICES.items()],
-        "numbers": [{"name": n, "label": lab, "min": lo, "max": hi, "unit": u, "default": float(str(proc.get(key, lo)).rstrip("%"))}
-                    for n, (key, lab, lo, hi, u) in NUMBERS.items()],
-        "numbers_fil": [{"name": n, "label": lab, "min": lo, "max": hi, "unit": u, "step": 0.001 if key == "pressure_advance" else 0.01,
-                         "default": float(fil.get(key, [lo])[0])} for n, (key, lab, lo, hi, u) in FIL_NUMBERS.items()],
-        "temps": [{"name": n, "label": lab, "min": lo, "max": hi,
-                   "default_pla": float((fil["nozzle_temperature"] if n == "temp_buse" else fil[PLATES[DEFAULT_PLATE][1]])[0])}
-                  for n, (lab, lo, hi) in TEMPS.items()],
+        "plates": [{"value": k, "label": lab} for k, (_, _, lab) in PLATES.items()],
+        "default_plate": DEFAULT_PLATE,
+        "choices": [
+            {
+                "name": n,
+                "label": lab,
+                "default": rev[n].get(str(proc.get(key)), next(iter(opts))),
+                "options": [{"value": v, "label": label} for v, (_, label) in opts.items()],
+            }
+            for n, (key, lab, opts) in CHOICES.items()
+        ],
+        "numbers": [
+            {
+                "name": n,
+                "label": lab,
+                "min": lo,
+                "max": hi,
+                "unit": u,
+                "default": float(str(proc.get(key, lo)).rstrip("%")),
+            }
+            for n, (key, lab, lo, hi, u) in NUMBERS.items()
+        ],
+        "numbers_fil": [
+            {
+                "name": n,
+                "label": lab,
+                "min": lo,
+                "max": hi,
+                "unit": u,
+                "step": 0.001 if key == "pressure_advance" else 0.01,
+                "default": float(fil.get(key, [lo])[0]),
+            }
+            for n, (key, lab, lo, hi, u) in FIL_NUMBERS.items()
+        ],
+        "temps": [
+            {
+                "name": n,
+                "label": lab,
+                "min": lo,
+                "max": hi,
+                "default_pla": float(
+                    (
+                        fil["nozzle_temperature"]
+                        if n == "temp_buse"
+                        else fil[PLATES[DEFAULT_PLATE][1]]
+                    )[0]
+                ),
+            }
+            for n, (lab, lo, hi) in TEMPS.items()
+        ],
     }
 
 
-def build(advanced: dict[str, Any] | None, plate: str = DEFAULT_PLATE) -> tuple[dict[str, str], dict[str, Any]]:
+def build(
+    advanced: dict[str, Any] | None, plate: str = DEFAULT_PLATE
+) -> tuple[dict[str, str], dict[str, Any]]:
     """User choices -> (process overrides, filament overrides). Unknown names or bad values raise ValueError."""
     advanced = {k: v for k, v in (advanced or {}).items() if v not in (None, "")}
     if plate not in PLATES:
@@ -125,8 +239,11 @@ def build(advanced: dict[str, Any] | None, plate: str = DEFAULT_PLATE) -> tuple[
             v = int(float(value))
             if not lo <= v <= hi:
                 raise ValueError(f"{label} : {v} °C hors de {lo:g} à {hi:g} °C")
-            keys = ("nozzle_temperature", "nozzle_temperature_initial_layer") if name == "temp_buse" \
+            keys = (
+                ("nozzle_temperature", "nozzle_temperature_initial_layer")
+                if name == "temp_buse"
                 else (bed_key, f"{bed_key}_initial_layer")
+            )
             fil.update({k: [str(v)] for k in keys})
         else:
             raise ValueError(f"réglage inconnu « {name} »")

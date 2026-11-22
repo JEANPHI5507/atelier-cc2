@@ -12,7 +12,7 @@ import threading
 import time
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from urllib.parse import urlsplit
 
 import httpx
@@ -54,13 +54,15 @@ JOBS_FILE = config.MODELS_DIR / ".jobs.json"
 ALLOWED = mesh.MODEL_EXT | {".gcode", ".zip"}
 
 
-
 def _pal(values: list[str | None] | None) -> tuple[str | None, ...] | None:
     """Spool colours to repaint a model with (slot 1 first); anything that is not #RRGGBB is an empty slot."""
     if not values:
         return None
-    pal = tuple(v.upper() if isinstance(v, str) and spools.HEX.fullmatch(v) else None for v in values[:4])
+    pal = tuple(
+        v.upper() if isinstance(v, str) and spools.HEX.fullmatch(v) else None for v in values[:4]
+    )
     return pal if any(pal) else None
+
 
 def _new_model_path(name: str) -> Path:
     """Where a new model goes: never overwrite one silently ("dragon (2).stl")."""
@@ -74,11 +76,27 @@ def _new_model_path(name: str) -> Path:
 
 def _base_args(body: Any) -> dict[str, Any]:
     """The slicing choices of a request, as prepare_and_slice takes them (comparisons and estimates)."""
-    return {"mapping": body.mapping, "filaments": body.filaments, "quality": body.quality, "infill": body.infill,
-                "supports": body.supports, "plate_only": body.plate_only, "height_mm": body.height_mm, "mode": body.mode,
-                "slot_colours": body.slot_colours, "plate": body.plate, "advanced": body.advanced, "rotate": tuple(body.rotate),
-                "copies": body.copies, "orient": body.orient, "usage": body.usage, "palette": _pal(body.palette),
-                "moves": _moves(body), "scales": _scales(body), "shift": tuple(body.shift[:2]) if body.shift else None}
+    return {
+        "mapping": body.mapping,
+        "filaments": body.filaments,
+        "quality": body.quality,
+        "infill": body.infill,
+        "supports": body.supports,
+        "plate_only": body.plate_only,
+        "height_mm": body.height_mm,
+        "mode": body.mode,
+        "slot_colours": body.slot_colours,
+        "plate": body.plate,
+        "advanced": body.advanced,
+        "rotate": tuple(body.rotate),
+        "copies": body.copies,
+        "orient": body.orient,
+        "usage": body.usage,
+        "palette": _pal(body.palette),
+        "moves": _moves(body),
+        "scales": _scales(body),
+        "shift": tuple(body.shift[:2]) if body.shift else None,
+    }
 
 
 def _scales(body: Any) -> dict[int, float] | None:
@@ -97,6 +115,7 @@ def _split_plates(dest: Path) -> dict[str, list[str]]:
     if dest.suffix.lower() != ".3mf":
         return {"plates": []}
     from . import threemf
+
     try:
         return {"plates": [p.name for p in threemf.split_plates(dest)]}
     except Exception:  # an odd file stays as uploaded
@@ -104,7 +123,7 @@ def _split_plates(dest: Path) -> dict[str, list[str]]:
 
 
 def _model_path(name: str) -> Path:
-    p = (config.MODELS_DIR / Path(name).name)
+    p = config.MODELS_DIR / Path(name).name
     if not p.is_file():
         raise HTTPException(404, f"modèle introuvable: {name}")
     return p
@@ -135,14 +154,16 @@ class TextIn(BaseModel):
     texte: str
     police: str = "manuscrite"
     angle: float = 0.0
-    taille: float | None = None        # capital height in mm, automatic when None
+    taille: float | None = None  # capital height in mm, automatic when None
 
 
 class AssistantIn(BaseModel):
     message: str
     history: list[dict[str, str]] = []
-    conversation: str = ""          # browser-side chat id: keeps the CLI session warm between messages
-    zone: dict[str, Any] | None = None   # the spot the user picked in the 3D view: {point: [x, y, z] mm (file axes), rayon}
+    conversation: str = ""  # browser-side chat id: keeps the CLI session warm between messages
+    zone: dict[str, Any] | None = (
+        None  # the spot the user picked in the 3D view: {point: [x, y, z] mm (file axes), rayon}
+    )
 
 
 class PartIn(BaseModel):
@@ -154,19 +175,19 @@ class MulticolorIn(BaseModel):
     name: str = "multicolore"
     parts: list[PartIn]
     filaments: list[str]
-    colours: list[str] | None = None   # the loaded spools' colours, slot 1 first
+    colours: list[str] | None = None  # the loaded spools' colours, slot 1 first
     quality: str = slicer.DEFAULT_QUALITY
     infill: int | None = None
 
 
 class ComposeIn(BaseModel):
-    names: list[str]                   # library models to put side by side on one plate
+    names: list[str]  # library models to put side by side on one plate
 
 
 class PieceIn(BaseModel):
-    index: int                         # object leaving the plate, as the viewer knows it
-    moves: dict[str, list[float]] = {}    # viewer placements: object index -> x, y, z in mm
-    scales: dict[str, float] = {}         # object index -> size factor
+    index: int  # object leaving the plate, as the viewer knows it
+    moves: dict[str, list[float]] = {}  # viewer placements: object index -> x, y, z in mm
+    scales: dict[str, float] = {}  # object index -> size factor
 
 
 class LangIn(BaseModel):
@@ -174,8 +195,8 @@ class LangIn(BaseModel):
 
 
 class PrepareIn(BaseModel):
-    mapping: dict[int, int] = {}       # source colour index -> CANVAS slot (1..4)
-    filaments: list[str] = ["PLA"]     # filament per slot
+    mapping: dict[int, int] = {}  # source colour index -> CANVAS slot (1..4)
+    filaments: list[str] = ["PLA"]  # filament per slot
     quality: str = slicer.DEFAULT_QUALITY
     infill: int | None = None
     supports: bool | str = False
@@ -184,18 +205,26 @@ class PrepareIn(BaseModel):
     mode: str = printprep.DEFAULT_MODE
     split: bool = True
     slot_colours: dict[int, str] | None = None  # colours of the spools really loaded
-    palette: list[str | None] | None = None     # repaint the model with these spool colours (slot 1 first)
+    palette: list[str | None] | None = (
+        None  # repaint the model with these spool colours (slot 1 first)
+    )
     plate: str = settings.DEFAULT_PLATE
     advanced: dict[str, Any] = {}
     rotate: list[float] = [0, 0, 0]
     copies: int = 1
     orient: bool = False
     usage: str = "profil"
-    pauses_mm: list[float] = []         # stop at these model heights (magnet, nut, colour swap)
-    moves: dict[int, list[float]] = {}  # object index -> [dx, dy, dz] (pieces dragged apart in the viewer)
-    scales: dict[int, float] = {}       # object index -> size factor (one piece resized on the plate)
-    shift: list[float] | None = None    # where the middle of the arrangement sits, from the plate centre
-    simplify_colours: bool | str = "leger"   # non / leger (3 %) / fort (10 %): specks of a layer take its main colour
+    pauses_mm: list[float] = []  # stop at these model heights (magnet, nut, colour swap)
+    moves: dict[int, list[float]] = (
+        {}
+    )  # object index -> [dx, dy, dz] (pieces dragged apart in the viewer)
+    scales: dict[int, float] = {}  # object index -> size factor (one piece resized on the plate)
+    shift: list[float] | None = (
+        None  # where the middle of the arrangement sits, from the plate centre
+    )
+    simplify_colours: bool | str = (
+        "leger"  # non / leger (3 %) / fort (10 %): specks of a layer take its main colour
+    )
 
 
 class PrinterIn(BaseModel):
@@ -250,7 +279,7 @@ class TrayIn(BaseModel):
 class ReviewIn(BaseModel):
     issues: list[str] = []
     note: str = ""
-    notes: dict[str, int] = {}     # question -> mark 0..5 (aftercare.QUESTIONS)
+    notes: dict[str, int] = {}  # question -> mark 0..5 (aftercare.QUESTIONS)
 
 
 class QueueIn(BaseModel):
@@ -267,7 +296,7 @@ class LinkIn(BaseModel):
 
 
 class PhoneAlertIn(BaseModel):
-    action: str   # "on" (new private topic), "off", "test"
+    action: str  # "on" (new private topic), "off", "test"
 
 
 class SurvIn(BaseModel):
@@ -295,7 +324,7 @@ def lab_router(cfg: config.Config) -> APIRouter:
         _model_path(name)
         try:
             png = await asyncio.to_thread(library.thumbnail, name)
-        except Exception:      # a mesh that cannot be read still lists, just without a picture
+        except Exception:  # a mesh that cannot be read still lists, just without a picture
             png = None
         if not png:
             raise HTTPException(404, "pas de vignette")
@@ -327,9 +356,14 @@ def lab_router(cfg: config.Config) -> APIRouter:
         if Path(name).suffix.lower() not in ALLOWED:
             raise HTTPException(400, f"format non supporté (accepté: {', '.join(sorted(ALLOWED))})")
         data = await file.read()
-        if name.lower().endswith(".zip") or data[:4] == b"PK\x03\x04" and not name.lower().endswith(".3mf"):
+        if (
+            name.lower().endswith(".zip")
+            or data[:4] == b"PK\x03\x04"
+            and not name.lower().endswith(".3mf")
+        ):
             from . import importlink
-            got = importlink._from_zip(data)   # a zip of models unpacks, same as from a link
+
+            got = importlink._from_zip(data)  # a zip of models unpacks, same as from a link
             names = []
             for n, d in got:
                 dest = _new_model_path(n)
@@ -344,7 +378,9 @@ def lab_router(cfg: config.Config) -> APIRouter:
         dest = _new_model_path(name)
         with dest.open("wb") as out:
             out.write(data)
-        if dest.suffix.lower() in mesh.CAD_EXT:   # a STEP becomes a plain GLB (trimesh cannot read CAD)
+        if (
+            dest.suffix.lower() in mesh.CAD_EXT
+        ):  # a STEP becomes a plain GLB (trimesh cannot read CAD)
             try:
                 converted = await asyncio.to_thread(mesh.step_to_glb, dest)
             except ValueError as err:
@@ -360,7 +396,9 @@ def lab_router(cfg: config.Config) -> APIRouter:
             q = json.loads((config.MODELS_DIR / ".queue.json").read_text())
         except (OSError, ValueError):
             return []
-        return [n for n in q if isinstance(n, str) and (config.MODELS_DIR / n).exists()]   # deleted files drop out
+        return [
+            n for n in q if isinstance(n, str) and (config.MODELS_DIR / n).exists()
+        ]  # deleted files drop out
 
     def _queue_save(q: list[str]) -> list[str]:
         config.write_atomic(config.MODELS_DIR / ".queue.json", json.dumps(q, ensure_ascii=False))
@@ -396,6 +434,7 @@ def lab_router(cfg: config.Config) -> APIRouter:
     @r.post("/models/from-url")
     async def import_from_url(body: LinkIn) -> dict[str, list[str]]:
         from . import importlink
+
         try:
             got = await importlink.fetch(body.url)
         except importlink.LinkError as e:
@@ -406,7 +445,9 @@ def lab_router(cfg: config.Config) -> APIRouter:
         for name, data in got:
             dest = _new_model_path(name)
             dest.write_bytes(data)
-            if dest.suffix.lower() in mesh.CAD_EXT:   # a STEP is read by none of trimesh's loaders: GLB at once
+            if (
+                dest.suffix.lower() in mesh.CAD_EXT
+            ):  # a STEP is read by none of trimesh's loaders: GLB at once
                 try:
                     converted = await asyncio.to_thread(mesh.step_to_glb, dest)
                 except ValueError as err:
@@ -429,18 +470,29 @@ def lab_router(cfg: config.Config) -> APIRouter:
         if p.suffix.lower() == ".gcode":
             return {"file": p.name, "note": "G-code déjà tranché"}
         try:
-            return {**mesh.info(p), "usage": printprep.suggest_usage(p), "retour": library.load_index().get(p.name, {}).get("retour")}
+            return {
+                **mesh.info(p),
+                "usage": printprep.suggest_usage(p),
+                "retour": library.load_index().get(p.name, {}).get("retour"),
+            }
         except Exception as err:
             raise HTTPException(422, str(err)) from err
 
     @r.get("/slicer")
     def slicer_profiles() -> dict[str, Any]:
         try:
-            return {"available": True, "nozzles": slicer.nozzles(), "qualities": slicer.qualities(),
-                    "filaments": slicer.filaments(), "default_quality": slicer.DEFAULT_QUALITY,
-                    "advanced": settings.spec(),
-                    "usages": [{"value": k, "label": u["label"], "hint": u["hint"], "quality": u["quality"]}
-                               for k, u in printprep.USAGES.items()]}
+            return {
+                "available": True,
+                "nozzles": slicer.nozzles(),
+                "qualities": slicer.qualities(),
+                "filaments": slicer.filaments(),
+                "default_quality": slicer.DEFAULT_QUALITY,
+                "advanced": settings.spec(),
+                "usages": [
+                    {"value": k, "label": u["label"], "hint": u["hint"], "quality": u["quality"]}
+                    for k, u in printprep.USAGES.items()
+                ],
+            }
         except slicer.SliceError as err:
             return {"available": False, "error": str(err)}
 
@@ -463,7 +515,9 @@ def lab_router(cfg: config.Config) -> APIRouter:
         if path.suffix.lower() == ".gcode":
             raise HTTPException(400, "déjà tranché")
         try:
-            return await asyncio.to_thread(colors.save_marks, path, body.add, body.erase, body.clear)
+            return await asyncio.to_thread(
+                colors.save_marks, path, body.add, body.erase, body.clear
+            )
         except (ValueError, OSError) as err:
             raise HTTPException(422, str(err)) from err
 
@@ -474,7 +528,11 @@ def lab_router(cfg: config.Config) -> APIRouter:
         if path.suffix.lower() == ".gcode":
             raise HTTPException(400, "déjà tranché : choisis un modèle")
         try:
-            return {"retouched": await asyncio.to_thread(colors.save_retouch, path, body.paint, body.erase, body.clear)}
+            return {
+                "retouched": await asyncio.to_thread(
+                    colors.save_retouch, path, body.paint, body.erase, body.clear
+                )
+            }
         except (ValueError, OSError) as err:
             raise HTTPException(422, str(err)) from err
 
@@ -492,6 +550,7 @@ def lab_router(cfg: config.Config) -> APIRouter:
     async def compose_plate(body: ComposeIn) -> dict[str, Any]:
         """Several library models side by side in a new model, one piece each (moved and resized in the viewer)."""
         from . import compose
+
         paths = [_model_path(n) for n in body.names]
         if any(p.suffix.lower() == ".gcode" for p in paths):
             raise HTTPException(422, "un G-code est déjà tranché : choisis des modèles")
@@ -504,22 +563,33 @@ def lab_router(cfg: config.Config) -> APIRouter:
     async def remove_piece(name: str, body: PieceIn) -> dict[str, Any]:
         """One piece leaves the plate: a new model holds the others, keeping their places and sizes."""
         from . import compose
+
         path = _model_path(name)
         if path.suffix.lower() == ".gcode":
             raise HTTPException(422, "déjà tranché : choisis un modèle")
-        moves = {int(k): tuple(v) for k, v in (body.moves or {}).items()}
+        moves = {
+            int(k): (float(v[0]), float(v[1]), float(v[2])) for k, v in (body.moves or {}).items()
+        }
         scales = {int(k): float(v) for k, v in (body.scales or {}).items()}
         try:
-            return await asyncio.to_thread(compose.remove, path, body.index, moves=moves, scales=scales)
+            return await asyncio.to_thread(
+                compose.remove, path, body.index, moves=moves, scales=scales
+            )
         except ValueError as err:
             raise HTTPException(422, str(err)) from err
 
     @r.get("/models/{name}/preview.glb")
-    async def model_preview(name: str, request: Request, map: str | None = None, pal: str | None = None) -> Response:
+    async def model_preview(
+        name: str, request: Request, map: str | None = None, pal: str | None = None
+    ) -> Response:
         """Any library model as a GLB coloured by CANVAS slot (``map`` = "colour:slot,...",
         ``pal`` = spool colours "#RRGGBB,,#RRGGBB" to repaint it with)."""
         src = _model_path(name)
-        mapping = {int(a): int(b) for a, b in (x.split(":") for x in map.split(",") if x)} if map else None
+        mapping = (
+            {int(a): int(b) for a, b in (x.split(":") for x in map.split(",") if x)}
+            if map
+            else None
+        )
         palette = _pal(pal.split(",") if pal else None)
         key = (src.name, src.stat().st_mtime, map or "", palette)
         # an AI model's preview weighs several MB: the browser keeps it and only asks whether it changed
@@ -543,9 +613,19 @@ def lab_router(cfg: config.Config) -> APIRouter:
         return {
             "printer": {"host": cur.host, "code_set": bool(cur.access_code), "serial": cur.serial},
             "pc_ip": connexion.resolve_hint(),
-            "dowel_play": config.dowel_play(), "plays": calibration.DOWEL_PLAYS,
-            "tests": [{"key": t.key, "title": t.title, "purpose": t.purpose, "look_for": t.look_for,
-                       "colours": t.colours, "file": t.file} for t in calibration.TESTS],
+            "dowel_play": config.dowel_play(),
+            "plays": calibration.DOWEL_PLAYS,
+            "tests": [
+                {
+                    "key": t.key,
+                    "title": t.title,
+                    "purpose": t.purpose,
+                    "look_for": t.look_for,
+                    "colours": t.colours,
+                    "file": t.file,
+                }
+                for t in calibration.TESTS
+            ],
         }
 
     @r.post("/setup/check")
@@ -575,9 +655,13 @@ def lab_router(cfg: config.Config) -> APIRouter:
 
         def work() -> dict[str, Any]:
             src = calibration.ensure(test)
-            res = printprep.prepare_and_slice(src, filaments=body.filaments or ["PLA"] * test.colours, **test.slice_opts)
+            res = printprep.prepare_and_slice(
+                src, filaments=body.filaments or ["PLA"] * test.colours, **test.slice_opts
+            )
             if test.bands:
-                res["bands"] = calibration.tune(config.MODELS_DIR / Path(res["gcode"][0]).name, test)
+                res["bands"] = calibration.tune(
+                    config.MODELS_DIR / Path(res["gcode"][0]).name, test
+                )
             return res
 
         try:
@@ -593,10 +677,17 @@ def lab_router(cfg: config.Config) -> APIRouter:
     async def add_text(name: str, body: TextIn) -> dict[str, Any]:
         """A name added to a flat model (second colour, tied to its strokes), as a new 3MF."""
         from . import addtext
+
         src = _model_path(name)
         try:
-            return await asyncio.to_thread(addtext.add, src, body.texte, font=body.police, angle=body.angle,
-                                           size_mm=body.taille)
+            return await asyncio.to_thread(
+                addtext.add,
+                src,
+                body.texte,
+                font=body.police,
+                angle=body.angle,
+                size_mm=body.taille,
+            )
         except (ValueError, OSError) as err:
             raise HTTPException(422, str(err)) from err
 
@@ -604,14 +695,23 @@ def lab_router(cfg: config.Config) -> APIRouter:
     async def add_shape(name: str, body: FormeIn) -> dict[str, Any]:
         """Drill a shape through the model, add it, or keep only what both share: a new file, the original kept."""
         from . import forme
+
         src = _model_path(name)
         if src.suffix.lower() == ".gcode":
             raise HTTPException(400, "déjà tranché")
         if len(body.taille) != 3 or len(body.position) != 3:
             raise HTTPException(422, "taille et position : trois nombres (mm)")
         try:
-            return await asyncio.to_thread(forme.apply, src, shape=body.forme, op=body.operation, size=tuple(body.taille),
-                                           at=tuple(body.position), axis=body.axe, colour=body.couleur)
+            return await asyncio.to_thread(
+                forme.apply,
+                src,
+                shape=body.forme,
+                op=body.operation,
+                size=(float(body.taille[0]), float(body.taille[1]), float(body.taille[2])),
+                at=(float(body.position[0]), float(body.position[1]), float(body.position[2])),
+                axis=body.axe,
+                colour=body.couleur,
+            )
         except (ValueError, OSError) as err:
             raise HTTPException(422, str(err)) from err
 
@@ -622,7 +722,9 @@ def lab_router(cfg: config.Config) -> APIRouter:
             glb, size = await asyncio.to_thread(parametric.preview, key, values)
         except ValueError as err:
             raise HTTPException(422, str(err)) from err
-        return Response(glb, media_type="model/gltf-binary", headers={"X-Size": ",".join(map(str, size))})
+        return Response(
+            glb, media_type="model/gltf-binary", headers={"X-Size": ",".join(map(str, size))}
+        )
 
     @r.post("/parametric/{key}")
     async def parametric_create(key: str, values: dict[str, Any]) -> dict[str, str]:
@@ -639,30 +741,55 @@ def lab_router(cfg: config.Config) -> APIRouter:
         try:
             canvas = await request.app.state.manager.printer.canvas_status()
         except Exception as err:
-            raise HTTPException(503, f"CANVAS illisible (imprimante injoignable ?) : {str(err)[:120]}") from err
+            raise HTTPException(
+                503, f"CANVAS illisible (imprimante injoignable ?) : {str(err)[:120]}"
+            ) from err
         trays = spools.loaded(canvas.raw)
         try:
             a = await asyncio.to_thread(colors.analyze, src)
-            if len(a["colours"]) == 1:   # one colour: any loaded spool can print it, no need to slice another tool
+            if (
+                len(a["colours"]) == 1
+            ):  # one colour: any loaded spool can print it, no need to slice another tool
                 active = canvas.raw.get("canvas_info", canvas.raw).get("active_tray_id")
-                res = spools.single(a["colours"][0], trays, coloured=a["source"] != "sans couleur", active=active)
+                res = spools.single(
+                    a["colours"][0], trays, coloured=a["source"] != "sans couleur", active=active
+                )
             else:
                 res = spools.match(a["colours"], trays)
                 # repaint the model with the spools themselves: every face takes the closest spool colour
-                palette = tuple(next((t["color"] for t in trays if t["pos"] == k), None) for k in range(4))
+                palette = tuple(
+                    next((t["color"] for t in trays if t["pos"] == k), None) for k in range(4)
+                )
                 p = await asyncio.to_thread(colors.analyze, src, palette)
                 if p["palette"]:
                     far = spools.far_colours(a["colours"], trays)
-                    res = spools.match(p["colours"], trays)   # spool colours: each one lands on its own spool
-                    res.update(colours=p["colours"], palette=list(palette), warnings=far + res["warnings"])
+                    res = spools.match(
+                        p["colours"], trays
+                    )  # spool colours: each one lands on its own spool
+                    res.update(
+                        colours=p["colours"], palette=list(palette), warnings=far + res["warnings"]
+                    )
         except ValueError as err:
             raise HTTPException(422, str(err)) from err
         cols = res.get("colours") or a["colours"]
         vol = (await asyncio.to_thread(mesh.info, src)).get("volume_cm3")
-        res["needs"] = spools.needs(vol, cols, usage=request.query_params.get("usage") or "decoratif",
-                                    mapping=res.get("mapping"), filaments=res.get("filaments"))
-        res["trays"] = [{"slot": t["pos"] + 1, "hex": t["color"], "name": t.get("filament_name") or t.get("type"),
-                         "type": t.get("type"), "filament": spools.filament_for(t)} for t in trays]
+        res["needs"] = spools.needs(
+            vol,
+            cols,
+            usage=request.query_params.get("usage") or "decoratif",
+            mapping=res.get("mapping"),
+            filaments=res.get("filaments"),
+        )
+        res["trays"] = [
+            {
+                "slot": t["pos"] + 1,
+                "hex": t["color"],
+                "name": t.get("filament_name") or t.get("type"),
+                "type": t.get("type"),
+                "filament": spools.filament_for(t),
+            }
+            for t in trays
+        ]
         return res
 
     @r.get("/models/{name}/paths")
@@ -686,37 +813,68 @@ def lab_router(cfg: config.Config) -> APIRouter:
     async def colour_plan(request: Request) -> dict[str, Any]:
         """The print in progress: the spool engaged now and the next colour changes, with their spools."""
         from . import suivi_couleurs
+
         mgr = request.app.state.manager
         st = await asyncio.wait_for(mgr.printer.status(), 10)
         name = Path(st.filename or "").name
         src = config.MODELS_DIR / name
         if not name or not src.exists():
             raise HTTPException(404, "impression lancée hors de l'atelier : pas de G-code à lire")
-        route = {int(k): int(v) for k, v in (stock.load()["prints"].get(name, {}).get("route") or {}).items()}
+        route = {
+            int(k): int(v)
+            for k, v in (stock.load()["prints"].get(name, {}).get("route") or {}).items()
+        }
         trays, active = {}, None
-        with contextlib.suppress(Exception):   # CANVAS unread: the G-code alone says where the print is
+        with contextlib.suppress(
+            Exception
+        ):  # CANVAS unread: the G-code alone says where the print is
             raw = (await asyncio.wait_for(mgr.printer.canvas_status(), 10)).raw
             trays = {t["pos"]: t for t in spools.loaded(raw)}
             tray = raw.get("canvas_info", raw).get("active_tray_id")
-            active = next((tool for tool, pos in route.items() if pos == tray), tray if not route else None)
+            active = next(
+                (tool for tool, pos in route.items() if pos == tray), tray if not route else None
+            )
         layer = st.print_info.current_layer if st.print_info else 1
         res = await asyncio.to_thread(suivi_couleurs.plan, src, layer or 1, active)
 
         def spool(tool: int) -> dict[str, Any]:
             pos = route.get(tool, tool)
             t = trays.get(pos) or {}
-            hexa = t.get("color") or (res["colours"][tool] if tool < len(res["colours"]) else "#d7dbe2")
-            return {"tool": tool, "bobine": pos + 1, "hex": hexa, "nom": t.get("name") or t.get("filament_name") or f"bobine {pos + 1}"}
-        kind = lambda t: res["types"][t] if t < len(res["types"]) else "PLA"   # noqa: E731
-        return {"couche": layer, "maintenant": spool(res["tool"]), "restants": res["left"], "total": res["total"],
-                "suivants": [{**spool(n["tool"]), "couche": n["layer"], "min": n["min"]} for n in res["next"]],
-                "purge": [{**spool(p["tool"]), "reste": p["left"], "total": p["count"],
-                           "reste_g": round(stock.grams(p["left_m"], kind(p["tool"])), 1)} for p in res["purge"]]}
+            hexa = t.get("color") or (
+                res["colours"][tool] if tool < len(res["colours"]) else "#d7dbe2"
+            )
+            return {
+                "tool": tool,
+                "bobine": pos + 1,
+                "hex": hexa,
+                "nom": t.get("name") or t.get("filament_name") or f"bobine {pos + 1}",
+            }
+
+        kind = lambda t: res["types"][t] if t < len(res["types"]) else "PLA"  # noqa: E731
+        return {
+            "couche": layer,
+            "maintenant": spool(res["tool"]),
+            "restants": res["left"],
+            "total": res["total"],
+            "suivants": [
+                {**spool(n["tool"]), "couche": n["layer"], "min": n["min"]} for n in res["next"]
+            ],
+            "purge": [
+                {
+                    **spool(p["tool"]),
+                    "reste": p["left"],
+                    "total": p["count"],
+                    "reste_g": round(stock.grams(p["left_m"], kind(p["tool"])), 1),
+                }
+                for p in res["purge"]
+            ],
+        }
 
     @r.get("/models/{name}/coupe")
     async def gcode_section(name: str, couche: int = 1, face: bool = True) -> dict[str, Any]:
         """For the tablet: the print seen from the front and the layer ``couche`` seen from above, in 2D."""
         from . import coupe
+
         src = _model_path(name)
         if src.suffix.lower() != ".gcode":
             raise HTTPException(400, "seulement pour un G-code")
@@ -724,19 +882,29 @@ def lab_router(cfg: config.Config) -> APIRouter:
 
     cut_cache: dict[tuple, tuple[dict[str, Any], bytes]] = {}
 
-    def _cut(name: str, height: float | None, map: str | None, pal: str | None = None) -> tuple[dict[str, Any], bytes]:
+    def _cut(
+        name: str, height: float | None, map: str | None, pal: str | None = None
+    ) -> tuple[dict[str, Any], bytes]:
         src = _model_path(name)
         palette = _pal(pal.split(",") if pal else None)
         key = (src.name, src.stat().st_mtime, height, map or "", config.dowel_play(), palette)
         if key not in cut_cache:
-            mapping = {int(a): int(b) for a, b in (x.split(":") for x in map.split(",") if x)} if map else None
-            summary, view = printprep.cut_preview(src, mapping=mapping, height_mm=height, palette=palette)
+            mapping = (
+                {int(a): int(b) for a, b in (x.split(":") for x in map.split(",") if x)}
+                if map
+                else None
+            )
+            summary, view = printprep.cut_preview(
+                src, mapping=mapping, height_mm=height, palette=palette
+            )
             cut_cache.clear() if len(cut_cache) > 8 else None
-            cut_cache[key] = (summary, view.export(file_type="glb"))
+            cut_cache[key] = (summary, cast("bytes", view.export(file_type="glb")))
         return cut_cache[key]
 
     @r.get("/models/{name}/cut-plan")
-    async def cut_plan(name: str, height: float | None = None, map: str | None = None, pal: str | None = None) -> dict[str, Any]:
+    async def cut_plan(
+        name: str, height: float | None = None, map: str | None = None, pal: str | None = None
+    ) -> dict[str, Any]:
         try:
             return (await asyncio.to_thread(_cut, name, height, map, pal))[0]
         except ValueError as err:
@@ -745,17 +913,28 @@ def lab_router(cfg: config.Config) -> APIRouter:
     orient_cache: dict[tuple, list[dict[str, Any]]] = {}
 
     @r.get("/models/{name}/orientations")
-    async def orientations(name: str, height: float | None = None, rz: int = 0) -> list[dict[str, Any]]:
+    async def orientations(
+        name: str, height: float | None = None, rz: int = 0
+    ) -> list[dict[str, Any]]:
         """Six ways to lay the part on the plate, each with a thumbnail; the best one marked."""
         from . import orient
+
         path = _model_path(name)
         if path.suffix.lower() == ".gcode":
             raise HTTPException(400, "déjà tranché")
         st = path.stat()
-        key = (name, st.st_mtime_ns, st.st_size, height, rz % 360)   # ~2 s on an AI model: computed once
+        key = (
+            name,
+            st.st_mtime_ns,
+            st.st_size,
+            height,
+            rz % 360,
+        )  # ~2 s on an AI model: computed once
         if key not in orient_cache:
             try:
-                orient_cache[key] = await asyncio.to_thread(orient.orientations, path, height, rz % 360)
+                orient_cache[key] = await asyncio.to_thread(
+                    orient.orientations, path, height, rz % 360
+                )
             except (ValueError, OSError) as err:
                 raise HTTPException(422, f"positions impossibles à calculer : {err}") from err
             while len(orient_cache) > 32:
@@ -765,17 +944,33 @@ def lab_router(cfg: config.Config) -> APIRouter:
     advice_cache: dict[tuple, dict[str, Any]] = {}
 
     @r.get("/models/{name}/advice")
-    async def advice(name: str, height: float | None = None, rx: float = 0, ry: float = 0, rz: float = 0,
-                     supports: bool = False, brim: bool = False, split: bool = False) -> dict[str, Any]:
+    async def advice(
+        name: str,
+        height: float | None = None,
+        rx: float = 0,
+        ry: float = 0,
+        rz: float = 0,
+        supports: bool = False,
+        brim: bool = False,
+        split: bool = False,
+    ) -> dict[str, Any]:
         """Print advisor: what could go wrong at this size/orientation, with one-click fixes."""
         from . import advisor
+
         path = _model_path(name)
         st = path.stat()
         key = (name, st.st_mtime_ns, st.st_size, height, rx, ry, rz, supports, brim, split)
         if key not in advice_cache:
             try:
-                advice_cache[key] = await asyncio.to_thread(advisor.analyze, path, height_mm=height, rotate=(rx, ry, rz),
-                                                            supports=supports, brim=brim, split=split)
+                advice_cache[key] = await asyncio.to_thread(
+                    advisor.analyze,
+                    path,
+                    height_mm=height,
+                    rotate=(rx, ry, rz),
+                    supports=supports,
+                    brim=brim,
+                    split=split,
+                )
             except (ValueError, OSError) as err:
                 raise HTTPException(422, f"analyse impossible : {err}") from err
             while len(advice_cache) > 64:
@@ -788,31 +983,59 @@ def lab_router(cfg: config.Config) -> APIRouter:
         infill, supports, fine settings and the pose, and justifies. Choices come back validated —
         the page applies them before slicing."""
         from . import advisor
+
         path = _model_path(name)
         if path.suffix.lower() == ".gcode":
             raise HTTPException(400, "déjà tranché : l'IA tranche un modèle, pas un G-code")
         analyse: dict[str, Any] = {}
         try:
-            key = (name, path.stat().st_mtime_ns, path.stat().st_size, body.height_mm,
-                   tuple(body.rotate), str(body.supports) != "False", body.advanced.get("bordure") in ("exterieure", "oreilles"),
-                   body.split)
+            key = (
+                name,
+                path.stat().st_mtime_ns,
+                path.stat().st_size,
+                body.height_mm,
+                tuple(body.rotate),
+                str(body.supports) != "False",
+                body.advanced.get("bordure") in ("exterieure", "oreilles"),
+                body.split,
+            )
             if key not in advice_cache:
                 advice_cache[key] = await asyncio.to_thread(
-                    advisor.analyze, path, height_mm=body.height_mm, rotate=tuple(body.rotate),
-                    supports=body.supports not in (False, "False", "aucun", ""), brim=body.advanced.get("bordure") in ("exterieure", "oreilles"),
-                    split=body.split)
+                    advisor.analyze,
+                    path,
+                    height_mm=body.height_mm,
+                    rotate=tuple(body.rotate),
+                    supports=body.supports not in (False, "False", "aucun", ""),
+                    brim=body.advanced.get("bordure") in ("exterieure", "oreilles"),
+                    split=body.split,
+                )
             analyse = advice_cache[key]
         except (ValueError, OSError):
-            analyse = {}                       # no analysis: the brain still reads the fiche
+            analyse = {}  # no analysis: the brain still reads the fiche
         try:
             res = await asyncio.to_thread(
-                assistant.slice_brain, path.name,
-                {"filaments": body.filaments, "usage": body.usage, "rotate": body.rotate,
-                 "height_mm": body.height_mm, "split": body.split, "verdict": analyse.get("verdict"),
-                 "warnings": analyse.get("warnings"),
-                 "actuel": {"qualite": body.quality, "remplissage": body.infill, "supports": body.supports,
-                            "reglages": body.advanced, "usage": body.usage, "rotate": body.rotate}},
-                qualities=slicer.qualities(), spec=settings.spec(body.quality))
+                assistant.slice_brain,
+                path.name,
+                {
+                    "filaments": body.filaments,
+                    "usage": body.usage,
+                    "rotate": body.rotate,
+                    "height_mm": body.height_mm,
+                    "split": body.split,
+                    "verdict": analyse.get("verdict"),
+                    "warnings": analyse.get("warnings"),
+                    "actuel": {
+                        "qualite": body.quality,
+                        "remplissage": body.infill,
+                        "supports": body.supports,
+                        "reglages": body.advanced,
+                        "usage": body.usage,
+                        "rotate": body.rotate,
+                    },
+                },
+                qualities=slicer.qualities(),
+                spec=settings.spec(body.quality),
+            )
         except ValueError as err:
             raise HTTPException(422, str(err)) from err
         return res
@@ -821,23 +1044,38 @@ def lab_router(cfg: config.Config) -> APIRouter:
     def print_review_get(entry: str) -> dict[str, Any]:
         """After a print: what to do with the part now, and the defects one can report."""
         from . import aftercare, gallery
+
         meta = next((m for m in gallery.entries() if m["id"] == entry), None)
         if meta is None:
             raise HTTPException(404, "impression inconnue")
         plan = aftercare.supports_plan(config.MODELS_DIR / meta["fichier"])
-        return {"tips": aftercare.tips(meta), "issues": aftercare.catalogue(), "bilan": meta.get("bilan"),
-                "questions": aftercare.questions(meta), "carte": plan["map"] if plan else None}
+        return {
+            "tips": aftercare.tips(meta),
+            "issues": aftercare.catalogue(),
+            "bilan": meta.get("bilan"),
+            "questions": aftercare.questions(meta),
+            "carte": plan["map"] if plan else None,
+        }
 
     @r.post("/bilan/{entry}")
     def print_review_set(entry: str, body: ReviewIn) -> dict[str, Any]:
         """The user's review: kept on the print, its corrections kept on the source model for next time."""
         from . import aftercare, gallery
+
         meta = next((m for m in gallery.entries() if m["id"] == entry), None)
         if meta is None:
             raise HTTPException(404, "impression inconnue")
         res = aftercare.review(meta, body.issues, body.note, body.notes)
-        gallery.update(entry, bilan={"date": int(time.time()), "issues": res["issues"], "note": body.note[:300], "notes": res["notes"],
-                                     "titres": [aftercare.ISSUES[k][0] for k in res["issues"]]})
+        gallery.update(
+            entry,
+            bilan={
+                "date": int(time.time()),
+                "issues": res["issues"],
+                "note": body.note[:300],
+                "notes": res["notes"],
+                "titres": [aftercare.ISSUES[k][0] for k in res["issues"]],
+            },
+        )
         return res
 
     # --- the camera, one whole picture at a time (see camfeed) --------------------------------------
@@ -846,25 +1084,31 @@ def lab_router(cfg: config.Config) -> APIRouter:
         """The next picture: newer than ``after`` (the X-Seq of the one the page shows), by default
         newer than the one already there when asked."""
         from . import camfeed
+
         st = request.app.state
         if getattr(st, "camfeed", None) is None:
             st.camfeed = camfeed.CameraFeed(st.manager.camera)
         got = await st.camfeed.next(st.camfeed.seq if after < 0 else after)
         if not got:
             raise HTTPException(503, "caméra indisponible")
-        return Response(got[1], media_type="image/jpeg", headers={"Cache-Control": "no-store", "X-Seq": str(got[0])})
+        return Response(
+            got[1],
+            media_type="image/jpeg",
+            headers={"Cache-Control": "no-store", "X-Seq": str(got[0])},
+        )
 
     # --- is the plate empty? the camera compared with a photo of the empty plate ---------------------
     async def _plate_photo(request: Request) -> bytes:
         """A camera photo with the chamber light on (switched on for it, then back as it was)."""
         from . import bedcheck, vision
+
         mgr = request.app.state.manager
         jpeg = await vision.grab(mgr)
         if not bedcheck.dark(jpeg) or not getattr(mgr, "enable_control", False):
             return jpeg
         await asyncio.wait_for(mgr.printer.set_light(True), 10)
         try:
-            await asyncio.sleep(2.5)            # the camera adjusts to the light
+            await asyncio.sleep(2.5)  # the camera adjusts to the light
             return await vision.grab(mgr)
         finally:
             with contextlib.suppress(Exception):
@@ -876,16 +1120,21 @@ def lab_router(cfg: config.Config) -> APIRouter:
         import base64
 
         from . import bedcheck
+
         try:
             jpeg = await _plate_photo(request)
-        except Exception as err:   # printer or camera away: the check is only advice
+        except Exception as err:  # printer or camera away: the check is only advice
             return {"etat": "inconnu", "raison": f"caméra indisponible ({type(err).__name__})"}
-        return {**bedcheck.check(jpeg), "photo": "data:image/jpeg;base64," + base64.b64encode(jpeg).decode()}
+        return {
+            **bedcheck.check(jpeg),
+            "photo": "data:image/jpeg;base64," + base64.b64encode(jpeg).decode(),
+        }
 
     @r.post("/plateau/vide")
     async def plate_empty(request: Request) -> dict[str, Any]:
         """The user says the plate is empty: this photo becomes the reference."""
         from . import bedcheck
+
         try:
             return bedcheck.save_reference(await _plate_photo(request))
         except ValueError as err:
@@ -897,6 +1146,7 @@ def lab_router(cfg: config.Config) -> APIRouter:
     async def optimize_model(name: str, height: float | None = None, rz: int = 0) -> dict[str, Any]:
         """« Optimiser pour la CC2 » : repair, size, best face, then the advisor's fixes; a plan for the page."""
         from . import optimize
+
         path = _model_path(name)
         if path.suffix.lower() == ".gcode":
             raise HTTPException(400, "déjà tranché")
@@ -909,6 +1159,7 @@ def lab_router(cfg: config.Config) -> APIRouter:
     async def repair_model(name: str) -> dict[str, Any]:
         """Closed copy of an open mesh (colours kept, original untouched)."""
         from . import repair
+
         path = _model_path(name)
         if path.suffix.lower() not in mesh.MESH_EXT:
             raise HTTPException(400, "réparation possible pour GLB, OBJ, PLY, STL, OFF et DAE")
@@ -919,19 +1170,24 @@ def lab_router(cfg: config.Config) -> APIRouter:
 
     def _assistant_msg(body: AssistantIn) -> str:
         """The message plus, when the user picked a spot in the 3D view, that spot spelled out in the
-        model file's own axes as heard from a sighted helper (x, y, z left as loaded, rayon in mm)."""
+        model file's own axes as heard from a sighted helper (x, y, z left as loaded, rayon in mm).
+        """
         pt, z = (body.zone or {}).get("point"), body.zone or {}
-        if not (isinstance(pt, list) and len(pt) == 3 and all(isinstance(v, (int, float)) for v in pt)):
+        if not (
+            isinstance(pt, list) and len(pt) == 3 and all(isinstance(v, (int, float)) for v in pt)
+        ):
             return body.message
         try:
             rad = max(2.0, min(80.0, float(z.get("rayon") or 10)))
         except (TypeError, ValueError):
             rad = 10.0
-        return (body.message + f"\n[ZONE CIBLÉE par l'utilisateur sur la vue 3D : centre "
-                f"({float(pt[0]):.1f}, {float(pt[1]):.1f}, {float(pt[2]):.1f}) mm — coordonnées du FICHIER "
-                f"du modèle (Z = hauteur), rayon {rad:.0f} mm. C'est là qu'il faut intervenir précisément ; "
-                f"avec « percer_ou_ajouter », recopie ces trois nombres telles quelles dans l'argument "
-                f"« zone », sans les recalculer.]")
+        return (
+            body.message + f"\n[ZONE CIBLÉE par l'utilisateur sur la vue 3D : centre "
+            f"({float(pt[0]):.1f}, {float(pt[1]):.1f}, {float(pt[2]):.1f}) mm — coordonnées du FICHIER "
+            f"du modèle (Z = hauteur), rayon {rad:.0f} mm. C'est là qu'il faut intervenir précisément ; "
+            f"avec « percer_ou_ajouter », recopie ces trois nombres telles quelles dans l'argument "
+            f"« zone », sans les recalculer.]"
+        )
 
     @r.post("/models/{name}/assistant")
     async def assistant_chat(name: str, body: AssistantIn, _request: Request) -> dict[str, Any]:
@@ -940,14 +1196,20 @@ def lab_router(cfg: config.Config) -> APIRouter:
         if path.suffix.lower() == ".gcode":
             raise HTTPException(400, "déjà tranché : l'assistant travaille sur un modèle")
         try:
-            return await asyncio.to_thread(assistant.chat, path.name, _assistant_msg(body), body.history, body.conversation)
+            return await asyncio.to_thread(
+                assistant.chat, path.name, _assistant_msg(body), body.history, body.conversation
+            )
         except ValueError as err:
             raise HTTPException(422, str(err)) from err
         except httpx.HTTPError as err:
-            raise HTTPException(503, f"Mistral injoignable ({type(err).__name__}) : réessaie") from err
+            raise HTTPException(
+                503, f"Mistral injoignable ({type(err).__name__}) : réessaie"
+            ) from err
 
     @r.post("/models/{name}/assistant/stream")
-    async def assistant_stream(name: str, body: AssistantIn, _request: Request) -> StreamingResponse:
+    async def assistant_stream(
+        name: str, body: AssistantIn, _request: Request
+    ) -> StreamingResponse:
         """The same turn as a live journal (server-sent events): the brain's tool calls as they happen,
         then the ordinary result in the last ``data:`` line."""
         path = _model_path(name)
@@ -956,13 +1218,18 @@ def lab_router(cfg: config.Config) -> APIRouter:
 
         def journal():
             try:
-                for ev in assistant.chat_events(path.name, _assistant_msg(body), body.history, body.conversation):
+                for ev in assistant.chat_events(
+                    path.name, _assistant_msg(body), body.history, body.conversation
+                ):
                     yield f"data: {json.dumps(ev, ensure_ascii=False)}\n\n"
-            except ValueError as err:                  # configuration mistake, before the CLI even ran
+            except ValueError as err:  # configuration mistake, before the CLI even ran
                 yield f"data: {json.dumps({'type': 'erreur', 'texte': str(err)}, ensure_ascii=False)}\n\n"
 
-        return StreamingResponse(journal(), media_type="text/event-stream",
-                                 headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+        return StreamingResponse(
+            journal(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
 
     defects_cache: dict[tuple, dict[str, Any]] = {}
 
@@ -970,6 +1237,7 @@ def lab_router(cfg: config.Config) -> APIRouter:
     async def defects(name: str) -> dict[str, Any]:
         """Where a model is open or wrongly shared: counts and line segments to draw on it."""
         from . import repair
+
         path = _model_path(name)
         if path.suffix.lower() not in mesh.MESH_EXT:
             raise HTTPException(400, "diagnostic possible pour GLB, OBJ, PLY, STL, OFF et DAE")
@@ -985,9 +1253,14 @@ def lab_router(cfg: config.Config) -> APIRouter:
         return defects_cache[key]
 
     @r.get("/models/{name}/cut-preview.glb")
-    async def cut_glb(name: str, height: float | None = None, map: str | None = None, pal: str | None = None) -> Response:
+    async def cut_glb(
+        name: str, height: float | None = None, map: str | None = None, pal: str | None = None
+    ) -> Response:
         try:
-            return Response((await asyncio.to_thread(_cut, name, height, map, pal))[1], media_type="model/gltf-binary")
+            return Response(
+                (await asyncio.to_thread(_cut, name, height, map, pal))[1],
+                media_type="model/gltf-binary",
+            )
         except ValueError as err:
             raise HTTPException(422, str(err)) from err
 
@@ -999,48 +1272,90 @@ def lab_router(cfg: config.Config) -> APIRouter:
             raise HTTPException(400, "déjà tranché: envoie-le directement")
         try:
             res = await asyncio.to_thread(
-                printprep.prepare_and_slice, src, mapping=body.mapping, filaments=body.filaments,
-                quality=body.quality, infill=body.infill, supports=body.supports, plate_only=body.plate_only,
+                printprep.prepare_and_slice,
+                src,
+                mapping=body.mapping,
+                filaments=body.filaments,
+                quality=body.quality,
+                infill=body.infill,
+                supports=body.supports,
+                plate_only=body.plate_only,
                 height_mm=body.height_mm,
-                mode=body.mode, split=body.split, slot_colours=body.slot_colours, plate=body.plate,
-                advanced=body.advanced, rotate=tuple(body.rotate), copies=body.copies, orient=body.orient, usage=body.usage,
-                palette=_pal(body.palette), pauses_mm=[h for h in body.pauses_mm if h > 0] or None,
-                simplify_colours=body.simplify_colours, moves=_moves(body), scales=_scales(body), shift=tuple(body.shift[:2]) if body.shift else None)
+                mode=body.mode,
+                split=body.split,
+                slot_colours=body.slot_colours,
+                plate=body.plate,
+                advanced=body.advanced,
+                rotate=tuple(body.rotate),
+                copies=body.copies,
+                orient=body.orient,
+                usage=body.usage,
+                palette=_pal(body.palette),
+                pauses_mm=[h for h in body.pauses_mm if h > 0] or None,
+                simplify_colours=body.simplify_colours,
+                moves=_moves(body),
+                scales=_scales(body),
+                shift=(float(body.shift[0]), float(body.shift[1])) if body.shift else None,
+            )
         except (ValueError, slicer.SliceError) as err:
             raise HTTPException(422, str(err)) from err
         # grams and cost per spool, remembered for the check before printing and the count at the end
-        items = (res["pieces"] + ([res["pins"]] if res.get("pins") else [])) if res.get("split") else [res]
+        items = (
+            (res["pieces"] + ([res["pins"]] if res.get("pins") else []))
+            if res.get("split")
+            else [res]
+        )
         g = eur = 0.0
         for it in items:
             if it.get("gcode") and it.get("per_filament_m"):
-                it["usage"] = stock.record_slice(Path(it["gcode"][0]).name, it["per_filament_m"], it.get("purge_m"))
+                it["usage"] = stock.record_slice(
+                    Path(it["gcode"][0]).name, it["per_filament_m"], it.get("purge_m")
+                )
                 g, eur = g + it["usage"]["g"], eur + it["usage"]["eur"]
-                library.record(Path(it["gcode"][0]).name, source=name, usage=body.usage, qualite=body.quality.split(" @")[0],
-                               temps=it.get("time"), couches=it.get("layers"), g=it["usage"]["g"], eur=it["usage"]["eur"],
-                               couleurs=[s["colour"] for s in it.get("slots", []) if s.get("metres", 0) > 0] or None,
-                               piece=it.get("name") if res.get("split") else None)
+                library.record(
+                    Path(it["gcode"][0]).name,
+                    source=name,
+                    usage=body.usage,
+                    qualite=body.quality.split(" @")[0],
+                    temps=it.get("time"),
+                    couches=it.get("layers"),
+                    g=it["usage"]["g"],
+                    eur=it["usage"]["eur"],
+                    couleurs=[s["colour"] for s in it.get("slots", []) if s.get("metres", 0) > 0]
+                    or None,
+                    piece=it.get("name") if res.get("split") else None,
+                )
         if res.get("split"):
-            res["usage"] = {"g": round(g, 1), "eur": round(eur, 2),
-                            "manques": [t for it in items for t in it.get("usage", {}).get("trays", []) if t["manque"]]}
+            res["usage"] = {
+                "g": round(g, 1),
+                "eur": round(eur, 2),
+                "manques": [
+                    t for it in items for t in it.get("usage", {}).get("trays", []) if t["manque"]
+                ],
+            }
         elif "usage" in res:
             res["usage"]["manques"] = [t for t in res["usage"]["trays"] if t["manque"]]
         return res
 
-
     async def _canvas(request: Request) -> dict[str, Any] | None:
         try:
-            return (await asyncio.wait_for(request.app.state.manager.printer.canvas_status(), 15)).raw
+            return cast(
+                "dict[str, Any]",
+                (await asyncio.wait_for(request.app.state.manager.printer.canvas_status(), 15)).raw,
+            )
         except Exception:
             return None
 
     @r.get("/entretien")
     def entretien() -> list[dict[str, Any]]:
         from . import maintenance
+
         return maintenance.status()
 
     @r.post("/entretien/{task}")
     def entretien_fait(task: str) -> list[dict[str, Any]]:
         from . import maintenance
+
         try:
             return maintenance.done(task)
         except ValueError as err:
@@ -1061,9 +1376,14 @@ def lab_router(cfg: config.Config) -> APIRouter:
     async def print_plan(name: str, request: Request) -> dict[str, Any]:
         """Start dialog: the file's colours, the loaded spools, the suggested colour -> spool map."""
         path = config.MODELS_DIR / Path(name).name
-        out = await asyncio.to_thread(launch.plan, path if path.suffix == ".gcode" else None, await _canvas(request))
+        out = await asyncio.to_thread(
+            launch.plan, path if path.suffix == ".gcode" else None, await _canvas(request)
+        )
         pos = {t["tray_id"]: t.get("pos", t["tray_id"]) for t in out.get("trays", [])}
-        out["stock"] = stock.check(Path(name).name, {m["t"]: pos.get(m["tray_id"], m["tray_id"]) for m in out.get("slot_map", [])})
+        out["stock"] = stock.check(
+            Path(name).name,
+            {m["t"]: pos.get(m["tray_id"], m["tray_id"]) for m in out.get("slot_map", [])},
+        )
         return out
 
     @r.post("/print/start")
@@ -1072,10 +1392,15 @@ def lab_router(cfg: config.Config) -> APIRouter:
         if not getattr(request.app.state.manager, "enable_control", False):
             raise HTTPException(403, "lecture seule : relance avec --control")
         from . import alerts
+
         w = getattr(request.app.state, "watcher", None)
         if w is not None and w.prev is not None and w.prev not in alerts.IDLE:
-            raise HTTPException(409, "l'imprimante imprime déjà : ajoute ce fichier à la file d'attente")
-        opts = {k: v for k, v in body.model_dump().items() if k in launch.DEFAULTS and v is not None}
+            raise HTTPException(
+                409, "l'imprimante imprime déjà : ajoute ce fichier à la file d'attente"
+            )
+        opts = {
+            k: v for k, v in body.model_dump().items() if k in launch.DEFAULTS and v is not None
+        }
         try:
             if body.remember:
                 launch.save_options(**opts)
@@ -1085,31 +1410,54 @@ def lab_router(cfg: config.Config) -> APIRouter:
             for m in body.slot_map or []:
                 if canvas is not None and int(m["tray_id"]) not in loaded:
                     raise ValueError(f"la bobine {m['tray_id']} n'est pas chargée dans le CANVAS")
-            payload = launch.params(launch.printer_name(body.filename), opts, body.slot_map,
-                                    canvas_id=int(unit[0].get("canvas_id", 0)) if unit else 0)
+            payload = launch.params(
+                launch.printer_name(body.filename),
+                opts,
+                body.slot_map,
+                canvas_id=int(unit[0].get("canvas_id", 0)) if unit else 0,
+            )
         except (ValueError, KeyError, TypeError) as err:
             raise HTTPException(422, str(err)) from err
         from pycentauri.client import PrinterError, RequestTimeoutError
+
         try:
             await request.app.state.manager.printer._cc2_request(1020, payload, timeout=30)
         except RequestTimeoutError as err:
-            raise HTTPException(504, "l'imprimante n'a pas confirmé le lancement : regarde son écran") from err
-        except PrinterError as err:   # a refusal carries the printer's error code
+            raise HTTPException(
+                504, "l'imprimante n'a pas confirmé le lancement : regarde son écran"
+            ) from err
+        except PrinterError as err:  # a refusal carries the printer's error code
             code = re.search(r"error_code=(\d+)", str(err))
-            raise HTTPException(409, f"l'imprimante refuse le lancement (code {code.group(1) if code else '?'}) : impression "
-                                     "déjà en cours, fichier absent ou bobine choisie vide") from err
-        pos = {int(t["tray_id"]): int(t.get("pos", t["tray_id"])) for t in spools.loaded(canvas or {})}
-        stock.record_route(Path(body.filename).name,
-                           {int(m["t"]): pos.get(int(m["tray_id"]), int(m["tray_id"])) for m in body.slot_map or []})
+            raise HTTPException(
+                409,
+                f"l'imprimante refuse le lancement (code {code.group(1) if code else '?'}) : impression "
+                "déjà en cours, fichier absent ou bobine choisie vide",
+            ) from err
+        pos = {
+            int(t["tray_id"]): int(t.get("pos", t["tray_id"])) for t in spools.loaded(canvas or {})
+        }
+        stock.record_route(
+            Path(body.filename).name,
+            {
+                int(m["t"]): pos.get(int(m["tray_id"]), int(m["tray_id"]))
+                for m in body.slot_map or []
+            },
+        )
         return {"ok": True, "sent": payload}
-
 
     @r.get("/canvas/bobines")
     async def loaded_spools(request: Request) -> list[dict[str, Any]]:
         """The spools in the CANVAS now, as the workshop sees them (own spools recognised), slot order."""
-        return [{"slot": t["pos"] + 1, "hex": t["color"], "name": t.get("filament_name") or t.get("type"),
-                 "type": t.get("type"), "filament": spools.filament_for(t)}
-                for t in sorted(spools.loaded(await _canvas(request) or {}), key=lambda t: t["pos"])]
+        return [
+            {
+                "slot": t["pos"] + 1,
+                "hex": t["color"],
+                "name": t.get("filament_name") or t.get("type"),
+                "type": t.get("type"),
+                "filament": spools.filament_for(t),
+            }
+            for t in sorted(spools.loaded(await _canvas(request) or {}), key=lambda t: t["pos"])
+        ]
 
     @r.get("/bobines")
     def bobines() -> dict[str, Any]:
@@ -1119,8 +1467,13 @@ def lab_router(cfg: config.Config) -> APIRouter:
     @r.post("/bobines/{tray}")
     def bobine_set(tray: int, body: TrayIn) -> dict[str, Any]:
         try:
-            return stock.set_tray(tray, restant_g=body.restant_g, poids_g=body.poids_g, prix_kg=body.prix_kg,
-                                  nouvelle=body.nouvelle)
+            return stock.set_tray(
+                tray,
+                restant_g=body.restant_g,
+                poids_g=body.poids_g,
+                prix_kg=body.prix_kg,
+                nouvelle=body.nouvelle,
+            )
         except ValueError as err:
             raise HTTPException(422, str(err)) from err
 
@@ -1155,7 +1508,7 @@ def lab_router(cfg: config.Config) -> APIRouter:
         threading.Thread(target=work, daemon=True).start()
         return job
 
-    estimate_lock = asyncio.Lock()   # one slice at a time: a quick succession of clicks queues up
+    estimate_lock = asyncio.Lock()  # one slice at a time: a quick succession of clicks queues up
 
     @r.post("/models/{name}/estimate")
     async def estimate(name: str, body: PrepareIn) -> dict[str, Any]:
@@ -1175,21 +1528,42 @@ def lab_router(cfg: config.Config) -> APIRouter:
 
     @r.post("/multicolor")
     async def multicolor(body: MulticolorIn) -> dict[str, Any]:
-        stem = "".join(c if c.isalnum() or c in "-_" else "_" for c in Path(body.name).stem) or "multicolore"
+        stem = (
+            "".join(c if c.isalnum() or c in "-_" else "_" for c in Path(body.name).stem)
+            or "multicolore"
+        )
         parts = [(_model_path(p.name), p.slot) for p in body.parts]
 
         def work() -> dict[str, Any]:
             out = config.MODELS_DIR / f"{stem}.3mf"
             n = max(len(body.filaments), max(s for _, s in parts))
             # the spools' own colours (purge sized to each change), else the workshop's fixed palette
-            cols = [c.upper() if c and spools.HEX.fullmatch(c) else colorize.PALETTE[i % 4]
-                    for i, c in enumerate(((body.colours or []) + [""] * n)[:n])]
-            info = colorize.build_3mf(parts, out, filaments=len(body.filaments), name=stem, colours=cols,
-                                      flush=colors.flush_matrix(cols) if body.colours else None)
-            res = slicer.slice_model(out, config.MODELS_DIR, quality=body.quality,
-                                     filament=body.filaments, infill=body.infill, colours=cols)
-            return {**res.as_dict(), "project": out.name, "size_mm": info["size_mm"],
-                    "load": [f"bobine {i + 1} = {n}" for i, n in enumerate(body.filaments)]}
+            cols = [
+                c.upper() if c and spools.HEX.fullmatch(c) else colorize.PALETTE[i % 4]
+                for i, c in enumerate(((body.colours or []) + [""] * n)[:n])
+            ]
+            info = colorize.build_3mf(
+                parts,
+                out,
+                filaments=len(body.filaments),
+                name=stem,
+                colours=cols,
+                flush=colors.flush_matrix(cols) if body.colours else None,
+            )
+            res = slicer.slice_model(
+                out,
+                config.MODELS_DIR,
+                quality=body.quality,
+                filament=body.filaments,
+                infill=body.infill,
+                colours=cols,
+            )
+            return {
+                **res.as_dict(),
+                "project": out.name,
+                "size_mm": info["size_mm"],
+                "load": [f"bobine {i + 1} = {n}" for i, n in enumerate(body.filaments)],
+            }
 
         try:
             return await asyncio.to_thread(work)
@@ -1198,8 +1572,12 @@ def lab_router(cfg: config.Config) -> APIRouter:
 
     @r.get("/comfy")
     def comfy_status() -> dict[str, Any]:
-        wf = sorted(p.stem for p in comfy.WORKFLOWS.glob("*.json") if not p.stem.endswith(".map")
-                    and (config.hunyuan_allowed() or not p.stem.startswith("hunyuan")))
+        wf = sorted(
+            p.stem
+            for p in comfy.WORKFLOWS.glob("*.json")
+            if not p.stem.endswith(".map")
+            and (config.hunyuan_allowed() or not p.stem.startswith("hunyuan"))
+        )
         try:
             s = comfy.Comfy(cfg.comfyui_url, timeout=3).stats()
             gpus = [d.get("name") for d in s.get("devices", [])]
@@ -1224,8 +1602,14 @@ def lab_router(cfg: config.Config) -> APIRouter:
 
         def work() -> None:
             try:
-                files = comfy.generate(comfy.Comfy(cfg.comfyui_url), workflow, config.MODELS_DIR,
-                                       image=tmp, prompt=prompt or None, on_queued=queued(jid))
+                files = comfy.generate(
+                    comfy.Comfy(cfg.comfyui_url),
+                    workflow,
+                    config.MODELS_DIR,
+                    image=tmp,
+                    prompt=prompt or None,
+                    on_queued=queued(jid),
+                )
                 finished(jid, files)
             except Exception as err:  # surfaced to the UI
                 jobs[jid].update(state="error", error=str(err))
@@ -1246,11 +1630,15 @@ def lab_router(cfg: config.Config) -> APIRouter:
         def mark(workflow: str, pid: str) -> None:
             jobs[jid]["stage"] = {"workflow": workflow, "prompt_id": pid}
             save_jobs()
+
         return mark
 
     def finished(jid: str, files: list[Path]) -> None:
-        jobs[jid].update(state="done", files=[f.name for f in files if f.parent == config.MODELS_DIR],
-                         images=[f.name for f in files if f.parent != config.MODELS_DIR])
+        jobs[jid].update(
+            state="done",
+            files=[f.name for f in files if f.parent == config.MODELS_DIR],
+            images=[f.name for f in files if f.parent != config.MODELS_DIR],
+        )
         save_jobs()
 
     def resume_all() -> None:
@@ -1269,8 +1657,13 @@ def lab_router(cfg: config.Config) -> APIRouter:
 
             def work(j: dict = j, stage: dict = stage) -> None:
                 try:
-                    files = comfy.resume(comfy.Comfy(cfg.comfyui_url), stage["workflow"], stage["prompt_id"],
-                                         config.MODELS_DIR, on_queued=queued(j["id"]))
+                    files = comfy.resume(
+                        comfy.Comfy(cfg.comfyui_url),
+                        stage["workflow"],
+                        stage["prompt_id"],
+                        config.MODELS_DIR,
+                        on_queued=queued(j["id"]),
+                    )
                     finished(j["id"], files)
                 except Exception as err:
                     j.update(state="error", error=str(err))
@@ -1300,7 +1693,7 @@ def lab_router(cfg: config.Config) -> APIRouter:
             "problematic_versions": firmware.PROBLEMATIC_FIRMWARE,
             "blocked_commands": firmware.BLOCKED_COMMANDS_IN_SAFE_MODE,
             "safe_commands": firmware.SAFE_COMMANDS,
-            "note": "Commands blocked in safe mode must be executed manually on the printer's screen."
+            "note": "Commands blocked in safe mode must be executed manually on the printer's screen.",
         }
 
     @r.get("/firmware/status")
@@ -1311,7 +1704,7 @@ def lab_router(cfg: config.Config) -> APIRouter:
             "detected_version": str(manager.detected_version) if manager.detected_version else None,
             "is_supported": manager.is_supported,
             "safe_mode": manager.safe_mode,
-            "known_issues": manager.get_known_issues() if manager.detected_version else [],
+            "known_issues": manager.get_known_issues() if manager.detected_version else [],  # type: ignore[attr-defined]
             "warning": manager.get_warning_message(),
         }
 
@@ -1321,19 +1714,33 @@ def lab_router(cfg: config.Config) -> APIRouter:
 class CommandLog:
     """Each order sent to the printer (pause, speed, temperature...) shows in the live terminal with its answer."""
 
-    LABELS = {"/print/start": "Lancement de l'impression", "/print/pause": "Pause", "/print/resume": "Reprise",
-              "/print/stop": "Arrêt de l'impression", "/print/speed": "Vitesse", "/print/fan": "Ventilateur",
-              "/print/temperature": "Température", "/canvas/refill": "Recharge auto CANVAS", "/light": "Lumière",
-              "/files/upload": "Envoi d'un fichier", "/files/delete": "Suppression d'un fichier"}
+    LABELS = {
+        "/print/start": "Lancement de l'impression",
+        "/print/pause": "Pause",
+        "/print/resume": "Reprise",
+        "/print/stop": "Arrêt de l'impression",
+        "/print/speed": "Vitesse",
+        "/print/fan": "Ventilateur",
+        "/print/temperature": "Température",
+        "/canvas/refill": "Recharge auto CANVAS",
+        "/light": "Lumière",
+        "/files/upload": "Envoi d'un fichier",
+        "/files/delete": "Suppression d'un fichier",
+    }
 
     def __init__(self, app: Any) -> None:
         self.app = app
 
     async def __call__(self, scope: dict, receive: Any, send: Any) -> None:
         path = scope.get("path", "")
-        label = self.LABELS.get(path.removeprefix("/lab/api")) if scope["type"] == "http" and scope["method"] == "POST" else None
+        label = (
+            self.LABELS.get(path.removeprefix("/lab/api"))
+            if scope["type"] == "http" and scope["method"] == "POST"
+            else None
+        )
         if not label:
-            return await self.app(scope, receive, send)
+            await self.app(scope, receive, send)
+            return None
         body, status = b"", 0
 
         async def rec() -> dict:
@@ -1341,7 +1748,7 @@ class CommandLog:
             m = await receive()
             if len(body) < 2000:
                 body += m.get("body", b"")
-            return m
+            return cast("dict[str, Any]", m)
 
         async def snd(m: dict) -> None:
             nonlocal status
@@ -1357,13 +1764,18 @@ class CommandLog:
                 args = ""
                 with contextlib.suppress(ValueError, AttributeError):
                     d = json.loads(body or b"{}")
-                    args = " ".join(f"{k}={({True: 'oui', False: 'non'}.get(v, v) if isinstance(v, bool) else v)}"
-                                    for k, v in d.items() if not isinstance(v, (dict, list)))[:120]
-                if not args:   # pycentauri takes most of its parameters in the query string
+                    args = " ".join(
+                        f"{k}={({True: 'oui', False: 'non'}.get(v, v) if isinstance(v, bool) else v)}"
+                        for k, v in d.items()
+                        if not isinstance(v, (dict, list))
+                    )[:120]
+                if not args:  # pycentauri takes most of its parameters in the query string
                     args = scope.get("query_string", b"").decode()[:120].replace("&", " ")
                 ok = 200 <= status < 300
-                w.say(f"→ {label}{' (' + args + ')' if args else ''} : {'OK' if ok else f'refusé ({status})'}",
-                      "cmd" if ok else "bad")
+                w.say(
+                    f"→ {label}{' (' + args + ')' if args else ''} : {'OK' if ok else f'refusé ({status})'}",
+                    "cmd" if ok else "bad",
+                )
 
 
 class SameOriginGuard:
@@ -1385,11 +1797,23 @@ class SameOriginGuard:
             host = h.get("host", "")
             site = h.get("sec-fetch-site")
             source = h.get("origin") or h.get("referer") or ""
-            foreign = site in ("cross-site", "same-site") or (bool(source) and urlsplit(source).netloc != host)
+            foreign = site in ("cross-site", "same-site") or (
+                bool(source) and urlsplit(source).netloc != host
+            )
             if foreign:
-                body = json.dumps({"detail": "Requête refusée : elle ne vient pas de l'atelier."}).encode()
-                await send({"type": "http.response.start", "status": 403,
-                            "headers": [(b"content-type", b"application/json"), (b"content-length", str(len(body)).encode())]})
+                body = json.dumps(
+                    {"detail": "Requête refusée : elle ne vient pas de l'atelier."}
+                ).encode()
+                await send(
+                    {
+                        "type": "http.response.start",
+                        "status": 403,
+                        "headers": [
+                            (b"content-type", b"application/json"),
+                            (b"content-length", str(len(body)).encode()),
+                        ],
+                    }
+                )
                 await send({"type": "http.response.body", "body": body})
                 return
         await self.app(scope, receive, send)
@@ -1412,11 +1836,18 @@ def _add_alerts(app: FastAPI) -> None:
         async with inner(a):
             mgr = a.state.manager
             from . import vision
-            w = alerts.Watcher(lambda: mgr.printer.status(), lambda: vision.grab(mgr), lambda: mgr.printer.canvas_status(),
-                               lambda: mgr.printer.pause(), lambda: mgr.printer.set_light(True),
-                               lambda: mgr.printer.print_history())
+
+            w = alerts.Watcher(
+                lambda: mgr.printer.status(),
+                lambda: vision.grab(mgr),
+                lambda: mgr.printer.canvas_status(),
+                lambda: mgr.printer.pause(),
+                lambda: mgr.printer.set_light(True),
+                lambda: mgr.printer.print_history(),
+            )
             a.state.watcher = w
             import logging
+
             term = alerts.TermHandler(w)
             for name in ("elegoo_lab", "pycentauri"):
                 logging.getLogger(name).addHandler(term)
@@ -1437,7 +1868,7 @@ def _add_alerts(app: FastAPI) -> None:
         w = getattr(request.app.state, "watcher", None)
         if w is None:
             raise HTTPException(503, "Suivi pas encore démarré")
-        return w
+        return cast("alerts.Watcher", w)
 
     @app.get("/lab/api/events", include_in_schema=False)
     def events(request: Request) -> list[dict[str, Any]]:
@@ -1451,7 +1882,10 @@ def _add_alerts(app: FastAPI) -> None:
             async for ev in w.stream():
                 if await request.is_disconnected():
                     break
-                yield {"event": "ligne" if ev.get("ligne") else "alerte", "data": json.dumps(ev, ensure_ascii=False)}
+                yield {
+                    "event": "ligne" if ev.get("ligne") else "alerte",
+                    "data": json.dumps(ev, ensure_ascii=False),
+                }
 
         return EventSourceResponse(gen(), ping=20)
 
@@ -1463,12 +1897,14 @@ def _add_alerts(app: FastAPI) -> None:
     @app.get("/lab/api/galerie", include_in_schema=False)
     def galerie() -> list[dict[str, Any]]:
         from . import gallery
+
         lib = {p.name for p in config.MODELS_DIR.glob("*.gcode")}
         return [{**e, "dans_bibliotheque": e.get("fichier") in lib} for e in gallery.entries()]
 
     @app.get("/lab/api/galerie/{entry}/{name}", include_in_schema=False)
     def galerie_file(entry: str, name: str) -> FileResponse:
         from . import gallery
+
         try:
             p = gallery.file(entry, name)
         except FileNotFoundError as err:
@@ -1478,26 +1914,40 @@ def _add_alerts(app: FastAPI) -> None:
     @app.delete("/lab/api/galerie/{entry}", include_in_schema=False)
     def galerie_delete(entry: str) -> dict[str, bool]:
         from . import gallery
+
         try:
             gallery.delete(entry)
         except FileNotFoundError as err:
             raise HTTPException(404, "Introuvable") from err
         return {"ok": True}
 
-
     model_dl: dict[str, Any] = {"state": "idle"}
 
     @app.get("/lab/api/surveillance", include_in_schema=False)
     def surveillance_get(request: Request) -> dict[str, Any]:
         from . import vision
+
         w = getattr(request.app.state, "watcher", None)
         live = None
         if w is not None:
             p = w.pred
-            live = {"frames": p.frames, "score": round(p.ewm - p.long, 3), "history": p.history[-60:],
-                    "etat": "pause" if w.ai_paused else "suspect" if p.failing(w.settings["sensibilite"]) else "ok",
-                    "en_cours": w.prev not in alerts.IDLE if w.prev is not None else False}
-        return {**alerts.surveillance(), "modele": vision.model_ready(), "telechargement": model_dl, "live": live}
+            live = {
+                "frames": p.frames,
+                "score": round(p.ewm - p.long, 3),
+                "history": p.history[-60:],
+                "etat": (
+                    "pause"
+                    if w.ai_paused
+                    else "suspect" if p.failing(w.settings["sensibilite"]) else "ok"
+                ),
+                "en_cours": w.prev not in alerts.IDLE if w.prev is not None else False,
+            }
+        return {
+            **alerts.surveillance(),
+            "modele": vision.model_ready(),
+            "telechargement": model_dl,
+            "live": live,
+        }
 
     @app.post("/lab/api/surveillance", include_in_schema=False)
     def surveillance_set(body: SurvIn) -> dict[str, Any]:
@@ -1515,7 +1965,8 @@ def _add_alerts(app: FastAPI) -> None:
     @app.post("/lab/api/alertes/telephone", include_in_schema=False)
     async def phone_alerts_set(body: PhoneAlertIn) -> dict[str, Any]:
         """Phone alerts that work with the app closed, through the ntfy app (opt-in: leaves the house network).
-        "on" makes an unguessable topic: anyone who knows it reads the alerts, so it is never reused."""
+        "on" makes an unguessable topic: anyone who knows it reads the alerts, so it is never reused.
+        """
         if body.action == "on":
             config.save("alertes", ntfy=f"https://ntfy.sh/cc2-{uuid.uuid4().hex[:20]}")
         elif body.action == "off":
@@ -1523,7 +1974,13 @@ def _add_alerts(app: FastAPI) -> None:
         elif body.action == "test":
             if not alerts.ntfy_url():
                 raise HTTPException(409, "alertes téléphone désactivées")
-            ok = await alerts.send_ntfy({"title": "Test de l'atelier", "detail": "Les alertes arrivent bien sur ce téléphone.", "level": "ok"})
+            ok = await alerts.send_ntfy(
+                {
+                    "title": "Test de l'atelier",
+                    "detail": "Les alertes arrivent bien sur ce téléphone.",
+                    "level": "ok",
+                }
+            )
             if not ok:
                 raise HTTPException(502, "ntfy injoignable : vérifie la connexion internet du PC")
         else:
@@ -1533,6 +1990,7 @@ def _add_alerts(app: FastAPI) -> None:
     @app.post("/lab/api/surveillance/modele", include_in_schema=False)
     def surveillance_model() -> dict[str, Any]:
         from . import vision
+
         if vision.model_ready() or model_dl["state"] == "running":
             return model_dl
         model_dl.update(state="running", done=0, total=0, error=None)
@@ -1554,44 +2012,68 @@ def _add_alerts(app: FastAPI) -> None:
             raise HTTPException(404, "Photo introuvable")
         return FileResponse(p, media_type="image/jpeg")
 
-    added = app.router.routes[start:]   # ahead of the /lab static mount
+    added = app.router.routes[start:]  # ahead of the /lab static mount
     del app.router.routes[start:]
     app.router.routes[0:0] = added
 
 
-def create_app(*, enable_control: bool = False, lan: bool = False, port: int = 0,
-               https: bool = False, http_port: int = 0) -> FastAPI:
+def create_app(
+    *,
+    enable_control: bool = False,
+    lan: bool = False,
+    port: int = 0,
+    https: bool = False,
+    http_port: int = 0,
+) -> FastAPI:
     cfg = config.load()
     p = cfg.printer
     import pycentauri.server as printer_server
-    printer_server.RECONNECT_BACKOFF_MAX = 8.0   # printer switched on: found within seconds, not up to 30 s
+
+    printer_server.RECONNECT_BACKOFF_MAX = (
+        8.0  # printer switched on: found within seconds, not up to 30 s
+    )
     # the printer's upload sends the file name in an HTTP header, which letters like 洋葱头宝宝 cannot
     # ride: every upload leaves with an ASCII name (launch.printer_name), never a pycentauri crash.
     # On the class, so a reconnection's fresh Printer keeps the fix.
     from pycentauri.cc2 import Printer as _Printer
+
     if not getattr(_Printer.upload_file, "_ascii_name", False):
         _upload_file = _Printer.upload_file
 
-        async def _upload_ascii(self: Any, path: str | Path, *, remote_name: str | None = None,
-                                **kwargs: Any) -> str:
-            return await _upload_file(self, path, remote_name=launch.printer_name(remote_name or Path(path).name),
-                                      **kwargs)
+        async def _upload_ascii(
+            self: Any, path: str | Path, *, remote_name: str | None = None, **kwargs: Any
+        ) -> str:
+            return await _upload_file(
+                self,
+                path,
+                remote_name=launch.printer_name(remote_name or Path(path).name),
+                **kwargs,
+            )
 
         _upload_ascii._ascii_name = True  # type: ignore[attr-defined]
-        _Printer.upload_file = _upload_ascii
+        cast("Any", _Printer).upload_file = _upload_ascii
     if not p.host or not p.access_code:
-        raise SystemExit("Imprimante non configurée: copie config.example.toml en config.toml "
-                         "(host + access_code).")
-    app = create_printer_app(p.host, enable_control=enable_control,
-                             mainboard_id=p.serial, access_code=p.access_code)
+        raise SystemExit(
+            "Imprimante non configurée: copie config.example.toml en config.toml "
+            "(host + access_code)."
+        )
+    app = create_printer_app(
+        p.host, enable_control=enable_control, mainboard_id=p.serial, access_code=p.access_code
+    )
     config.MODELS_DIR.mkdir(exist_ok=True)
     from fastapi.middleware.gzip import GZipMiddleware
+
     app.add_middleware(CommandLog)
-    app.add_middleware(GZipMiddleware, minimum_size=4096)  # G-code paths and previews compress ~2.5x
+    app.add_middleware(
+        GZipMiddleware, minimum_size=4096
+    )  # G-code paths and previews compress ~2.5x
     app.add_middleware(SameOriginGuard)
     if lan:
         from . import access
-        app.add_middleware(access.Gate, https_port=port if https else 0)  # outermost: nothing runs before the access check
+
+        app.add_middleware(
+            access.Gate, https_port=port if https else 0
+        )  # outermost: nothing runs before the access check
     app.include_router(lab_router(cfg))
     app.mount("/lab", FreshStatic(directory=WEB, html=True), name="lab")
 
@@ -1602,18 +2084,26 @@ def create_app(*, enable_control: bool = False, lan: bool = False, port: int = 0
 
     def _gone(request: Request, err: BaseException) -> bool:
         name = request.path_params.get("name")
-        return isinstance(err, FileNotFoundError) and bool(name) and not (config.MODELS_DIR / Path(name).name).exists()
+        return (
+            isinstance(err, FileNotFoundError)
+            and bool(name)
+            and not (config.MODELS_DIR / Path(name).name).exists()
+        )
 
     @app.exception_handler(FileNotFoundError)
     async def model_gone(request: Request, err: FileNotFoundError) -> Response:
         if _gone(request, err):
-            return JSONResponse({"detail": f"modèle introuvable: {request.path_params['name']}"}, status_code=404)
+            return JSONResponse(
+                {"detail": f"modèle introuvable: {request.path_params['name']}"}, status_code=404
+            )
         raise err
 
     @app.exception_handler(StarletteHTTPException)
     async def model_gone_422(request: Request, err: StarletteHTTPException) -> Response:
         if err.status_code == 422 and _gone(request, err.__cause__):
-            return JSONResponse({"detail": f"modèle introuvable: {request.path_params['name']}"}, status_code=404)
+            return JSONResponse(
+                {"detail": f"modèle introuvable: {request.path_params['name']}"}, status_code=404
+            )
         return await http_exception_handler(request, err)
 
     # our shell replaces pycentauri's "/" -> "/ui/" redirect
@@ -1627,13 +2117,19 @@ def create_app(*, enable_control: bool = False, lan: bool = False, port: int = 0
     @app.get("/lab/api/context", include_in_schema=False)
     def context(request: Request) -> dict[str, Any]:
         from .access import is_local
-        return {"control": enable_control, "host": p.host, "lan": lan,
-                "local": is_local(request.client.host if request.client else None)}
+
+        return {
+            "control": enable_control,
+            "host": p.host,
+            "lan": lan,
+            "local": is_local(request.client.host if request.client else None),
+        }
 
     app.router.routes.insert(0, app.router.routes.pop())
     _add_alerts(app)
-    if lan:   # alerts can link back to the workshop (ntfy "Faire le bilan")
+    if lan:  # alerts can link back to the workshop (ntfy "Faire le bilan")
         from . import alerts
+
         alerts.APP.update(https=https, port=port)
 
     @app.get("/lab/api/phone", include_in_schema=False)
@@ -1647,6 +2143,7 @@ def create_app(*, enable_control: bool = False, lan: bool = False, port: int = 0
         import qrcode.image.svg
 
         from . import access
+
         def qr(text: str) -> str:
             buf = io.BytesIO()
             qrcode.make(text, image_factory=qrcode.image.svg.SvgPathImage, border=2).save(buf)
@@ -1658,7 +2155,14 @@ def create_app(*, enable_control: bool = False, lan: bool = False, port: int = 0
         ts = access.tailscale()
         host = (ts["name"] or ts["ip"]) if ts else ip
         url = f"{'https' if https else 'http'}://{host}:{port}/lab/"
-        out = {"lan": True, "url": url, "qr": qr(url), "https": https, "tailscale": bool(ts), "local_url": local}
+        out: dict[str, Any] = {
+            "lan": True,
+            "url": url,
+            "qr": qr(url),
+            "https": https,
+            "tailscale": bool(ts),
+            "local_url": local,
+        }
         if https:
             out["ca_url"] = f"http://{host}:{http_port}/lab/ca.crt"
             out["ca_qr"] = qr(out["ca_url"])
@@ -1672,8 +2176,12 @@ def create_app(*, enable_control: bool = False, lan: bool = False, port: int = 0
         if not https:
             raise HTTPException(404, "HTTPS non activé")
         from . import certs
-        return Response(certs.ca_pem(), media_type="application/x-x509-ca-cert",
-                        headers={"Content-Disposition": 'attachment; filename="atelier-cc2.crt"'})
+
+        return Response(
+            certs.ca_pem(),
+            media_type="application/x-x509-ca-cert",
+            headers={"Content-Disposition": 'attachment; filename="atelier-cc2.crt"'},
+        )
 
     app.router.routes.insert(0, app.router.routes.pop())
     return app

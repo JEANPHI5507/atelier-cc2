@@ -39,7 +39,9 @@ def extract(path: Path) -> dict[str, Any]:
         for line in f:
             c = line[:1]
             if c == ";":
-                if line.startswith(";Z:"):  # OrcaSlicer layer marker: the start purge line comes before
+                if line.startswith(
+                    ";Z:"
+                ):  # OrcaSlicer layer marker: the start purge line comes before
                     layer_z.append(float(line[3:]))
                 elif line.startswith(";TYPE:"):
                     kind = _kind(line[6:].strip())
@@ -76,7 +78,11 @@ def extract(path: Path) -> dict[str, Any]:
                 knd.append(kind)
                 tl.append(tool)
             x, y, z = nx, ny, nz
-    s = np.round(np.asarray(seg, dtype=float) * SCALE).astype("<i2") if seg else np.zeros((0, 4), "<i2")
+    s = (
+        np.round(np.asarray(seg, dtype=float) * SCALE).astype("<i2")
+        if seg
+        else np.zeros((0, 4), "<i2")
+    )
     return {
         "scale": SCALE,
         "layers": [round(v, 3) for v in layer_z],
@@ -103,7 +109,7 @@ def cached(path: Path, most: int = 0) -> dict[str, Any]:
         _cache[full] = d
         if most:
             _cache[key] = lite(d, most)
-        while len(_cache) > 4:      # a few big prints at most: each is tens of MB
+        while len(_cache) > 4:  # a few big prints at most: each is tens of MB
             _cache.pop(next(iter(_cache)))
     return _cache[key]
 
@@ -118,7 +124,13 @@ def lite(d: dict[str, Any], most: int) -> dict[str, Any]:
     lay = np.frombuffer(base64.b64decode(d["layer"]), "<u2")
     knd = np.frombuffer(base64.b64decode(d["kind"]), "u1")
     tl = np.frombuffer(base64.b64decode(d["tool"]), "u1")
-    keep = (lay % step == 0) | (lay == lay.max())     # the top layer always: it is what one sees
-    return {**d, "count": int(keep.sum()), "pas": step,
-            "segments": base64.b64encode(seg[keep].tobytes()).decode(), "layer": base64.b64encode(lay[keep].tobytes()).decode(),
-            "kind": base64.b64encode(knd[keep].tobytes()).decode(), "tool": base64.b64encode(tl[keep].tobytes()).decode()}
+    keep = (lay % step == 0) | (lay == lay.max())  # the top layer always: it is what one sees
+    return {
+        **d,
+        "count": int(keep.sum()),
+        "pas": step,
+        "segments": base64.b64encode(seg[keep].tobytes()).decode(),
+        "layer": base64.b64encode(lay[keep].tobytes()).decode(),
+        "kind": base64.b64encode(knd[keep].tobytes()).decode(),
+        "tool": base64.b64encode(tl[keep].tobytes()).decode(),
+    }
