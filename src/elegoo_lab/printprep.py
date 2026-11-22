@@ -261,7 +261,7 @@ def prepare_and_slice(
                                                       # (its firmware reads EXCLUDE_OBJECT_DEFINE like Klipper); one part: profile as is
                                                       **({"exclude_object": "1"} if copies > 1 else {}), **adv_proc},
                                  filament_overrides={**(MODES[mode].get("filament", {}) if n > 1 else {}), **adv_fil}, cli_args=cli)
-    except slicer.SupportNeeded:   # OrcaSlicer found parts that would hang in the air: tree supports, said in the result
+    except slicer.SupportNeededError:   # OrcaSlicer found parts that would hang in the air: tree supports, said in the result
         warnings.append("Supports en arbre ajoutés : OrcaSlicer a trouvé des parties qui flotteraient sans support.")
         if layers:
             couches.remove(target)

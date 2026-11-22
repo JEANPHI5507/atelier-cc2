@@ -30,7 +30,7 @@ class SliceError(RuntimeError):
     pass
 
 
-class SupportNeeded(SliceError):
+class SupportNeededError(SliceError):
     """OrcaSlicer's command line refused a part sliced without supports (return -100): worth one retry with them."""
 
 
@@ -342,7 +342,7 @@ def slice_model(
             # without supports, OrcaSlicer's command line fails (return -100, code 156) on parts that would hang
             # in the air instead of warning; its log only says so at --debug 3, so the caller retries with supports
             if not supports and report.get("return_code", run.returncode) in (156, -100) and "return -100" in run.stdout + run.stderr:
-                raise SupportNeeded("une partie flotterait sans support")
+                raise SupportNeededError("une partie flotterait sans support")
             detail = (report.get("error_string") or "") + " " + (run.stdout + run.stderr).strip()[-400:]
             raise SliceError(f"OrcaSlicer a échoué (code {report.get('return_code', run.returncode)}): {detail.strip()}")
 
