@@ -36,6 +36,7 @@ from . import (
     comfy,
     config,
     connexion,
+    firmware,
     gcode_preview,
     launch,
     library,
@@ -1290,6 +1291,29 @@ def lab_router(cfg: config.Config) -> APIRouter:
     @r.get("/jobs")
     def list_jobs() -> list[dict[str, Any]]:
         return sorted(jobs.values(), key=lambda j: -j["started"])
+
+    @r.get("/firmware/limits")
+    def firmware_limits() -> dict[str, Any]:
+        """Return information about CC2 firmware limitations and blocked commands."""
+        return {
+            "supported_versions": firmware.SUPPORTED_FIRMWARE_VERSIONS,
+            "problematic_versions": firmware.PROBLEMATIC_FIRMWARE,
+            "blocked_commands": firmware.BLOCKED_COMMANDS_IN_SAFE_MODE,
+            "safe_commands": firmware.SAFE_COMMANDS,
+            "note": "Commands blocked in safe mode must be executed manually on the printer's screen."
+        }
+
+    @r.get("/firmware/status")
+    def firmware_status() -> dict[str, Any]:
+        """Return current firmware detection status and safe mode information."""
+        manager = firmware.firmware_manager
+        return {
+            "detected_version": str(manager.detected_version) if manager.detected_version else None,
+            "is_supported": manager.is_supported,
+            "safe_mode": manager.safe_mode,
+            "known_issues": manager.get_known_issues() if manager.detected_version else [],
+            "warning": manager.get_warning_message(),
+        }
 
     return r
 
