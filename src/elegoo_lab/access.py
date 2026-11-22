@@ -145,6 +145,7 @@ class Gate:
         if scope["type"] == "http" and scope.get("method") == "GET" and not path.startswith(("/lab/api", "/api", "/status", "/events", "/stream", "/snapshot", "/canvas", "/files", "/history")):
             return await _reply(send, 303, b"", [(b"location", b"/lab/login.html")])
         await _reply(send, 401, json.dumps({"detail": "Code d'accès requis"}).encode(), [(b"content-type", b"application/json")])
+        return None
 
     async def _login(self, scope: dict, receive: Any, send: Any, ip: str) -> None:
         if self.too_many(ip):
@@ -167,6 +168,7 @@ class Gate:
         if scope.get("scheme") == "https":
             cookie += "; Secure"
         await _reply(send, 200, b'{"ok": true}', [(b"content-type", b"application/json"), (b"set-cookie", cookie.encode())])
+        return None
 
 
 async def _reply(send: Any, status: int, body: bytes, headers: list[tuple[bytes, bytes]]) -> None:
