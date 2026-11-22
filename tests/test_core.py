@@ -614,6 +614,7 @@ def test_comfy_chained_workflow_frees_vram_between_stages(tmp_path, monkeypatch)
     assert len(uploads) == 2                                      # stage 2 received stage 1's image
 
 
+@pytest.mark.slicing
 def test_spool_matching_follows_loaded_canvas():
     from elegoo_lab import spools
     trays = spools.loaded({"canvas_info": {"canvas_list": [{"tray_list": [
@@ -634,6 +635,7 @@ def test_spool_matching_follows_loaded_canvas():
     assert any("incompatibles" in w for w in mixed["warnings"])   # PLA + PETG
 
 
+@pytest.mark.slicing
 def test_a_colour_needs_grams_before_any_slicing(web):
     """The colour step says how many grams each colour will use (from the model's volume), so a nearly
     empty spool is caught before slicing, not when the print is already running."""
@@ -675,6 +677,7 @@ def test_a_colour_needs_grams_before_any_slicing(web):
     assert stock.fill_factor("decoratif") == 1.5            # (100 g in, 200 g measured: ratio 2, half step)
 
 
+@pytest.mark.slicing
 def test_one_colour_model_takes_a_loaded_spool(tmp_path):
     from elegoo_lab import launch, spools
     trays = spools.loaded({"canvas_info": {"canvas_list": [{"tray_list": [
@@ -954,6 +957,7 @@ def test_the_api_engine_guards(web, monkeypatch):
     assert choices[-1] == "none"
 
 
+@pytest.mark.slicing
 def test_the_aI_picks_the_slice_settings(web, monkeypatch):
     """slice-brain: the brain reads the part and decides the slicing settings; only valid choices survive."""
     from elegoo_lab import assistant
@@ -2296,6 +2300,7 @@ def _piece_plate(tmp_path, name, gap_mm=10.0, extruders=(1, 2), heights=(20, 20)
     return out, cols
 
 
+@pytest.mark.slicing
 def test_piece_by_piece_groups_colours_and_checks_the_head_path(tmp_path):
     """«Ordre d'impression : pièce par pièce» sorts the pieces by colour, keeps the wipes' place, and
     asks for the CC2's own clearances: enough space between pieces, low enough pieces."""

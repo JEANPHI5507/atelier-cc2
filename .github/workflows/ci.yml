@@ -117,6 +117,11 @@ jobs:
         run: |
           uv sync
 
+      - name:  Install Fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fonts-dejavu-core fonts-urw-base35
+
       - name:  Run Unit Tests with Coverage
         run: |
           uv run pytest tests/test_core.py -v --tb=short -m "not slicing" --cov=src/elegoo_lab --cov-report=xml --cov-report=html || true
