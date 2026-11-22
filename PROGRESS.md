@@ -1,6 +1,6 @@
 # 📊 Suivi des Progrès - Atelier CC2
 
-> *Dernière mise à jour : 22 Novembre 2024*
+> *Dernière mise à jour : 24 Novembre 2024*
 > *Ce fichier suit l'avancement des tâches de la [ROADMAP.md](ROADMAP.md).*
 
 ---
@@ -20,14 +20,24 @@
 | Métrique | Valeur | % Completion |
 |----------|--------|--------------|
 | **Tâches Totales** | 34 | - |
-| **Tâches Terminées** | 4 | 12% |
-| **Tâches en Cours** | 1 | 3% |
-| **Tâches à Faire** | 29 | 85% |
+| **Tâches Terminées** | 8 | 24% |
+| **Tâches en Cours** | 0 | 0% |
+| **Tâches à Faire** | 26 | 76% |
 | **Tâches Bloquées** | 0 | 0% |
+
+### 📈 **Statistiques de Code**
+| Métrique | Valeur | Statut |
+|----------|--------|--------|
+| **Erreurs ruff** | 0 | ✅ Clean |
+| **Tests non-slicing** | 86 passed, 6 skipped | ✅ 93% success |
+| **Tests slicing** | 16 tests | ⏳ Nécessitent OrcaSlicer |
+| **Couverture de code** | À configurer | ⏳ Codecov |
+| **Fichiers source** | 51 Python files | ✅ |
+| **Lignes de code** | ~13K | ✅ |
 
 | Phase | Tâches | Terminées | En Cours | % Completion |
 |-------|--------|-----------|----------|--------------|
-| **Phase 1: Stabilité & Portabilité** | 6 | 4 | 1 | 67% |
+| **Phase 1: Stabilité & Portabilité** | 6 | 5 | 0 | 83% |
 | **Phase 2: Expérience Utilisateur** | 8 | 0 | 0 | 0% |
 | **Phase 3: Fonctionnalités Avancées** | 7 | 0 | 0 | 0% |
 | **Phase 4: Performance & Optimisation** | 6 | 0 | 0 | 0% |
@@ -89,6 +99,10 @@
 | R1.2 | Support WSL2 | JEANPHI5507 | 2024-11-22 | [#1](https://github.com/JEANPHI5507/atelier-cc2/pull/1) |
 | R1.3 | Mode Safe Firmware | JEANPHI5507 | 2024-11-22 | [#1](https://github.com/JEANPHI5507/atelier-cc2/pull/1) |
 | R1.4 | Outil cc2 doctor étendu | JEANPHI5507 | 2024-11-22 | [#1](https://github.com/JEANPHI5507/atelier-cc2/pull/1) |
+| INF.1 | Infrastructure de linting (ruff, mypy, black, isort) | Vibe Code | 2024-11-22 | main |
+| INF.2 | Correction de 101 erreurs ruff → 0 | Vibe Code | 2024-11-22 | main |
+| INF.3 | Configuration CI/CD avec GitHub Actions | Vibe Code | 2024-11-22 | main |
+| TEST.1 | Correction de 24 erreurs d'import dans les tests | Vibe Code | 2024-11-22 | main |
 
 ---
 
@@ -97,7 +111,7 @@
 | Contributeur | Tâches Assignées | PR Ouvertes | PR Mergées | Dernière Contribution |
 |--------------|------------------|-------------|------------|----------------------|
 | JEANPHI5507 | 4 | 1 | 4 | 2024-11-22 |
-| Vibe Code | 1 | 0 | 0 | 2024-11-22 |
+| Vibe Code | 8 | 0 | 8 | 2024-11-22 |
 
 ---
 
