@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  atelier-cc2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: atelier-cc2
+    restart: unless-stopped
+    ports:
+      - "8787:8787"  # Mode contrôle (avec CC2 réelle)
+      - "8788:8788"  # Mode simulateur
+    volumes:
+      # Persistance des données
+      - ./config.toml:/home/appuser/app/config.toml:ro
+      - ./models:/home/appuser/app/models
+      - ./demo:/home/appuser/app/demo
+      - ./gallery:/home/appuser/app/gallery
+      # Pour OrcaSlicer (si téléchargé manuellement)
+      - ./OrcaSlicer:/home/appuser/app/OrcaSlicer
+      # Pour le modèle IA (optionnel)
+      - ./obico_model:/home/appuser/app/obico_model
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+    # Pour le mode simulateur
+    command: ["simulateur", "--duree", "60"]
+    
+    # Pour le mode avec une vraie CC2 (remplacer IP et CODE)
+    # command: ["--control", "dash", "--ip", "192.168.1.100", "--code", "123456"]
+
+  # Service optionnel pour la caméra (si vous avez une caméra USB)
+  # camera:
+  #   image: aler9/rtsp-simple-server
+  #   ports:
+  #     - "8554:8554"
+  #   devices:
+  #     - "/dev/video0:/dev/video0"

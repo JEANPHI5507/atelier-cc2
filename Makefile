@@ -36,6 +36,59 @@ dash:
 ia:  ## modèle de détection des ratés (Obico, 200 Mo, vérifié)
 	uv run python -c "from elegoo_lab import vision; vision.download_model(); print('modèle IA installé')"
 
+# ============================================================================
+# Docker
+# ============================================================================
+DOCKER_IMAGE ?= atelier-cc2
+DOCKER_COMPOSE ?= docker-compose
+
+# Construire l'image Docker
+docker-build:
+	docker build -t $(DOCKER_IMAGE) .
+
+# Exécuter avec le simulateur (mode démo)
+docker-simulator:
+	docker run -it --rm \
+		-p 8788:8788 \
+		-v $(pwd)/demo:/home/appuser/app/demo \
+		$(DOCKER_IMAGE)
+
+# Exécuter avec une vraie CC2 (remplacer IP et CODE)
+docker-cc2:
+	@echo "Usage: make docker-cc2 IP=<adresse> CODE=<code>"
+	@echo "Example: make docker-cc2 IP=192.168.1.100 CODE=123456"
+
+.PHONY: docker-cc2-impl
+docker-cc2-impl:
+	docker run -it --rm \
+		-p 8787:8787 \
+		-v $(pwd)/config.toml:/home/appuser/app/config.toml:ro \
+		-v $(pwd)/models:/home/appuser/app/models \
+		-v $(pwd)/demo:/home/appuser/app/demo \
+		-v $(pwd)/gallery:/home/appuser/app/gallery \
+		$(DOCKER_IMAGE) \
+		--control dash --ip $(IP) --code $(CODE)
+
+# Démarrer avec Docker Compose (simulateur)
+docker-up:
+	$(DOCKER_COMPOSE) up -d
+
+# Arrêter Docker Compose
+docker-down:
+	$(DOCKER_COMPOSE) down
+
+# Voir les logs Docker Composedocker-logs:
+	$(DOCKER_COMPOSE) logs -f atelier-cc2
+
+# Construire et démarrer (simulateur)
+docker-start:
+	$(MAKE) docker-build
+	$(MAKE) docker-up
+
+# Nettoyer les images et conteneurs Docker
+docker-clean:
+	docker system prune -f
+
 # Envoie le code sur le serveur maison (ssh $(SERVEUR), dossier ~/elegoo) et y relance l'atelier.
 # La bibliothèque (models/), config.toml, .certs et tools/ du serveur ne sont pas touchés.
 deploy:
