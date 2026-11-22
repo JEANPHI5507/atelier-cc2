@@ -97,9 +97,18 @@ jobs:
         run: |
           uv sync --all-extras
 
-      - name: 🧪 Run Unit Tests
+      - name: 🧪 Run Unit Tests with Coverage
         run: |
-          uv run pytest tests/test_core.py -v --tb=short -m "not slicing" || true
+          uv run pytest tests/test_core.py -v --tb=short -m "not slicing" --cov=src/elegoo_lab --cov-report=xml --cov-report=html || true
+
+      - name: 🐍 Upload Coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+        continue-on-error: true
 
   # 🧪 Job 3: Exécution des tests de slicing (avec OrcaSlicer et OpenGL)
   test-slicing:
