@@ -36,8 +36,8 @@ def _by_pattern(core: str, pats: list[tuple[re.Pattern, str]]) -> str | None:
         if m:
             groups, seq = m.groups(), iter(m.groups())
 
-            def fill(g: re.Match) -> str:
-                v = groups[int(g.group(1)) - 1] if g.group(1) else next(seq, "")
+            def fill(g: re.Match, grp=groups, s=seq) -> str:
+                v = grp[int(g.group(1)) - 1] if g.group(1) else next(s, "")
                 return tr(v, "en") if v else v
             return re.sub(r"\{(\d*)\}", fill, en)
     return None

@@ -95,7 +95,7 @@ def apply(src: Path, *, shape: str, op: str, size: tuple[float, float, float], a
         kept = []
         for p in o.parts:
             solid, _ = _solid(p)
-            result = {"percer": lambda: solid - cutter, "garder": lambda: solid ^ cutter, "ajouter": lambda: solid}[op]()
+            result = {"percer": lambda s=solid: s - cutter, "garder": lambda s=solid: s ^ cutter, "ajouter": lambda s=solid: s}[op]()
             q = _part(result, p, solid.original_id())
             if q is not None:
                 kept.append(q)
