@@ -60,6 +60,11 @@
 </header>
 
 <main>
+  <div id="firmware-warning" class="fw-warning" hidden>
+    <svg class="i" style="color:var(--error)"><use href="#i-x"/></svg>
+    <span id="fw-message"></span>
+    <button class="btn ghost sm" onclick="document.getElementById('firmware-warning').hidden=true" title="Masquer">×</button>
+  </div>
   <section id="lab">
     <aside class="lib">
       <div class="lib-head"><h2>Bibliothèque</h2><div style="display:flex;gap:2px"><button class="btn ghost" id="make-open" title="Créer une pièce sur mesure (boîte, étiquette, crochet…)"><svg class="i"><use href="#i-plus"/></svg>Créer</button><button class="btn ghost" id="asm-open" title="Assembler plusieurs pièces, une couleur chacune"><svg class="i"><use href="#i-puzzle"/></svg>Assembler</button></div></div>
@@ -394,8 +399,8 @@
             <div class="switch"><label for="mc-level">Niveler le plateau avant chaque impression</label><input type="checkbox" id="mc-level" data-ctl></div>
             <div class="switch" style="margin-top:8px"><label for="mc-check">Vérifications de l'imprimante avant de démarrer</label><input type="checkbox" id="mc-check" data-ctl></div>
             <div class="switch" style="margin-top:8px"><label for="mc-video">Timelapse de l'imprimante</label><input type="checkbox" id="mc-video" data-ctl></div>
-            <details class="mc-screen"><summary>À régler sur l'écran de la CC2</summary>
-              <p class="note" style="margin:8px 0 6px">En réseau local, la CC2 n'accepte pas ces commandes (le SDK officiel d'Elegoo les désactive) : fais-les sur l'écran tactile.</p>
+            <details class="mc-screen" open><summary>⚠️ À régler sur l'écran de la CC2</summary>
+              <p class="note" style="margin:8px 0 6px; color:var(--error);">⚠️ <b>En réseau local, la CC2 n'accepte pas ces commandes</b> (le SDK officiel d'Elegoo les désactive) : <b>fais-les sur l'écran tactile</b>.</p>
               <ul><li><b>Mise en origine, déplacer la tête</b> : avant un nettoyage de buse ou un changement de plateau.</li>
                 <li><b>Décalage Z (première couche)</b> : si le test « Première couche » est trop écrasé ou ne colle pas, par pas de 0,02 mm.</li>
                 <li><b>Calibrations automatiques</b> (nivellement, vibrations) : après le transport et tous les quelques mois.</li>

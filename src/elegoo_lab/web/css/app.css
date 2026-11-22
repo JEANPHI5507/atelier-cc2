@@ -841,3 +841,10 @@
   #chat-fold:hover { color: var(--txt); }
   @media (max-width: 860px) { #chat-sec { top: 100px; } }   /* the toolbar wraps higher there */
   @media (max-width: 600px) { #chat-sec { width: min(300px, calc(100% - 24px)); max-height: 55vh; } }
+
+  /* Message d'avertissement firmware */
+  .fw-warning { display: flex; align-items: center; gap: 10px; padding: 12px 20px; 
+                background: var(--surface); border-bottom: 1px solid var(--line); 
+                color: var(--txt); font-size: 14px; }
+  .fw-warning svg { flex: none; }
+  .fw-warning button { margin-left: auto; }

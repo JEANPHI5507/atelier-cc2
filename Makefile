@@ -5,7 +5,7 @@ ORCA_URL     := https://github.com/OrcaSlicer/OrcaSlicer/releases/download/v$(OR
 
 SERVEUR      ?=   # make deploy SERVEUR=<hôte ssh> (une entrée de ~/.ssh/config)
 
-.PHONY: install slicer plateau test dash deploy
+.PHONY: install slicer plateau test dash deploy lint format check all
 install:
 	uv sync
 
@@ -32,6 +32,26 @@ test:
 	uv run pytest -q
 dash:
 	uv run cc2 --control dash
+
+lint:
+	uv run ruff check src/ tests/
+	uv run mypy src/elegoo_lab --ignore-missing-imports
+	uv run black --check src/ tests/
+	uv run isort --check-only src/ tests/
+
+format:
+	uv run ruff check --fix src/ tests/
+	uv run black src/ tests/
+	uv run isort src/ tests/
+
+check:
+	uv run pytest -q
+	uv run ruff check src/ tests/
+	uv run mypy src/elegoo_lab --ignore-missing-imports
+	uv run black --check src/ tests/
+	uv run isort --check-only src/ tests/
+
+all: lint test
 
 ia:  ## modèle de détection des ratés (Obico, 200 Mo, vérifié)
 	uv run python -c "from elegoo_lab import vision; vision.download_model(); print('modèle IA installé')"
