@@ -57,7 +57,7 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          uv sync --all-extras
+          uv pip sync
 
       - name: Run Fast Tests
         run: |
@@ -84,7 +84,7 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          uv sync --all-extras
+          uv pip sync
 
       - name: Install OpenGL dependencies
         run: |
@@ -120,7 +120,7 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          uv sync --all-extras
+          uv pip sync
 
       - name: Install Chrome for Playwright
         run: |
@@ -156,7 +156,7 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          uv sync --all-extras
+          uv pip sync
 
       - name: Start Simulator
         run: |
