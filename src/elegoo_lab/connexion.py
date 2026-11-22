@@ -61,8 +61,8 @@ async def check(host: str, access_code: str, mqtt_port: int = 1883, http_port: i
 
     # 3. the printer itself (MQTT, read-only)
     try:
-        from pycentauri.cc2 import CC2Printer
         import pycentauri.cc2 as cc2
+        from pycentauri.cc2 import CC2Printer
         old_port = cc2.MQTT_PORT
         cc2.MQTT_PORT = mqtt_port
         try:

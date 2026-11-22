@@ -20,7 +20,6 @@ import numpy as np
 
 from .parametric import FONT, SCRIPT_FONT, Part, _rounded, text_section
 
-
 PREVIEW = contextvars.ContextVar("preview", default=False)   # the live preview: coarser where it costs (lithophane)
 
 

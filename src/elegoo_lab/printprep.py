@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import re
 import time
-
 from pathlib import Path
 from typing import Any
 
@@ -279,7 +278,7 @@ def prepare_and_slice(
     palette = slot_hex or colorize.PALETTE
     per = res.per_filament_m + [0.0] * n
     purge = res.purge_m + [0.0] * n
-    from . import spools, stock                       # needs() is what the colours step shows: keep it honest
+    from . import spools, stock  # needs() is what the colours step shows: keep it honest
     vol = mesh.info(src).get("volume_cm3")
     if vol and res.per_filament_m:
         est = sum((spools.needs(vol, info["colours"], usage=usage, mapping=slots, filaments=fil)).values())
@@ -462,6 +461,7 @@ def compare(src: Path, base: dict[str, Any], on_row=None, only_current: bool = F
     usages, and for a multicolour model two copies on one plate (colour changes are shared: measured
     on a 4-colour figurine, 2 copies cost 57 g / 11 h instead of 2 × 39 g / 2 × 8 h 45)."""
     import tempfile
+
     from . import stock
     current = base.get("usage", DEFAULT_USAGE)
     variants = [("Ton choix", {})]

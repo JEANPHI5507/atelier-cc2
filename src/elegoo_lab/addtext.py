@@ -16,7 +16,7 @@ import manifold3d as mf
 import numpy as np
 import trimesh
 
-from . import colorize, config, mesh, parametric, threemf
+from . import colorize, mesh, parametric, threemf
 
 LINE_FONT = Path(__file__).parent / "fonts" / "Sacramento-Regular.ttf"   # joined, one even line (SIL OFL)
 FONTS = {"manuscrite": parametric.SCRIPT_FONT, "droite": parametric.FONT, "trait": LINE_FONT}

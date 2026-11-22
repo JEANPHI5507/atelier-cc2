@@ -17,8 +17,9 @@ from typing import Annotated, Optional
 import typer
 from pycentauri.cli import app as printer_app
 
+from . import colorize, colors
 from . import comfy as comfy_mod
-from . import colorize, colors, config, mesh, printprep, slicer
+from . import config, mesh, printprep, slicer
 
 app = typer.Typer(help=__doc__, no_args_is_help=True, add_completion=False)
 
@@ -52,7 +53,9 @@ def dash(
 ) -> None:
     """Lance le tableau de bord web (imprimante + atelier)."""
     import asyncio
+
     import uvicorn
+
     from .app import create_app
     control = bool(ctx.parent and ctx.parent.params.get("control"))
     port = port or config.load().dashboard_port
@@ -67,8 +70,9 @@ def dash(
                f"  [contrôle {'activé' if control else 'lecture seule'}]")
     servers = [uvicorn.Config(web, host=bind, port=port, log_level="warning", timeout_graceful_shutdown=3)]
     if lan:
-        from . import access
         import time
+
+        from . import access
         ip = access.lan_ip()
         for _ in range(30):   # started with the PC: the network may come up a few seconds after us
             if ip != "127.0.0.1":
@@ -109,7 +113,9 @@ def simulateur(
     avec sa propre bibliothèque et ses réglages dans demo/ (ta vraie bibliothèque n'est pas touchée)."""
     import asyncio
     import logging
+
     import uvicorn
+
     from . import simulateur as sim
     demo = config.ROOT / "demo"
     (demo / "models").mkdir(parents=True, exist_ok=True)
@@ -143,6 +149,7 @@ def code_acces(
 ) -> None:
     """Change le code d'accès depuis le téléphone (les téléphones déjà connectés devront le ressaisir)."""
     import secrets
+
     from . import access
     code = code or f"{secrets.randbelow(10**6):06d}"
     try:
@@ -284,6 +291,7 @@ def backup_install(
 def backup_status() -> None:
     """Date de la dernière sauvegarde réussie et dernière erreur."""
     import time
+
     from . import sauvegarde
     s = sauvegarde.status()
     fmt = lambda t: time.strftime("%d/%m/%Y %H:%M", time.localtime(t))   # noqa: E731
@@ -503,8 +511,8 @@ def gen(
 @app.command("doctor")
 def doctor() -> None:
     """Vérifie la configuration, l'imprimante, OrcaSlicer, le modèle IA, la caméra et ComfyUI."""
-    import socket
     import shutil
+    import socket
     import sys
     from pathlib import Path
 

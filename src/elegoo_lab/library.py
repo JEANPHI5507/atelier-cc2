@@ -154,7 +154,9 @@ def thumbnail(name: str) -> bytes | None:
     if cache.exists():
         return cache.read_bytes()
     import numpy as np
-    from . import colors, thumbnail as th
+
+    from . import colors
+    from . import thumbnail as th
     v, f, slots, slot_hex = colors.solid(p, {})
     rgb = np.array([colors._rgb(slot_hex[int(s) - 1]) for s in slots]) if slot_hex else np.full((len(f), 3), 190.0)
     png = th.render(v, f, rgb, size=144)

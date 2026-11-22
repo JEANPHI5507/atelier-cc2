@@ -11,8 +11,8 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
-import re
 import logging
+import re
 import threading
 import time
 from collections import deque
@@ -142,7 +142,7 @@ async def send_ntfy(ev: dict[str, Any]) -> bool:
     url = ntfy_url()
     if not url:
         return False
-    from .i18n import tr   # in the language last chosen in the interface
+    from .i18n import tr  # in the language last chosen in the interface
     extra: dict[str, str] = {}
     if (base := app_url()):
         extra["Click"] = base
@@ -423,6 +423,7 @@ class Watcher:
 
     def _multicolour(self, name: str) -> bool:
         from pathlib import Path
+
         from . import stock
         rec = stock.load()["prints"].get(Path(name).name) if name else None
         return bool(rec) and sum(1 for m in rec["per_m"] if m > 0) > 1
@@ -622,6 +623,7 @@ class Watcher:
     def _account(self, name: str, fraction: float, ref: str) -> None:
         """Take the filament of this print off the spools; warn when one runs low."""
         from pathlib import Path
+
         from . import stock
         if not name:
             return

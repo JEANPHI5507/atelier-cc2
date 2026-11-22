@@ -347,6 +347,7 @@ class Sim:
     def camera_frame(self) -> bytes:
         """A drawn view of the chamber: the plate, and the part growing with the progress."""
         import io
+
         from PIL import Image, ImageDraw
         s = self.s
         img = Image.new("RGB", (640, 360), (52, 56, 62))

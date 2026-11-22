@@ -5,26 +5,48 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import hashlib
-import httpx
 import json
 import re
-from urllib.parse import urlsplit
 import shutil
 import threading
 import time
 import uuid
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
-from pydantic import BaseModel
-from fastapi.responses import StreamingResponse
+import httpx
 from fastapi import APIRouter, FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
+from fastapi.responses import (
+    FileResponse,
+    JSONResponse,
+    RedirectResponse,
+    Response,
+    StreamingResponse,
+)
 from fastapi.staticfiles import StaticFiles
 from pycentauri.server import create_app as create_printer_app
+from pydantic import BaseModel
 
-from . import (assistant, launch, library, stock, calibration, colorize, colors, comfy, config, connexion, gcode_preview, mesh, parametric, printprep,
-               settings, slicer, spools)
+from . import (
+    assistant,
+    calibration,
+    colorize,
+    colors,
+    comfy,
+    config,
+    connexion,
+    gcode_preview,
+    launch,
+    library,
+    mesh,
+    parametric,
+    printprep,
+    settings,
+    slicer,
+    spools,
+    stock,
+)
 
 WEB = Path(__file__).parent / "web"
 JOBS_FILE = config.MODELS_DIR / ".jobs.json"
@@ -852,6 +874,7 @@ def lab_router(cfg: config.Config) -> APIRouter:
     async def plate_check(request: Request) -> dict[str, Any]:
         """Before a print: "vide", "occupe" or "inconnu", with the photo it is based on."""
         import base64
+
         from . import bedcheck
         try:
             jpeg = await _plate_photo(request)
@@ -1352,8 +1375,10 @@ class SameOriginGuard:
 def _add_alerts(app: FastAPI) -> None:
     """Start the print watcher with the printer connection, and expose its events."""
     from contextlib import asynccontextmanager
+
     from fastapi.responses import FileResponse
     from sse_starlette.sse import EventSourceResponse
+
     from . import alerts
 
     inner = app.router.lifespan_context
@@ -1594,8 +1619,10 @@ def create_app(*, enable_control: bool = False, lan: bool = False, port: int = 0
         if not lan:
             return {"lan": False}
         import io
+
         import qrcode
         import qrcode.image.svg
+
         from . import access
         def qr(text: str) -> str:
             buf = io.BytesIO()

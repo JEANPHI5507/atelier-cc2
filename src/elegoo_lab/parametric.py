@@ -291,6 +291,7 @@ def _build(key: str, values: dict[str, Any]) -> tuple[Kind, dict[str, Any], list
 def preview(key: str, values: dict[str, Any]) -> tuple[bytes, list[float]]:
     """The part as a coloured GLB for the live preview (nothing written), and its size in mm."""
     import trimesh
+
     from .parametric_more import PREVIEW
     tok = PREVIEW.set(True)
     try:

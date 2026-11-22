@@ -3,10 +3,26 @@ target-version = "py312"
 
 [lint]
 select = ["E", "W", "F", "I", "B", "C4", "UP", "N", "S", "BLE", "FBT", "C90", "ICN", "ISC", "PIE", "PT", "Q", "RSE", "RET", "SIM", "TCH", "ARG"]
-ignore = ["E501", "B008", "C901", "S101", "S301", "S307", "S603", "S607", "UP007"]
+ignore = [
+    "E501",      # line too long (handled by black)
+    "B008",      # do not perform function calls in argument defaults
+    "C901",      # too complex
+    "S101",      # assert used
+    "S301",      # pickle
+    "S307",      # eval
+    "S603",      # subprocess without shell=True
+    "S607",      # start_process_with_partial_path
+    "UP007",     # non-pep604-annotation
+    "RET502",    # implicit return None (will fix gradually)
+    "RET503",    # missing explicit return None (will fix gradually)
+    "BLE001",    # blind exception (will fix gradually)
+    "B905",      # zip without strict (will fix gradually)
+    "TC003",     # pathlib in type-checking block (will fix gradually)
+]
 
 [lint.per-file-ignores]
-"tests/*" = ["S101", "ARG001"]
+"tests/*" = ["S101", "ARG001", "PLR0913", "PLR0915"]
+"src/elegoo_lab/web/*" = ["ALL"]
 
 [format]
 quote-style = "double"
