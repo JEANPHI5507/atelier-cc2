@@ -49,7 +49,7 @@ def _load(path: str, _mtime: float) -> dict[str, Any]:
                 m = tool[a:b] == t
                 np.add.at(cover[t], lo[m], 1)
                 np.add.at(cover[t], hi[m] + 1, -1)
-            cover = np.cumsum(cover, axis=1)[:, :nb]
+            cover = np.cumsum(cover, axis=1)[:, :nb]  # type: ignore[assignment]
             col = np.where(cover.max(axis=0) > 0, cover.argmax(axis=0), -1)
             i = 0
             while i < nb:                                     # runs of one colour: [first column, last column, tool]

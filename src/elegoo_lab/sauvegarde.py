@@ -35,7 +35,7 @@ def _file() -> Path:
 
 def status() -> dict[str, Any]:
     try:
-        return json.loads(_file().read_text())
+        return json.loads(_file().read_text())  # type: ignore[no-any-return]
     except (OSError, ValueError):
         return {}
 

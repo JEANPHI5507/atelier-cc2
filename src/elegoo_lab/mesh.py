@@ -71,7 +71,7 @@ def _info(path: Path) -> dict[str, Any]:
         m = trimesh.util.concatenate(parts)
         x, y, z = (float(v) for v in m.extents)
         tight = all(p.is_watertight for p in parts)
-        return {"file": path.name, "triangles": int(len(m.faces)), "size_mm": [round(x, 2), round(y, 2), round(z, 2)],
+        return {"file": path.name, "triangles": int(len(m.faces)), "size_mm": [round(x, 2), round(y, 2), round(z, 2)],  # type: ignore[attr-defined]
                 "watertight": tight, "volume_cm3": round(sum(float(p.volume) for p in parts) / 1000, 2) if tight else None,
                 "fits_bed": max(x, y, z) <= BED_MM, "objects": len(parts),
                 "unitless": False}

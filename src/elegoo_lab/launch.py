@@ -77,7 +77,7 @@ def gcode_colours(path: Path) -> list[dict[str, Any]]:
         mm = float(used[i]) if i < len(used) and re.fullmatch(r"[\d.]+", used[i]) else None
         out.append({"t": i, "colour": c.upper() if re.fullmatch(r"#[0-9A-Fa-f]{6}", c) else "#888888",
                     "type": types[i] if i < len(types) else "PLA", "m": round(mm / 1000, 2) if mm is not None else None})
-    return [t for t in out if t["m"] is None or t["m"] > 0] or out[:1]
+    return [t for t in out if isinstance(t.get("m"), (int, float)) and t["m"] > 0] or out[:1]  # type: ignore[operator]
 
 
 ABRASIVE = ("CF", "GF", "GLOW", "PAILLET", "GLITTER", "SPARKLE", "MARBLE")

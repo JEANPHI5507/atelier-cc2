@@ -54,7 +54,9 @@ def plan(path: Path, *, height_mm: float | None = None, rz: int = 0) -> dict[str
         step(f"Posée {best['label'].lower()}", why[:1].upper() + why[1:] + ".")
 
     # 4. the advisor at that position, its fixes applied until it has nothing left it can fix
-    supports, advanced, split = "aucun", {}, False
+    supports = "aucun"
+    advanced: dict = {}
+    split = False
     for _ in range(MAX_ROUNDS):
         a = advisor.analyze(path, height_mm=height_mm, rotate=rotate, supports=supports != "aucun",
                             brim=advanced.get("bordure") in ("exterieure", "oreilles"), split=split)

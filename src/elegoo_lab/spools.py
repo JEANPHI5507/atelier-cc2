@@ -71,7 +71,7 @@ def filament_for(tray: dict[str, Any]) -> str:
     """OrcaSlicer profile name for a tray: same material, and the variant named on the spool if known."""
     known = slicer.filaments()
     if tray.get("profile") in known:
-        return tray["profile"]
+        return tray["profile"]  # type: ignore[no-any-return]
     material = str(tray.get("type") or "PLA").strip().upper()
     name = f"{tray.get('filament_name') or ''} {tray.get('brand') or ''}".upper()
     same = [k for k in known if k.split()[0].upper() == material]

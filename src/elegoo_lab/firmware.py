@@ -9,6 +9,7 @@ Ce module permet de :
 
 from __future__ import annotations
 
+from typing import Any
 import logging
 
 # 4CD Versions de firmware testées et supportées
@@ -204,7 +205,7 @@ class FirmwareManager:
             f"Niveau de support: {self._detected_version.get_support_level()}"
         )
 
-    def get_safe_mode_info(self) -> dict[str, any]:
+    def get_safe_mode_info(self) -> dict[str, Any]:
         """Retourne les informations sur le mode safe pour l'API."""
         if self._detected_version is None:
             return {

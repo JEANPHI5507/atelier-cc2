@@ -34,7 +34,7 @@ def _check_host(url: str) -> None:
     except OSError:
         raise LinkError(f"Adresse introuvable : {u.hostname}") from None
     for a in addrs:
-        ip = ipaddress.ip_address(a.split("%")[0])
+        ip = ipaddress.ip_address(str(a).split("%")[0])
         if not ip.is_global:
             raise LinkError("Ce lien pointe vers le réseau local : refusé.")
 

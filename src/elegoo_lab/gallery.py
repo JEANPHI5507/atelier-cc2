@@ -152,7 +152,7 @@ def update(entry_id: str, **values: Any) -> dict[str, Any]:
     meta = json.loads((d / "meta.json").read_text())
     meta.update(values)
     config.write_atomic(d / "meta.json", json.dumps(meta, ensure_ascii=False, indent=1))
-    return meta
+    return meta  # type: ignore[no-any-return]
 
 
 def delete(entry_id: str) -> None:

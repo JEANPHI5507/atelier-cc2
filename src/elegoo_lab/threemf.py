@@ -91,7 +91,7 @@ def _attr(name: bytes, attrs: list[bytes]) -> list[bytes | None]:
 
 
 def _code(m: re.Match | None) -> str | None:
-    return m.group(1).decode() or None if m else None
+    return m.group(1).decode() or None if m else None  # type: ignore[no-any-return]
 
 
 def _numbers(rows: list[tuple], dtype: type) -> np.ndarray:
