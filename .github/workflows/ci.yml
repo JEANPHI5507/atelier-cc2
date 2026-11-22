@@ -24,6 +24,28 @@ on:
       - '*.jpg'
       - 'LICENSE'
       - '.gitignore'
+  workflow_dispatch:
+    inputs:
+      run-lint:
+        description: 'Run Linting'
+        required: true
+        default: true
+        type: boolean
+      run-tests:
+        description: 'Run Tests'
+        required: true
+        default: true
+        type: boolean
+      run-build:
+        description: 'Run Build'
+        required: true
+        default: true
+        type: boolean
+      run-docker:
+        description: 'Build and Push Docker'
+        required: true
+        default: false
+        type: boolean
 
 
 #  Variables globales
@@ -248,28 +270,3 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./docs
         continue-on-error: true
-
-
-#  Workflow Dispatch (pour excuter manuellement)
-  workflow_dispatch:
-    inputs:
-      run-lint:
-        description: 'Run Linting'
-        required: true
-        default: true
-        type: boolean
-      run-tests:
-        description: 'Run Tests'
-        required: true
-        default: true
-        type: boolean
-      run-build:
-        description: 'Run Build'
-        required: true
-        default: true
-        type: boolean
-      run-docker:
-        description: 'Build and Push Docker'
-        required: true
-        default: false
-        type: boolean
