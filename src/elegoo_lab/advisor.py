@@ -89,7 +89,7 @@ def analyze(path: Path, *, height_mm: float | None = None, rotate: tuple[float, 
     if secs is not None:
         reach = (secs[1][0] - secs[0][0] if len(secs) > 1 else SLICE_STEP) * np.tan(np.radians(OVERHANG_DEG))
         layers = [max(0.0, (cs - below.offset(reach, mf.JoinType.Round)).area())
-                  for (_, below), (_, cs) in zip(secs, secs[1:])]
+                  for (_, below), (_, cs) in zip(secs, secs[1:], strict=False)]
         over = float(sum(layers))
         big = over > 60 or max(layers, default=0) > 20      # a lot in all, or one flat ceiling
     else:  # open mesh: fall back to the faces' orientation

@@ -87,7 +87,7 @@ def _header_meta(path: Path) -> dict[str, Any]:
     cols = [c for c in re.split(r"[;,]", one("filament_colour") or "") if re.fullmatch(r"#[0-9A-Fa-f]{6}", c.strip())]
     used = [float(x) for x in re.findall(r"[\d.]+", one("filament used [mm]") or "")]
     if used and len(used) == len(cols):
-        cols = [c for c, u in zip(cols, used) if u > 0]
+        cols = [c for c, u in zip(cols, used, strict=False) if u > 0]
     g = one("total filament used [g]")
     meta = {"temps": one("estimated printing time (normal mode)"), "couches": one("total layer number"),
             "g": float(g) if g and re.fullmatch(r"[\d.]+", g) else None,

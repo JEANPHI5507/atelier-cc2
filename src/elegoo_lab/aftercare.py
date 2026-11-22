@@ -35,11 +35,11 @@ ISSUES: dict[str, tuple[str, str, str, Fix]] = {
     "dessus": ("Dessus rugueux ou troué",
                "Pas assez de couches pleines sur le remplissage.",
                "La prochaine fois : plus de couches dessus et lissage de la face la plus haute.",
-               lambda u: {"advanced": {"dessus": 6, "lissage": "dernier"}}),
+               lambda _: {"advanced": {"dessus": 6, "lissage": "dernier"}}),
     "couture": ("Ligne ou petits boutons sur le côté",
                 "La couture : chaque couche commence au même endroit.",
                 "Ébavure au cutter. La prochaine fois : couture cachée à l'arrière.",
-                lambda u: {"advanced": {"couture": "arriere"}}),
+                lambda _: {"advanced": {"couture": "arriere"}}),
     "fragile": ("Fragile, couches qui se séparent",
                 "Couches mal soudées (buse un peu froide) ou parois trop fines.",
                 "La prochaine fois : une paroi de plus, buse +5 °C, remplissage gyroïde.",
@@ -47,28 +47,28 @@ ISSUES: dict[str, tuple[str, str, str, Fix]] = {
     "supports": ("Supports durs à enlever ou marques",
                  "Supports trop solides ou trop collés à la pièce.",
                  "Retire-les pièce froide, à la pince coupante, par petits morceaux. La prochaine fois : supports en arbre fins.",
-                 lambda u: {"supports": "arbre_fin"}),
+                 lambda _: {"supports": "arbre_fin"}),
     "affaisse": ("Dessous ou surplombs affaissés",
                  "Des zones penchées n'avaient rien dessous.",
                  "La prochaine fois : supports en arbre, déclenchés plus tôt (40°).",
-                 lambda u: {"supports": "arbre", "advanced": {"angle_support": 40}}),
+                 lambda _: {"supports": "arbre", "advanced": {"angle_support": 40}}),
     "maigre": ("Trous ou lignes maigres",
                "Pas assez de plastique (débit, filament humide ou buse en partie bouchée).",
                "Imprime la tour de débit (onglet Démarrage) et reporte la valeur ; vérifie que la bobine tourne librement.",
-               lambda u: {}),
+               lambda _: {}),
     "couleurs": ("Couleurs qui bavent les unes sur les autres",
                  "La purge entre deux couleurs ne suffisait pas.",
                  "La prochaine fois : mode multicolore Équilibré (tour d'essuyage).",
-                 lambda u: {"mode": "equilibre"}),
+                 lambda _: {"mode": "equilibre"}),
     "gouttes": ("Gouttes ou pâtés aux changements de couleur",
                 "La buse coule en attendant la couleur suivante et dépose le surplus sur la pièce.",
                 "Les gouttes partent au cutter, pièce froide. La prochaine fois : mode Équilibré, la buse s'essuie sur une tour avant de revenir sur la pièce.",
-                lambda u: {"mode": "equilibre"}),
+                lambda _: {"mode": "equilibre"}),
     "tour": ("Tour de purge tombée ou décollée",
              "La buse revient de chaque purge en suintant : le fil fait des boucles sur la tour et la buse finit par les accrocher.",
              ("Ne remets pas la tour : reprends, quelques fils tomberont à sa place. L'atelier imprime déjà la tour avec une bordure "
              "de 8 mm et lève la buse de 0,8 mm ; nettoie le plateau à cet endroit. Pour une petite pièce, le mode Économie n'a pas de tour."),
-             lambda u: {}),
+             lambda _: {}),
     "pied": ("Base évasée (pied d'éléphant)",
              "Première couche écrasée par un plateau trop chaud.",
              "Lime légèrement l'arête du bas. La prochaine fois : plateau 5 °C plus froid.",
@@ -76,7 +76,7 @@ ISSUES: dict[str, tuple[str, str, str, Fix]] = {
     "decalage": ("Couches décalées d'un coup",
                  "La tête a sauté des pas : choc, courroie ou vitesse trop haute.",
                  "Vérifie que rien ne gêne la tête, puis imprime en vitesse Équilibré ou Silencieux (onglet Imprimante).",
-                 lambda u: {}),
+                 lambda _: {}),
 }
 
 
@@ -183,7 +183,7 @@ def _supports_plan(gcode: Path) -> dict[str, Any] | None:
     ci_x = (np.floor(contact[:, 0] / CELL) - x0).astype(int).clip(0, grid.shape[1] - 1)
     ci_y = (np.floor(contact[:, 1] / CELL) - y0).astype(int).clip(0, grid.shape[0] - 1)
     zones = []
-    for lo, hi in zip(edges[:-1], edges[1:]):
+    for lo, hi in zip(edges[:-1], edges[1:], strict=False):
         inb = (sup[:, 2] >= lo) & (sup[:, 2] < hi)
         g = np.zeros_like(grid)
         np.add.at(g, (cy[inb], cx[inb]), sup[inb, 3])
@@ -225,11 +225,11 @@ def _supports_plan(gcode: Path) -> dict[str, Any] | None:
            if u["arbre"] else
            "Glisse un cutter ou la pince sous un coin du bloc et soulève-le d'un seul morceau, sans tirer sur la pièce.")
     # the page draws them: part outline and support zones, cells of CELL mm, y up
-    top = [[int((x + x0) * CELL), int((y + y0) * CELL)] for y, x in zip(*np.nonzero(_occupied(part, x0, y0, grid.shape)))]
+    top = [[int((x + x0) * CELL), int((y + y0) * CELL)] for y, x in zip(*np.nonzero(_occupied(part, x0, y0, grid.shape)), strict=False)]
     return {
         "tips": [f"Supports : {len(zones)} zone{'s' if len(zones) > 1 else ''} à retirer, en orange sur la vue 3D. {how}", *lines,
                  "Il reste de petits points là où les supports touchaient : passe le cutter à plat, sans appuyer."],
-        "map": {"cell": CELL, "part": top, "supports": [[int((x + x0) * CELL), int((y + y0) * CELL)] for y, x in zip(*np.nonzero(grid))]},
+        "map": {"cell": CELL, "part": top, "supports": [[int((x + x0) * CELL), int((y + y0) * CELL)] for y, x in zip(*np.nonzero(grid), strict=False)]},
     }
 
 

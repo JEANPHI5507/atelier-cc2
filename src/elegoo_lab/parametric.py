@@ -58,30 +58,30 @@ class _FlatPen(BasePen):
         self.cur: list[tuple[float, float]] = []
         self.steps = steps
 
-    def _moveTo(self, p: tuple[float, float]) -> None:
+    def _move_to(self, p: tuple[float, float]) -> None:
         self.cur = [p]
 
-    def _lineTo(self, p: tuple[float, float]) -> None:
+    def _line_to(self, p: tuple[float, float]) -> None:
         self.cur.append(p)
 
-    def _curveToOne(self, p1: Any, p2: Any, p3: Any) -> None:
+    def _curve_to_one(self, p1: Any, p2: Any, p3: Any) -> None:
         p0 = np.array(self.cur[-1])
         for t in np.linspace(0, 1, self.steps + 1)[1:]:
             pt = (1 - t) ** 3 * p0 + 3 * (1 - t) ** 2 * t * np.array(p1) + 3 * (1 - t) * t ** 2 * np.array(p2) + t ** 3 * np.array(p3)
             self.cur.append(tuple(pt))
 
-    def _qCurveToOne(self, p1: Any, p2: Any) -> None:
+    def _q_curve_to_one(self, p1: Any, p2: Any) -> None:
         p0 = np.array(self.cur[-1])
         for t in np.linspace(0, 1, self.steps + 1)[1:]:
             pt = (1 - t) ** 2 * p0 + 2 * (1 - t) * t * np.array(p1) + t ** 2 * np.array(p2)
             self.cur.append(tuple(pt))
 
-    def _closePath(self) -> None:
+    def _close_path(self) -> None:
         if len(self.cur) >= 3:
             self.contours.append(self.cur)
         self.cur = []
 
-    _endPath = _closePath
+    _end_path = _close_path
 
 
 def text_section(text: str, height: float, font_file: Path = FONT) -> mf.CrossSection:

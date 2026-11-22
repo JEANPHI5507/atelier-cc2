@@ -58,7 +58,7 @@ def _layer_stats(solid: mf.Manifold, rot: np.ndarray | None, scale: float) -> di
     zs = np.arange(min(0.2, h / 2), h, step)
     secs = [turned.slice(float(z)) for z in zs]
     reach = step * np.tan(np.radians(50))
-    over = sum(max(0.0, (cs - below.offset(reach, mf.JoinType.Round)).area()) for below, cs in zip(secs, secs[1:]))
+    over = sum(max(0.0, (cs - below.offset(reach, mf.JoinType.Round)).area()) for below, cs in zip(secs, secs[1:], strict=False))
     return {"contact": float(secs[0].area()) if secs else 0.0, "surplomb": float(over), "hauteur": float(h)}
 
 

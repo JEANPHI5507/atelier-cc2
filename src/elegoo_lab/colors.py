@@ -597,7 +597,7 @@ def _analyze(path: Path, palette: Palette | None = None) -> dict[str, Any]:
         centres, labels, detected = _rgb_labels(pr, palette)
         painted = bool(palette)
         share = np.zeros(len(centres))
-        for p, lab in zip(parts, labels):
+        for p, lab in zip(parts, labels, strict=False):
             share += np.bincount(lab, weights=_areas(p), minlength=len(centres))
         share /= share.sum() or 1
         found = [{"index": i + 1, "hex": _hex(centres[i]), "share": round(100 * share[i], 1)}
@@ -761,7 +761,7 @@ def to_canvas(path: Path, out: Path, mapping: dict[int, int], *, height_mm: floa
         _, labels, _ = _rgb_labels(pr, palette)
         codes = {s: encode_state(s) for s in range(1, MAX_SLOTS + 1)}
         face_states = []
-        for p, lab in zip(parts, labels):
+        for p, lab in zip(parts, labels, strict=False):
             states = np.array([mapping.get(int(label) + 1, 1) for label in lab])
             p.extruder = int(np.bincount(states).argmax())
             p.paint = [codes[int(s)] for s in states]
@@ -798,7 +798,7 @@ def to_canvas(path: Path, out: Path, mapping: dict[int, int], *, height_mm: floa
     simplified = 0
     if simplify > 0 and rgb:   # placed and scaled now: layers are known
         simplified = simplify_layers(parts, face_states, layer_mm, simplify)
-        for p, states in zip(parts, face_states):
+        for p, states in zip(parts, face_states, strict=False):
             p.paint = [codes[int(x)] for x in states]
             p.extruder = int(np.bincount(states).argmax())
     if copies > 1:  # repeat every object on a grid, then centre the whole grid
@@ -852,7 +852,7 @@ def _piece_par_piece(pr: threemf.Project, offset: np.ndarray) -> str | None:
         return "meme"
     radius, height = slicer.clearances()
     boxes = []
-    for o, k in zip(pr.objects, keys):
+    for o, k in zip(pr.objects, keys, strict=False):
         label = o.name.split(" · ")[-1]
         v = np.vstack([p.vertices for p in o.parts]) + offset if o.parts else np.zeros((1, 3)) + offset
         lo, hi = v.min(0), v.max(0)
@@ -951,7 +951,7 @@ def preview(path: Path, mapping: dict[int, int] | None = None, palette: Palette 
             idx.append(np.array([p.extruder if st == 0 else st for st in first]))
     grey = np.array([200.0, 200.0, 200.0])
     verts, faces, cols, off = [], [], [], 0
-    for p, ix in zip(parts, idx):
+    for p, ix in zip(parts, idx, strict=False):
         verts.append(p.vertices)
         faces.append(p.faces + off)
         off += len(p.vertices)

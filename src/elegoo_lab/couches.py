@@ -77,7 +77,7 @@ def apply(model: Path, layer_mm: float, level: str) -> int:
         if not o.parts:
             continue
         v = np.vstack([p.vertices for p in o.parts])
-        f = np.vstack([p.faces + off for p, off in zip(o.parts, np.cumsum([0] + [len(p.vertices) for p in o.parts]))])
+        f = np.vstack([p.faces + off for p, off in zip(o.parts, np.cumsum([0] + [len(p.vertices) for p in o.parts]), strict=False)])
         v = v - [0, 0, v[:, 2].min()]
         rng = bands(v, f, layer_mm, level)
         extra += sum((z1 - z0) / h - (z1 - z0) / layer_mm for z0, z1, h in rng)

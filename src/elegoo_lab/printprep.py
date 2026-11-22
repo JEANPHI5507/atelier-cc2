@@ -281,11 +281,12 @@ def prepare_and_slice(
     vol = mesh.info(src).get("volume_cm3")
     if vol and res.per_filament_m:
         est = sum((spools.needs(vol, info["colours"], usage=usage, mapping=slots, filaments=fil)).values())
-        real = sum(stock.grams(mm + p, f) for mm, p, f in zip(per, purge, fil))
+        real = sum(stock.grams(mm + p, f) for mm, p, f in zip(per, purge, fil, strict=False))
         try:
             stock.calibrate_fill(usage, est, real)
-        except Exception:
-            pass                                      # a failed estimate correction must never fail a slice
+        except Exception as e:  # a failed estimate correction must never fail a slice
+            import logging
+            logging.getLogger(__name__).debug("calibrate_fill failed: %s", e)
     out = res.as_dict()
     out["warnings"] = warnings + out["warnings"]
     if pauses_mm:

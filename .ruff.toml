@@ -20,6 +20,11 @@ ignore = [
     "TC003",     # pathlib in type-checking block (will fix gradually)
     "F401",      # unused import (some are intentional for availability checks)
     "F811",      # redefined name (some are intentional)
+    "FBT001",    # boolean-typed positional argument (will fix gradually)
+    "FBT002",    # boolean default positional argument (will fix gradually)
+    "FBT003",    # boolean positional value in function call (will fix gradually)
+    "S104",      # binding to all interfaces (0.0.0.0) is intentional for local server
+    "S311",      # random.randrange for seed is not for crypto
 ]
 
 [lint.per-file-ignores]

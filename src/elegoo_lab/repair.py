@@ -71,7 +71,7 @@ def _load(path: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray | None]:
         off += len(g.vertices)
     rgba = None
     if any(c is not None for c in cs):
-        rgba = np.vstack([c if c is not None else np.full((len(v), 4), [192.0, 192.0, 192.0, 255.0]) for c, v in zip(cs, vs)])
+        rgba = np.vstack([c if c is not None else np.full((len(v), 4), [192.0, 192.0, 192.0, 255.0]) for c, v in zip(cs, vs, strict=False)])
     return np.vstack(vs), np.vstack(fs), rgba
 
 

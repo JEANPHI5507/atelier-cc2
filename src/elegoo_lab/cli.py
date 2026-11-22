@@ -154,7 +154,7 @@ def code_acces(
     try:
         access.set_code(code)
     except ValueError as e:
-        raise typer.BadParameter(str(e))
+        raise typer.BadParameter(str(e)) from None
     typer.echo(f"Nouveau code d'accès: {code}")
 
 

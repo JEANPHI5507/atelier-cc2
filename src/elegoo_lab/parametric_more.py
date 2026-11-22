@@ -198,8 +198,8 @@ def gear(dents: int, module: float, epaisseur: float, alesage: float, angle_pres
         left = [c - half + _involute(rb, r) for r in radii]
         right = [c + half - _involute(rb, r) for r in radii]
         pts.append((rf * math.cos(c - math.pi / z + 0.0001), rf * math.sin(c - math.pi / z + 0.0001)))
-        pts += [(r * math.cos(t), r * math.sin(t)) for r, t in zip(radii, left)]
-        pts += [(r * math.cos(t), r * math.sin(t)) for r, t in reversed(list(zip(radii, right)))]
+        pts += [(r * math.cos(t), r * math.sin(t)) for r, t in zip(radii, left, strict=False)]
+        pts += [(r * math.cos(t), r * math.sin(t)) for r, t in reversed(list(zip(radii, right, strict=False)))]
     body = mf.CrossSection([pts]).extrude(epaisseur)
     if alesage > 0:
         if alesage >= 2 * rf - 2 * m:

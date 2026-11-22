@@ -115,7 +115,7 @@ def far_colours(model_colours: list[dict[str, Any]], trays: list[dict[str, Any]]
     tl = colors._to_lab(np.array([colors._rgb(t["color"]) for t in trays]))
     de = np.linalg.norm(lab[:, None] - tl[None], axis=2)
     out = []
-    for c, row in zip(model_colours, de):
+    for c, row in zip(model_colours, de, strict=False):
         t = trays[int(row.argmin())]
         if row.min() > FAR_DE and c["share"] >= 2:
             out.append(f"La couleur {c['hex']} ({c['share']:.0f} % du modèle) n'a pas de bobine proche : elle sera "
@@ -140,7 +140,7 @@ def match(model_colours: list[dict[str, Any]], trays: list[dict[str, Any]]) -> d
     pick = {}
     head = order[: len(trays)]
     rows, cols = linear_sum_assignment(de[head])
-    for r, c in zip(rows, cols):
+    for r, c in zip(rows, cols, strict=False):
         pick[int(head[r])] = int(c)
     for i in order[len(trays):]:                               # more colours than spools: share the nearest
         pick[int(i)] = int(np.argmin(de[i]))

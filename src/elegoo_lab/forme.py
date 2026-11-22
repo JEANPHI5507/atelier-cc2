@@ -58,7 +58,7 @@ def _part(result: mf.Manifold, source: threemf.Part, origin: int) -> threemf.Par
     run = np.searchsorted(runs, np.arange(len(tri)) * 3, side="right") - 1
     face = np.asarray(out.face_id).astype(np.int64)
     mine = ids[run] == origin                      # faces of this part; the others come from the shape
-    paint = ([source.paint[f] if ok else None for f, ok in zip(face.tolist(), mine.tolist())] if source.paint else None)
+    paint = ([source.paint[f] if ok else None for f, ok in zip(face.tolist(), mine.tolist(), strict=False)] if source.paint else None)
     rgb = None
     if source.face_rgb is not None:
         known = np.asarray(source.face_rgb, float)

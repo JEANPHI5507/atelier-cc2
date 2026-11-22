@@ -79,7 +79,7 @@ def _inside(points: np.ndarray, rings: list[np.ndarray]) -> np.ndarray:
     for ring in rings:
         xa, ya = ring[:, 0], ring[:, 1]
         xb, yb = np.roll(xa, -1), np.roll(ya, -1)
-        for x1, y1, x2, y2 in zip(xa, ya, xb, yb):
+        for x1, y1, x2, y2 in zip(xa, ya, xb, yb, strict=False):
             crosses = ((y1 > y) != (y2 > y)) & (x < (x2 - x1) * (y - y1) / ((y2 - y1) or 1e-12) + x1)
             inside ^= crosses
     return inside
