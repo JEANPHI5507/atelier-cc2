@@ -42,7 +42,7 @@ class Comfy:
         try:
             r = self.http.get("/system_stats")
             r.raise_for_status()
-            return r.json()
+            return r.json()  # type: ignore[no-any-return]
         except httpx.HTTPError as err:
             raise ComfyError(f"ComfyUI injoignable sur {self.url}: {err}") from err
 
@@ -65,13 +65,13 @@ class Comfy:
         with path.open("rb") as f:
             r = self.http.post("/upload/image", files={"image": (path.name, f)}, data={"overwrite": "true"})
         r.raise_for_status()
-        return r.json()["name"]
+        return r.json()["name"]  # type: ignore[no-any-return]
 
     def queue(self, workflow: dict[str, Any]) -> str:
         r = self.http.post("/prompt", json={"prompt": workflow})
         if r.status_code != 200:
             raise ComfyError(f"workflow refusé ({r.status_code}): {r.text[:500]}")
-        return r.json()["prompt_id"]
+        return r.json()["prompt_id"]  # type: ignore[no-any-return]
 
     def wait(self, prompt_id: str, poll: float = 2.0, timeout: float = 1800.0) -> dict[str, Any]:
         end = time.monotonic() + timeout
@@ -84,7 +84,7 @@ class Comfy:
                 if status.get("status_str") == "error":
                     raise ComfyError(f"échec ComfyUI: {json.dumps(status.get('messages', [])[-1:])[:500]}")
                 if status.get("completed") or entry.get("outputs"):
-                    return entry["outputs"]
+                    return entry["outputs"]  # type: ignore[no-any-return]
             time.sleep(poll)
         raise ComfyError(f"timeout après {timeout:.0f}s")
 

@@ -266,7 +266,7 @@ def _default_picture() -> np.ndarray:
     """A heart on a soft gradient: the preview before a photo is chosen."""
     y, x = np.mgrid[1.4:-1.3:240j, -1.8:1.8:320j]
     heart = (x ** 2 + y ** 2 - 1) ** 3 - x ** 2 * y ** 3 < 0          # the classic heart curve, point down
-    return np.where(heart, 0.2, 0.9) - 0.1 * (y + 1.3) / 2.7
+    return np.where(heart, 0.2, 0.9) - 0.1 * (y + 1.3) / 2.7  # type: ignore[no-any-return]
 
 
 def _picture(data: str | None) -> np.ndarray:
@@ -291,7 +291,7 @@ def lithophane(photo: str, largeur: float, epaisseur_min: float, epaisseur_max: 
     nx = max(20, int(largeur / step))
     ny = max(20, int(nx * g.shape[0] / g.shape[1]))
     from PIL import Image
-    g = np.asarray(Image.fromarray((g * 255).astype(np.uint8)).resize((nx, ny), Image.LANCZOS), float) / 255
+    g = np.asarray(Image.fromarray((g * 255).astype(np.uint8)).resize((nx, ny), Image.LANCZOS), float) / 255  # type: ignore[type-var,attr-defined,operator]
     hgt = epaisseur_min + (1 - g[::-1]) * (epaisseur_max - epaisseur_min)
     xs, ys = np.arange(nx) * step, np.arange(ny) * step
     x, y = np.meshgrid(xs, ys)

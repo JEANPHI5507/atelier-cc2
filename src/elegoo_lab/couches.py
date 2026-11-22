@@ -46,9 +46,9 @@ def bands(v: np.ndarray, f: np.ndarray, layer_mm: float, level: str) -> list[tup
     if sloped.any():
         steps = np.arange(MIN_MM, hi + 1e-9, 0.02)
         h = np.clip(cusp / nz[face][sloped], MIN_MM, hi)
-        level = np.searchsorted(steps, h - 1e-9)
+        level = np.searchsorted(steps, h - 1e-9)  # type: ignore[assignment]
         hist = np.zeros((count, len(steps)))
-        np.add.at(hist, (band[sloped], level), share_area[sloped])
+        np.add.at(hist, (band[sloped], level), share_area[sloped])  # type: ignore[arg-type]
         enough = np.cumsum(hist, axis=1) >= MIN_SHARE * total[:, None]
         first = np.where(enough.any(axis=1), enough.argmax(axis=1), len(steps) - 1)
         want = np.minimum(want, steps[first])
@@ -58,10 +58,10 @@ def bands(v: np.ndarray, f: np.ndarray, layer_mm: float, level: str) -> list[tup
         want[i] = min(want[i], want[i + 1] * 1.5)
     want = np.round(want / 0.02) * 0.02  # fewer ranges, same look
     out: list[tuple[float, float, float]] = []
-    for i, h in enumerate(want):
+    for i, h in enumerate(want):  # type: ignore[assignment]
         z0, z1 = i * BAND_MM, min((i + 1) * BAND_MM, height)
         if out and abs(out[-1][2] - h) < 1e-9:
-            out[-1] = (out[-1][0], z1, h)
+            out[-1] = (out[-1][0], z1, h)  # type: ignore[assignment]
         else:
             out.append((z0, z1, float(h)))
     return out

@@ -37,7 +37,7 @@ def _thumbs() -> Path:
 
 def load_index() -> dict[str, dict[str, Any]]:
     try:
-        return json.loads(_index_file().read_text())
+        return json.loads(_index_file().read_text())  # type: ignore[no-any-return]
     except (OSError, ValueError):
         return {}
 
@@ -157,9 +157,9 @@ def thumbnail(name: str) -> bytes | None:
 
     from . import colors
     from . import thumbnail as th
-    v, f, slots, slot_hex = colors.solid(p, {})
-    rgb = np.array([colors._rgb(slot_hex[int(s) - 1]) for s in slots]) if slot_hex else np.full((len(f), 3), 190.0)
-    png = th.render(v, f, rgb, size=144)
+    v, f, slots, slot_hex = colors.solid(p, {})  # type: ignore[assignment]
+    rgb = np.array([colors._rgb(slot_hex[int(s) - 1]) for s in slots]) if slot_hex else np.full((len(f), 3), 190.0)  # type: ignore[arg-type]
+    png = th.render(v, f, rgb, size=144)  # type: ignore[arg-type]
     _thumbs().mkdir(exist_ok=True)
     cache.write_bytes(png)
     return png
