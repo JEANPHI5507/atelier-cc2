@@ -43,7 +43,7 @@ def check_firmware_on_connection(attrs) -> dict:
     return firmware_manager.get_safe_mode_info()
 
 
-def can_execute_printer_command(command: str, printer=None) -> tuple[bool, str]:
+def can_execute_printer_command(command: str, _printer=None) -> tuple[bool, str]:
     """Vérifie si une commande peut être exécutée sur l'imprimante.
 
     Args:

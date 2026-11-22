@@ -21,7 +21,7 @@ MAX_SECTION = 5000     # lines kept for the layer seen from above
 
 
 @lru_cache(maxsize=4)
-def _load(path: str, mtime: float) -> dict[str, Any]:
+def _load(path: str, _mtime: float) -> dict[str, Any]:
     d = gcode_preview.extract(Path(path))
     k = 1 / d["scale"]
     seg = np.frombuffer(base64.b64decode(d["segments"]), "<i2").reshape(-1, 4).astype(np.float32) * k

@@ -933,7 +933,7 @@ def lab_router(cfg: config.Config) -> APIRouter:
                 f"« zone », sans les recalculer.]")
 
     @r.post("/models/{name}/assistant")
-    async def assistant_chat(name: str, body: AssistantIn, request: Request) -> dict[str, Any]:
+    async def assistant_chat(name: str, body: AssistantIn, _request: Request) -> dict[str, Any]:
         """The workshop's assistant: the local CLI brain (MCP Blender included) or Mistral, acting through the workshop's own tools."""
         path = _model_path(name)
         if path.suffix.lower() == ".gcode":
@@ -946,7 +946,7 @@ def lab_router(cfg: config.Config) -> APIRouter:
             raise HTTPException(503, f"Mistral injoignable ({type(err).__name__}) : réessaie") from err
 
     @r.post("/models/{name}/assistant/stream")
-    async def assistant_stream(name: str, body: AssistantIn, request: Request) -> StreamingResponse:
+    async def assistant_stream(name: str, body: AssistantIn, _request: Request) -> StreamingResponse:
         """The same turn as a live journal (server-sent events): the brain's tool calls as they happen,
         then the ordinary result in the last ``data:`` line."""
         path = _model_path(name)

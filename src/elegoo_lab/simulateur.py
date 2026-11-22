@@ -384,10 +384,10 @@ def patch_pycentauri() -> None:
 
     camera.CAMERA_PORT_CC2 = SIM_HTTP_PORT   # the simulator draws its own camera
 
-    async def _port_open(host: str, port: int, timeout: float = 2.0) -> bool:
+    async def _port_open(_host: str, _port: int, _timeout: float = 2.0) -> bool:
         return True
 
-    async def _fetch_serial(host: str, access_code: str, timeout: float = 5.0) -> str:
+    async def _fetch_serial(_host: str, _access_code: str, _timeout: float = 5.0) -> str:
         return SIM_SERIAL
 
     import pycentauri.upload as upload

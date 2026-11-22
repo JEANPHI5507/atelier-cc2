@@ -23,7 +23,7 @@ def language() -> str:
 
 
 @lru_cache(maxsize=1)
-def _load(mtime: float) -> tuple[dict[str, str], list[tuple[re.Pattern, str, str]]]:
+def _load(_mtime: float) -> tuple[dict[str, str], list[tuple[re.Pattern, str, str]]]:
     d: dict[str, Any] = json.loads(DICT.read_text())
     pats = [(re.compile("^" + re.escape(fr).replace(r"\{\}", "(.*?)") + "$"), en, fr.replace("{}", ""))
             for fr, en in d.get("patterns", [])]

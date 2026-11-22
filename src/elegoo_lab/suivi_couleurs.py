@@ -21,7 +21,7 @@ _REMAIN = re.compile(r"^M73 P\d+ R(\d+)")
 
 
 @lru_cache(maxsize=4)
-def _scan(path: str, mtime: float) -> dict[str, Any]:
+def _scan(path: str, _mtime: float) -> dict[str, Any]:
     layer, remain = 0, None
     first_tool, changes, remain_at = None, [], [None]   # remain_at[i]: minutes left when layer i starts
     colours: list[str] = []
