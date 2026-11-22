@@ -80,7 +80,7 @@ def spec(quality: str = slicer.DEFAULT_QUALITY) -> dict[str, Any]:
     return {
         "plates": [{"value": k, "label": lab} for k, (_, _, lab) in PLATES.items()], "default_plate": DEFAULT_PLATE,
         "choices": [{"name": n, "label": lab, "default": rev[n].get(str(proc.get(key)), next(iter(opts))),
-                     "options": [{"value": v, "label": l} for v, (_, l) in opts.items()]} for n, (key, lab, opts) in CHOICES.items()],
+                     "options": [{"value": v, "label": label} for v, (_, label) in opts.items()]} for n, (key, lab, opts) in CHOICES.items()],
         "numbers": [{"name": n, "label": lab, "min": lo, "max": hi, "unit": u, "default": float(str(proc.get(key, lo)).rstrip("%"))}
                     for n, (key, lab, lo, hi, u) in NUMBERS.items()],
         "numbers_fil": [{"name": n, "label": lab, "min": lo, "max": hi, "unit": u, "step": 0.001 if key == "pressure_advance" else 0.01,

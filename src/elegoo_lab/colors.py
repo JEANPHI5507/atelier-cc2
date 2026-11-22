@@ -144,7 +144,7 @@ def _merge_close(centres: np.ndarray, labels: np.ndarray, weights: np.ndarray) -
         else:
             keep.append(int(i))
     new_index = {k: j for j, k in enumerate(keep)}
-    return centres[keep], np.array([new_index[remap[l]] for l in range(len(centres))])[labels]
+    return centres[keep], np.array([new_index[remap[label_idx]] for label_idx in range(len(centres))])[labels]
 
 
 # --- hand retouching: faces repainted in the viewer, kept beside the model (never inside it) ---------
@@ -762,7 +762,7 @@ def to_canvas(path: Path, out: Path, mapping: dict[int, int], *, height_mm: floa
         codes = {s: encode_state(s) for s in range(1, MAX_SLOTS + 1)}
         face_states = []
         for p, lab in zip(parts, labels):
-            states = np.array([mapping.get(int(l) + 1, 1) for l in lab])
+            states = np.array([mapping.get(int(label) + 1, 1) for label in lab])
             p.extruder = int(np.bincount(states).argmax())
             p.paint = [codes[int(s)] for s in states]
             p.face_rgb = None
@@ -1050,7 +1050,7 @@ def solid(path: Path, mapping: dict[int, int], *, height_mm: float | None = None
     parts = _parts(pr)
     if _rgb_mode(pr):
         _, labels, _ = _rgb_labels(pr, palette)
-        per = [np.array([mapping.get(int(l) + 1, 1) for l in lab]) for lab in labels]
+        per = [np.array([mapping.get(int(label) + 1, 1) for label in lab]) for lab in labels]
     else:
         per = []
         for p in parts:

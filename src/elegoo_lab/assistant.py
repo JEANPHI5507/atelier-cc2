@@ -347,8 +347,8 @@ CLISYSTEM = (SYSTEM + " " + LAPP + " TES SKILLS (chargées avec l'outil « skill
 def _cli_detail(stderr: str) -> str:
     """The CLI's stderr as one short human reason: keyring noise dropped, recurring refusals explained
     in plain French with what to do."""
-    lines = [l.strip() for l in (stderr or "").strip().splitlines() if l.strip()]
-    lines = [l for l in lines if not l.startswith("Reading API keys")]
+    lines = [line.strip() for line in (stderr or "").strip().splitlines() if line.strip()]
+    lines = [line for line in lines if not line.startswith("Reading API keys")]
     txt = " ".join(lines)[-300:]
     low = txt.lower()
     if "subscription" in low or "not available" in low:

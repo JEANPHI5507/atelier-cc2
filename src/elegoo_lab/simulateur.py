@@ -307,7 +307,7 @@ class Sim:
         try:
             head = (await r.readuntil(b"\r\n\r\n")).decode("latin1").split("\r\n")
             method, path, _ = head[0].split(" ", 2)
-            h = {k.lower(): v for k, v in (l.split(": ", 1) for l in head[1:] if ": " in l)}
+            h = {k.lower(): v for k, v in (header_line.split(": ", 1) for header_line in head[1:] if ": " in header_line)}
             body = await r.readexactly(int(h.get("content-length", 0)))
             status, out = 404, b"{}"
             if method == "GET" and path.startswith("/video"):   # MJPEG like the CC2 camera (:8080/video)
