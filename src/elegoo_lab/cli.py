@@ -17,8 +17,9 @@ from typing import Annotated
 import typer
 from pycentauri.cli import app as printer_app
 
-from . import colorize, colors, config, mesh, printprep, slicer
+from . import colorize, colors
 from . import comfy as comfy_mod
+from . import config, mesh, printprep, slicer
 
 app = typer.Typer(help=__doc__, no_args_is_help=True, add_completion=False)
 
