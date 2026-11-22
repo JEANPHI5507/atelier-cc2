@@ -22,7 +22,7 @@ from pathlib import Path
 from xml.sax.saxutils import quoteattr
 
 import numpy as np
-from defusedxml.ElementTree import ElementTree
+from defusedxml import ElementTree as ET
 
 CORE = "http://schemas.microsoft.com/3dmanufacturing/core/2015/02"
 MAT = "http://schemas.microsoft.com/3dmanufacturing/material/2015/02"
@@ -157,7 +157,7 @@ def read(path: Path) -> Project:
 def _read(path: Path) -> Project:
     meshes: dict[str, _Mesh] = {}
 
-    def parse(name: str, data: bytes) -> ElementTree.Element:
+    def parse(name: str, data: bytes) -> ET.Element:
         out, pos = [], 0
         while m := _MESH.search(data, pos):
             close = b"</" + m.group(1) + b"mesh>"
@@ -168,7 +168,7 @@ def _read(path: Path) -> Project:
             meshes[key] = _mesh_arrays(data[m.end():end])
             out += [data[pos:m.start()], b"<" + m.group(1) + b'mesh cc2ref="' + key.encode() + b'"/>']
             pos = end + len(close)
-        return ElementTree.fromstring(b"".join(out) + data[pos:])
+        return ET.fromstring(b"".join(out) + data[pos:])
 
     with zipfile.ZipFile(path) as z:
         names = z.namelist()
@@ -201,7 +201,7 @@ def _read(path: Path) -> Project:
             if e:
                 part_ext[pm.group(1)] = int(e.group(1))
 
-    def resources(doc_path: str) -> tuple[dict[str, ElementTree.Element], dict[str, list]]:
+    def resources(doc_path: str) -> tuple[dict[str, ET.Element], dict[str, list]]:
         doc = docs[doc_path]
         objs, mats = {}, {}
         for res in doc.iter(f"{{{CORE}}}resources"):
@@ -218,7 +218,7 @@ def _read(path: Path) -> Project:
     cache = {p: resources(p) for p in docs}
     unit = UNITS.get(docs[root_name].get("unit", "millimeter"), 1.0)
 
-    def mesh_part(el: ElementTree.Element, mats: dict, xf: np.ndarray, name: str, ext: int) -> Part:
+    def mesh_part(el: ET.Element, mats: dict, xf: np.ndarray, name: str, ext: int) -> Part:
         mesh = el.find(f"{{{CORE}}}mesh")
         m = meshes[mesh.get("cc2ref")]
         vs, faces, paint, tris = m.vertices, m.faces, m.paint, m.tris

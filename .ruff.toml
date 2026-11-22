@@ -30,6 +30,7 @@ ignore = [
 [lint.per-file-ignores]
 "tests/*" = ["S101", "ARG001", "PLR0913", "PLR0915"]
 "src/elegoo_lab/web/*" = ["ALL"]
+"src/elegoo_lab/threemf.py" = ["N817"]
 
 [format]
 quote-style = "double"
