@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""4D6 Script pour créer automatiquement les issues GitHub à partir de la ROADMAP.
+"""4D6 Script pour créer automatiquement les issues GitHub à partir de la ROADMAP.
 
 Utilisation:
     python scripts/create_issues.py --token VOTRE_GITHUB_TOKEN --dry-run
@@ -15,18 +15,15 @@ import argparse
 import json
 import re
 import sys
-from typing import Dict, List, Optional
+from typing import Optional
 
 import httpx
-
----
 
 # 4C4 Configuration
 REPO_OWNER = "JEANPHI5507"
 REPO_NAME = "atelier-cc2"
 ROADMAP_FILE = "ROADMAP.md"
 
----
 
 # 4DD Mappings pour les labels et milestones
 PHASE_TO_MILESTONE = {
@@ -51,7 +48,6 @@ CATEGORY_TO_LABEL = {
     "Intégrations & Écosystème": "catégorie:intégration",
 }
 
----
 
 class GitHubAPI:
     """Client simple pour l'API GitHub."""
@@ -67,7 +63,7 @@ class GitHubAPI:
             "X-GitHub-Api-Version": "2022-11-28",
         }
 
-    async def get_milestone(self, title: str) -> Optional[Dict]:
+    async def get_milestone(self, title: str) -> dict | None:
         """Récupère un milestone par son titre."""
         async with httpx.AsyncClient() as client:
             response = await client.get(
@@ -84,7 +80,7 @@ class GitHubAPI:
                     return milestone
             return None
 
-    async def create_milestone(self, title: str, description: str, due_on: str) -> Dict:
+    async def create_milestone(self, title: str, description: str, due_on: str) -> dict:
         """Crée un nouveau milestone."""
         data = {
             "title": title,
@@ -104,7 +100,7 @@ class GitHubAPI:
                 return {}
             return response.json()
 
-    async def get_label(self, name: str) -> Optional[Dict]:
+    async def get_label(self, name: str) -> dict | None:
         """Récupère un label par son nom."""
         async with httpx.AsyncClient() as client:
             response = await client.get(
@@ -121,7 +117,7 @@ class GitHubAPI:
                     return label
             return None
 
-    async def create_label(self, name: str, color: str, description: str = "") -> Dict:
+    async def create_label(self, name: str, color: str, description: str = "") -> dict:
         """Crée un nouveau label."""
         data = {
             "name": name,
@@ -144,9 +140,9 @@ class GitHubAPI:
         self,
         title: str,
         body: str,
-        labels: List[str] = None,
+        labels: list[str] = None,
         milestone: int = None,
-    ) -> Dict:
+    ) -> dict:
         """Crée une nouvelle issue."""
         data = {
             "title": title,
@@ -168,7 +164,7 @@ class GitHubAPI:
                 return {}
             return response.json()
 
-    async def get_issue_by_title(self, title: str) -> Optional[Dict]:
+    async def get_issue_by_title(self, title: str) -> dict | None:
         """Récupère une issue par son titre."""
         async with httpx.AsyncClient() as client:
             response = await client.get(
@@ -186,9 +182,8 @@ class GitHubAPI:
                     return issue
             return None
 
----
 
-def parse_roadmap(roadmap_content: str) -> List[Dict]:
+def parse_roadmap(roadmap_content: str) -> list[dict]:
     """Parse le fichier ROADMAP.md pour extraire les tâches."""
     tasks = []
     current_phase = None
@@ -204,7 +199,7 @@ def parse_roadmap(roadmap_content: str) -> List[Dict]:
             continue
 
         # Détection des backlog
-        if line.startswith("### 📋 **Backlog") or line.startswith("## 📋 **Backlog"):
+        if line.startswith(("### 📋 **Backlog", "## 📋 **Backlog")):
             current_phase = "Backlog"
             current_category = current_phase
             continue
@@ -232,23 +227,24 @@ def parse_roadmap(roadmap_content: str) -> List[Dict]:
             elif "🟡" in line:
                 priority = "🟡 Moyenne"
 
-            tasks.append({
-                "id": task_id,
-                "title": title,
-                "description": description,
-                "complexity": complexity,
-                "status": status,
-                "priority": priority,
-                "phase": current_phase,
-                "category": current_category,
-            })
+            tasks.append(
+                {
+                    "id": task_id,
+                    "title": title,
+                    "description": description,
+                    "complexity": complexity,
+                    "status": status,
+                    "priority": priority,
+                    "phase": current_phase,
+                    "category": current_category,
+                }
+            )
             continue
 
     return tasks
 
----
 
-def generate_issue_body(task: Dict) -> str:
+def generate_issue_body(task: dict) -> str:
     """Génère le corps d'une issue à partir d'une tâche."""
     body = f"""## 4A1 {task['title']}
 
@@ -257,12 +253,10 @@ def generate_issue_body(task: Dict) -> str:
 **Priorité** : {task['priority']}
 **Complexité** : {'⭐' * task['complexity']}
 
----
 
 ### 4F0 Description
 {task['description']}
 
----
 
 ### 527 Étapes à Suivre
 - [ ] Comprendre la tâche et son contexte
@@ -272,22 +266,19 @@ def generate_issue_body(task: Dict) -> str:
 - [ ] Vérifier que tous les tests passent (`make test`)
 - [ ] Ouvrir une PR avec une description claire
 
----
 
 ### 4CD Ressources Utiles
 - [ROADMAP.md](https://github.com/{REPO_OWNER}/{REPO_NAME}/blob/main/ROADMAP.md)
 - [CONTRIBUTING.md](https://github.com/{REPO_OWNER}/{REPO_NAME}/blob/main/CONTRIBUTING.md)
 - [Guide de Développement](https://github.com/{REPO_OWNER}/{REPO_NAME}/blob/main/guide/developpement.md)
 
----
 
 *Merci pour votre contribution ! 64F*
 """
     return body
 
----
 
-def get_labels_for_task(task: Dict) -> List[str]:
+def get_labels_for_task(task: dict) -> list[str]:
     """Détermine les labels pour une tâche."""
     labels = []
 
@@ -297,7 +288,7 @@ def get_labels_for_task(task: Dict) -> List[str]:
 
     # Label de catégorie
     if task["phase"] and task["phase"] != "Backlog":
-        for phase, label in PHASE_TO_MILESTONE.items():
+        for phase, _label in PHASE_TO_MILESTONE.items():
             if phase in task["phase"]:
                 category = task["phase"].split(": ")[1] if ": " in task["phase"] else task["phase"]
                 if category in CATEGORY_TO_LABEL:
@@ -314,7 +305,6 @@ def get_labels_for_task(task: Dict) -> List[str]:
 
     return labels
 
----
 
 async def main():
     parser = argparse.ArgumentParser(description="Créer des issues GitHub à partir de la ROADMAP")
@@ -326,7 +316,7 @@ async def main():
 
     # Lire le fichier ROADMAP
     try:
-        with open(ROADMAP_FILE, "r", encoding="utf-8") as f:
+        with open(ROADMAP_FILE, encoding="utf-8") as f:
             roadmap_content = f.read()
     except FileNotFoundError:
         print(f"534 Erreur: Fichier {ROADMAP_FILE} introuvable")
@@ -388,7 +378,7 @@ async def main():
                 milestone_number = milestones[milestone_title]
 
         if args.dry_run:
-            print(f"\n4E2 [DRY RUN] Créerait l'issue:")
+            print("\n4E2 [DRY RUN] Créerait l'issue:")
             print(f"  Titre: {task['title']}")
             print(f"  Labels: {labels}")
             print(f"  Milestone: {milestone_number}")
@@ -396,7 +386,9 @@ async def main():
             created_issues.append(task["title"])
         else:
             if not args.token:
-                print(f"\n4A1 Pour créer l'issue '{task['title']}', fournissez un token GitHub avec --token")
+                print(
+                    f"\n4A1 Pour créer l'issue '{task['title']}', fournissez un token GitHub avec --token"
+                )
                 continue
 
             github = GitHubAPI(args.token, args.repo_owner, args.repo_name)
@@ -423,7 +415,6 @@ async def main():
     if args.dry_run:
         print("\n4A1 *Mode dry-run: Aucune issue n'a été réellement créée*")
 
----
 
 if __name__ == "__main__":
     import asyncio
