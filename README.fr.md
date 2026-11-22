@@ -101,3 +101,4 @@ Code sous licence MIT (voir [`LICENSE`](LICENSE)). Fourni avec : three.js (MIT, 
 Téléchargés à l'installation, sous leurs propres licences : OrcaSlicer et le plateau Elegoo qu'il contient
 (AGPL-3.0), pycentauri (Apache-2.0), le modèle de détection d'Obico (AGPL-3.0, `make ia`). Les workflows ComfyUI
 utilisent des modèles aux licences variées : voir [le guide ComfyUI](guide/comfyui.md).
+# Test CI/CD avec Codecov et Docker - Sun Nov 22 09:50:59 PM UTC 2026
