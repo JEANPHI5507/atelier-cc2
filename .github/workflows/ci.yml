@@ -76,7 +76,7 @@ jobs:
 
       - name:  Install Dependencies
         run: |
-          uv sync --all-extras
+          uv pip sync --all-extras
 
       - name:  Run Ruff (Linting)
         run: |
@@ -115,7 +115,7 @@ jobs:
 
       - name:  Install Dependencies
         run: |
-          uv sync --all-extras
+          uv pip sync --all-extras
 
       - name:  Run Unit Tests with Coverage
         run: |
@@ -151,7 +151,7 @@ jobs:
 
       - name:  Install Dependencies
         run: |
-          uv sync --all-extras
+          uv pip sync --all-extras
 
       - name:  Install OrcaSlicer
         run: |
@@ -204,7 +204,7 @@ jobs:
 
       - name:  Install Build Dependencies
         run: |
-          uv sync --all-extras
+          uv pip sync --all-extras
 
       - name:  Build Package
         run: |
@@ -258,7 +258,7 @@ jobs:
 
       - name:  Install Dependencies
         run: |
-          uv sync
+          uv pip sync
 
       - name:  Build Documentation
         run: |
