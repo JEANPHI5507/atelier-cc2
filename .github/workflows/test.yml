@@ -34,7 +34,7 @@ on:
 
 env:
   PYTHON_VERSION: "3.12"
-  UV_VERSION: "0.1.0"
+  UV_VERSION: "0.13.9"
 
 jobs:
   # Job 1: Tests unitaires rapides (sans OrcaSlicer)
@@ -57,7 +57,7 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          uv pip sync
+          uv sync
 
       - name: Run Fast Tests
         run: |
@@ -84,7 +84,7 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          uv pip sync
+          uv sync
 
       - name: Install OpenGL dependencies
         run: |
@@ -120,7 +120,7 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          uv pip sync
+          uv sync
 
       - name: Install Chrome for Playwright
         run: |
@@ -156,7 +156,7 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          uv pip sync
+          uv sync
 
       - name: Start Simulator
         run: |

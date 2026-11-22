@@ -51,7 +51,7 @@ on:
 #  Variables globales
 env:
   PYTHON_VERSION: "3.12"
-  UV_VERSION: "0.1.0"
+  UV_VERSION: "0.13.9"
   PROJECT_NAME: "elegoo-lab"
 
 
@@ -76,7 +76,7 @@ jobs:
 
       - name:  Install Dependencies
         run: |
-          uv pip sync
+          uv sync
 
       - name:  Run Ruff (Linting)
         run: |
@@ -115,7 +115,7 @@ jobs:
 
       - name:  Install Dependencies
         run: |
-          uv pip sync
+          uv sync
 
       - name:  Run Unit Tests with Coverage
         run: |
@@ -151,7 +151,7 @@ jobs:
 
       - name:  Install Dependencies
         run: |
-          uv pip sync
+          uv sync
 
       - name:  Install OrcaSlicer
         run: |
@@ -204,7 +204,7 @@ jobs:
 
       - name:  Install Build Dependencies
         run: |
-          uv pip sync
+          uv sync
 
       - name:  Build Package
         run: |
@@ -258,7 +258,7 @@ jobs:
 
       - name:  Install Dependencies
         run: |
-          uv pip sync
+          uv sync
 
       - name:  Build Documentation
         run: |
