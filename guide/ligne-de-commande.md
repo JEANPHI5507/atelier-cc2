@@ -46,7 +46,7 @@ cc2 models list                                   # la bibliothèque
 cc2 models info modele.glb                        # dimensions, étanchéité, tient-il sur le plateau ?
 cc2 models prepare modele.glb --height 60         # STL réparé, posé sur le plateau, à 60 mm de haut
 cc2 colors modele.3mf                             # couleurs trouvées et bobine proposée pour chacune
-cc2 slice modele.3mf                              # trancher (mode multicolore Économie par défaut)
+cc2 slice modele.3mf                              # trancher (mode multicolore Équilibré par défaut)
 cc2 slice-profiles                                # buses, qualités et filaments disponibles
 ```
 
@@ -64,6 +64,8 @@ Options de `cc2 slice` :
 | `--decouper` | découper en pièces avec chevilles si trop grand |
 | `--nozzle 0.6` | autre buse (tranchage simple, une couleur) |
 | `--upload --start` | envoyer puis lancer (avec `cc2 --control slice …`) |
+
+Le résultat affiche aussi les températures de buse et de plateau du profil Elegoo (adaptées au filament choisi).
 
 Exemples :
 

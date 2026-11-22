@@ -18,7 +18,7 @@ import numpy as np
 from fontTools.pens.basePen import BasePen
 from fontTools.ttLib import TTFont
 
-from . import colorize, config, threemf
+from . import colorize, config, mesh, threemf
 
 FONT = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
 SCRIPT_FONT = Path("/usr/share/fonts/opentype/urw-base35/Z003-MediumItalic.otf")   # handwriting (URW, free)
@@ -314,7 +314,7 @@ def create(key: str, values: dict[str, Any], name: str | None = None) -> Path:
     kind, args, objects, lo, hi = _build(key, values)
     n = max(o[3] for o in objects)
     if (hi - lo)[:2].max() > 246 or (hi - lo)[2] > 246:
-        raise ValueError(f"la pièce ({(hi - lo).round(0).astype(int).tolist()} mm) ne tient pas sur le plateau")
+        raise ValueError(f"la pièce ({mesh.size_text(hi - lo)}) ne tient pas sur le plateau")
     offset = np.array([128 - (lo[0] + hi[0]) / 2, 128 - (lo[1] + hi[1]) / 2, -lo[2]])
     # parts that touch (the label's text on its plate) must be one object; separate pieces stay apart
     if key == "etiquette":

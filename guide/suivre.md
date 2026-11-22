@@ -51,14 +51,22 @@ Après une impression (bouton **Bilan** dans la galerie, ou **Faire le bilan** d
 
 1. L'atelier rappelle quoi faire maintenant, selon la pièce : attendre que le plateau refroidisse, retirer les
    supports, vider le bac de purge après du multicolore, ne pas poncer le PLA Silk…
-2. Tu coches ce qui n'allait pas : pièce décollée, fils, dessus troué, couture visible, pièce fragile, supports durs à
+   Pour les supports, l'atelier lit le G-code imprimé : il dit **où** ils sont (à gauche, à l'avant, de tant à tant de
+   mm de haut, où ils touchent la pièce), **comment** les retirer (arbre : du haut vers le bas, branches fines d'abord ;
+   bloc : soulevé d'un seul morceau) et les montre en 3D comme la vue « Couche par couche » de l'onglet Imprimante : la pièce en clair, les supports en orange (sans WebGL, un plan vu de dessus).
+2. Tu notes de 0 à 5 : dans l'ensemble, surfaces lisses, détails fins, supports faciles à enlever, couleurs propres,
+   solidité (les deux dernières seulement quand elles ont un sens pour la pièce). Une note de 2 ou moins coche le défaut
+   qui correspond, pour qu'il te propose sa correction. La note d'ensemble s'affiche sur la carte de la galerie.
+3. Tu coches ce qui n'allait pas : pièce décollée, fils, dessus troué, couture visible, pièce fragile, supports durs à
    enlever, surplombs affaissés, lignes maigres, couleurs qui bavent, gouttes aux changements, tour de purge tombée,
    pied d'éléphant, couches décalées.
-3. Pour chaque défaut : la cause probable, le geste à faire sur cette pièce, et la correction pour la prochaine fois,
+4. Pour chaque défaut : la cause probable, le geste à faire sur cette pièce, et la correction pour la prochaine fois,
    calculée sur les vrais réglages de l'impression (une buse à 230 °C qui file passe à 220 °C, pas « 10 °C de moins
    que le profil »).
 
-Les corrections sont gardées sur le modèle : la prochaine fois que tu le prépares, l'atelier les propose en un clic.
+Les corrections sont gardées sur le modèle : la prochaine fois que tu le prépares, l'atelier les applique d'office —
+un clic sur « Enlever les corrections » pour revenir en arrière. Et si le bilan a signalé des couleurs qui bavent ou
+des gouttes, la purge du tranchage suivant passe au pire cas à chaque changement, quel que soit le mode multicolore.
 
 ## Le plateau froid
 

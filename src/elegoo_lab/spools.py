@@ -172,3 +172,29 @@ def match(model_colours: list[dict[str, Any]], trays: list[dict[str, Any]]) -> d
     return {"mapping": mapping, "filaments": filaments, "details": details, "warnings": warnings,
             "slot_colours": {s: by_slot[s]["color"] for s in by_slot},
             "unused": [{"slot": t["pos"] + 1, "hex": t["color"], "name": t.get("filament_name")} for t in unused]}
+
+
+# share of the model's solid volume that actually gets extruded, per usage: walls, infill, brim and
+# supports counted in, calibrations from the workshop's own slices (Décoratif measured at ~28 %)
+FILL = {"decoratif": 0.30, "detaille": 0.32, "rapide": 0.40, "turbo": 0.45, "profil": 0.55, "fonctionnel": 0.95}
+
+
+def needs(volume_cm3: float | None, colours: list[dict[str, Any]], usage: str = "decoratif",
+          material: str = "PLA", mapping: dict[int, int] | None = None,
+          filaments: list[str] | None = None) -> dict[int, int]:
+    """Grams each colour should need, judged before any slicing: the model's solid volume × the usage's
+    fill share (as corrected by the workshop's own real slices) × the colour's share of the surface,
+    in grams rounded to 5 g (one metre of 1.75 mm filament ≈ 2.4 cm³). ``mapping`` + ``filaments`` give
+    each colour's own material; {} when the volume is unknown (open mesh): no estimate, not a wrong one."""
+    from . import stock
+    if not volume_cm3:
+        return {}
+    fill = FILL.get(usage, 0.55) * stock.fill_factor(usage)
+    mapping = mapping or {}
+    out = {}
+    for c in colours:
+        slot = mapping.get(c["index"], 1)
+        mater = (filaments[slot - 1] if filaments and slot <= len(filaments) else material)
+        g = volume_cm3 * fill * stock.DENSITY.get(mater.split()[0].upper(), 1.24) * c["share"] / 100
+        out[c["index"]] = max(5, round(g / 5) * 5)
+    return out

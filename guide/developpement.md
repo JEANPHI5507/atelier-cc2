@@ -17,7 +17,7 @@ src/elegoo_lab/
   slicer.py         OrcaSlicer en ligne de commande, profils CC2, purge M6211
   printprep.py      du modèle au G-code : couleurs, taille, pose, modes multicolores, découpe, exemplaires
   colors.py         couleurs d'un modèle, conversion pour le CANVAS, purge dosée, simplification
-  colorize.py       assemblage de pièces en un 3MF multicolore
+  colorize.py       assemblage de pièces en un 3MF multicolore ; compose.py (plusieurs modèles sur un plateau)
   mesh.py, orient.py, cut.py, advisor.py, optimize.py   maillage, positions, découpe, conseiller, « Optimiser »
   parametric.py, parametric_more.py, addtext.py          les pièces de « Créer »
   forme.py          percer ou ajouter une forme ; couches.py (hauteur de couche variable)

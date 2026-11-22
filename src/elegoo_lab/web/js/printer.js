@@ -4,7 +4,7 @@ import { buildPaths, cam, files, frame, grid, info, launchFile, miniViewer, tray
 
 /* printer status */
 async function pollPrinter() {
-  try {
+  if (!document.hidden) try {   // a hidden tab needs no live status: it will catch up on return
     const s = await (await fetch('/status')).json(), ps = s.print_status ?? 0, busy = ![0, 8, 9].includes(ps);
     $('printer').className = 'pill ' + (busy ? 'busy' : 'ok');
     $('printer-txt').textContent = `${STATE[ps] || 'État ' + ps}${busy && s.progress != null ? ' · ' + s.progress + ' %' : ''}`;
@@ -103,6 +103,7 @@ async function layersTrack(busy, name, cur) {
     const done = p.start[l] * 2, all = p.start[nl] * 2;
     p.lines.geometry.setDrawRange(0, done); p.rest.geometry.setDrawRange(done, all - done);
   });
+  lv?.render?.();
   $('pv-lnote').textContent = `Couche ${l} / ${nl} · ${mm(lvLayers[l - 1])} mm sur ${mm(lvLayers[nl - 1])} mm`;
 }
 
@@ -148,7 +149,7 @@ async function pvStatus() {
     $('pv-light').checked = !!raw.LightStatus?.SecondLight;
     $('pv-cam-light').hidden = !!raw.LightStatus?.SecondLight || !raw.LightStatus;   // light off: the camera shows black
   } catch { $('pv-state').textContent = 'Imprimante injoignable'; $('pv-pill').className = 'pill'; $('pv-pill-t').textContent = 'Hors ligne'; }
-  if (pvOpen) pvTimer = setTimeout(pvStatus, BUSY.has(lastSt?.print_status ?? 0) ? 1000 : 2000);   // the CC2 sends its position once a second
+  if (pvOpen) pvTimer = setTimeout(() => { if (!document.hidden) pvStatus(); }, BUSY.has(lastSt?.print_status ?? 0) ? 1000 : 2000);   // the CC2 sends its position once a second
 }
 // the nozzle in the layer view: an orange cone, its tip where the nozzle is (that view is centred on the plate)
 let tip = null;
@@ -161,6 +162,7 @@ function nozzle3d([x, y, z], on) {
   }
   tip.visible = !!on;
   tip.position.set(x - 128, y - 128, z + 2.5);
+  lv.render?.();
 }
 // where the nozzle is: "x,y,z" in mm from the CC2 (its spelling: CurrenCoord), drawn on the plate seen from above
 const trail = [];
@@ -237,7 +239,7 @@ async function pvCanvas() {
     spoolQuestions(st, trays.map(norm));
     $('pv-month').textContent = st ? `Ce mois : ${st.mois.impressions} impression${st.mois.impressions > 1 ? 's' : ''} · ${fmtG(st.mois.g)} · ${euro(st.mois.eur)}` : '';
   } catch { $('pv-trays').innerHTML = '<div class="empty" style="grid-column:1/-1">CANVAS injoignable</div>'; }
-  if (pvOpen) setTimeout(pvCanvas, 10000);
+  if (pvOpen) setTimeout(() => { if (!document.hidden) pvCanvas(); }, 10000);
 }
 
 async function pvFiles() {
@@ -340,7 +342,7 @@ async function svLoad() {
   const h = L?.history || [];
   $('sv-spark').innerHTML = h.length > 1 ? `<line x1="0" x2="120" y1="${24 - 24 * 0.78 / 2}" y2="${24 - 24 * 0.78 / 2}"/><path d="${h.map((v, i) => `${i ? 'L' : 'M'}${(120 * i / (h.length - 1)).toFixed(1)},${(24 - 24 * Math.min(v, 2) / 2).toFixed(1)}`).join('')}"/>` : '';
   $('sv-note').textContent = !on ? '' : L?.en_cours ? (L.frames < 30 ? `Analyse en cours : ${L.frames} image${L.frames > 1 ? 's' : ''} (l'IA juge à partir de 30, soit 5 minutes).` : `${L.frames} images analysées, une toutes les 10 s.`) : 'L\'IA regardera la caméra pendant la prochaine impression.';
-  if (pvOpen) svTimer = setTimeout(svLoad, dl.state === 'running' ? 1500 : 10000);
+  if (pvOpen) svTimer = setTimeout(() => { if (!document.hidden) svLoad(); }, dl.state === 'running' ? 1500 : 10000);
 }
 const svSave = async body => { try { await api('/surveillance', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); svLoad(); } catch (e) { toast(e.message, 'bad'); } };
 $('sv-ia').onchange = () => svSave({ ia: $('sv-ia').checked });

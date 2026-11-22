@@ -231,3 +231,25 @@ def summary() -> dict[str, Any]:
             "mois": {"g": round(sum(h["g"] for h in this_month)), "eur": round(sum(h["eur"] for h in this_month), 2),
                      "impressions": sum(1 for h in this_month if h["g"] > 0)},   # not the ones cancelled at 0 %
             "low_g": LOW_G}
+
+
+def fill_factor(usage: str) -> float:
+    """The usage's fill factor as corrected by the workshop's own real slices (1.0 until one exists)."""
+    f = load().get("fill", {}).get(usage)
+    return float(f["ratio"]) if f else 1.0
+
+
+def calibrate_fill(usage: str, estimated_g: float, real_g: float) -> None:
+    """Self-correcting estimates: after each real slice, the usage's fill factor moves one step toward
+    the ratio measured (1/2 the first time, then an average over the last 20). A slice that skipped
+    or over-delivered far off still moves it, but the ratio is bridled to keep stray prints harmless."""
+    if estimated_g <= 5 or real_g <= 0:
+        return
+    target = min(3.0, max(0.2, real_g / estimated_g))
+    with _lock:
+        data = load()
+        cur = data.get("fill", {}).get(usage) or {"ratio": 1.0, "n": 1}
+        n = min(int(cur.get("n", 1)) + 1, 21)
+        cur = {"ratio": round(cur["ratio"] + (target - cur["ratio"]) / min(n, 20), 3), "n": n}
+        data.setdefault("fill", {})[usage] = cur
+        save(data)

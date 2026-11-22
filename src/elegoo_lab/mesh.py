@@ -8,6 +8,35 @@ from typing import Any
 import trimesh
 
 BED_MM = 256.0  # Centauri Carbon 2 build volume is 256 x 256 x 256 mm
+
+# every 3D file the workshop takes. Mesh formats carry real colours (paint works on them); 3MF is a
+# project; STEP is a CAD solid: trimesh cannot read it, cascadio turns it into a GLB at import.
+MESH_EXT = {".stl", ".obj", ".off", ".dae", ".ply", ".glb", ".gltf"}
+PROJECT_EXT = {".3mf"}
+CAD_EXT = {".step", ".stp"}
+MODEL_EXT = MESH_EXT | PROJECT_EXT | CAD_EXT
+
+
+def step_to_glb(src: Path) -> Path:
+    """A CAD STEP file as a plain GLB mesh: the whole pipeline (sizes, colours, bed) then treats it like any mesh.
+
+    Raises ValueError when the CAD file is unreadable (cascadio's own message is terse)."""
+    out = src.with_suffix(".glb")
+    try:
+        import cascadio
+        cascadio.step_to_glb(str(src), str(out))
+    except Exception as e:
+        out.unlink(missing_ok=True)
+        raise ValueError(f"{src.name} : fichier CAD illisible ({type(e).__name__})") from None
+    if not out.is_file() or out.stat().st_size == 0:
+        raise ValueError(f"{src.name} : fichier CAD illisible (aucune pièce convertie)")
+    return out
+
+
+def size_text(size, dec: int = 0) -> str:
+    """A size for the user, each side named in the same order everywhere (across, front to back, up)."""
+    x, y, z = (f"{float(v):.{dec}f}".replace(".", ",") for v in list(size)[:3])
+    return f"largeur {x} × profondeur {y} × hauteur {z} mm"
 UNITLESS_MM = 3.0  # AI generators (TRELLIS, Hunyuan) output ~1-unit meshes: below this, no real unit
 UNITLESS_EXT = {".glb", ".gltf", ".obj", ".ply"}  # never STL/3MF: those come from CAD/slicers in mm
 DEFAULT_AI_HEIGHT_MM = 60.0

@@ -17,8 +17,8 @@ from pathlib import Path
 from urllib.parse import unquote, urljoin, urlsplit
 
 MAX_BYTES = 300 * 1024 * 1024
-MODEL_EXT = (".stl", ".3mf", ".obj", ".glb", ".gltf", ".ply", ".gcode")
-_LINK = re.compile(r"""href=["']([^"'#]+?\.(?:stl|3mf|obj|glb|ply|zip)(?:\?[^"']*)?)["']""", re.I)
+MODEL_EXT = (".stl", ".3mf", ".obj", ".off", ".dae", ".glb", ".gltf", ".ply", ".step", ".stp", ".gcode")
+_LINK = re.compile(r"""href=["']([^"'#]+?\.(?:stl|3mf|obj|off|dae|glb|gltf|ply|step|stp|zip)(?:\?[^"']*)?)["']""", re.I)
 
 
 class LinkError(ValueError):
@@ -77,7 +77,7 @@ def _from_zip(data: bytes) -> list[tuple[str, bytes]]:
                     raise LinkError(f"{name} : trop gros.")
                 out.append((name, z.read(info)))
     if not out:
-        raise LinkError("L'archive ne contient aucun modèle (STL, 3MF, OBJ…).")
+        raise LinkError("L'archive ne contient aucun modèle (STL, 3MF, OBJ, GLB, PLY…).")
     return out
 
 
@@ -98,5 +98,5 @@ async def fetch(url: str) -> list[tuple[str, bytes]]:
     if name.lower().endswith(".zip") or data[:4] == b"PK\x03\x04" and not name.lower().endswith(".3mf"):
         return _from_zip(data)
     if not name.lower().endswith(MODEL_EXT):
-        raise LinkError("Ce lien ne mène pas à un modèle (STL, 3MF, OBJ, GLB, PLY ou G-code).")
+        raise LinkError("Ce lien ne mène pas à un modèle (STL, 3MF, OBJ, GLB, PLY, STEP, OFF, DAE… ou G-code).")
     return [(name, data)]

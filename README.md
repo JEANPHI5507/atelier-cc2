@@ -20,12 +20,16 @@ post-print review. It runs at home, on a Linux PC or small server, and opens fro
 
 ## What it does
 
-- **Prepare**: import an STL, 3MF, OBJ, GLB, PLY or a link to a file (or to a page that offers one); map each colour to
+- **Prepare**: import an STL, 3MF, STEP, OBJ, GLB, PLY, OFF, DAE, a zip, or a link to a file (or to a page that offers one); map each colour to
   a CANVAS spool; "Optimise for the CC2" (repair, size, best face on the plate, supports, brim); cut an oversized part
   into pieces with dowels; create parts without CAD (Gridfinity, screws and nuts, gears, name keychains and Christmas
   ornaments, lithophanes…).
 - **Slice**: OrcaSlicer from the command line, with Elegoo's CC2 profiles. Time, grams, cost and number of colour
-  changes before starting, side-by-side comparison of variants, purge sized per colour change, multicolour modes.
+  changes before starting, side-by-side comparison of variants, purge sized per colour change, multicolour modes,
+  the pieces of a plate printed one after the other to group the colours.
+- **Assistant**: a chat that edits the model for you (repair, size, rotation, shapes, slicing) — the `vibe` agent
+  CLI (signed in to your account, no API key) driven by the workshop's own tools, with access to MCP servers
+  (Blender for real CAD).
 - **Print**: sent to the CC2 with the right spool for each colour, a camera check that the plate is empty, a print
   queue, pause at a given height.
 - **Monitor**: live camera, an AI that spots "spaghetti" (Obico's model, run on your own machine), the part growing in

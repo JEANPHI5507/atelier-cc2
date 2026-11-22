@@ -4,7 +4,8 @@ Two parts. The tips depend on how the print was made (supports, several colours,
 plate temperature), read from the G-code that was printed. Then the user ticks what went wrong; each
 defect comes with its cause and a correction in the workshop's own settings, computed from the values
 really used (a Silk PLA printed at 230 °C gets 220 °C against stringing, not the profile's 210 - 10).
-The corrections are kept on the source model and offered the next time it is prepared.
+The corrections are kept on the source model and applied by itself the next time it is prepared (prepared in
+printprep: the form gets them as defaults, and bled colours purge the worst case at every change).
 """
 
 from __future__ import annotations
@@ -13,6 +14,9 @@ import re
 import time
 from pathlib import Path
 from typing import Any, Callable
+
+import numpy as np
+from scipy import ndimage
 
 from . import config, library
 
@@ -77,7 +81,7 @@ ISSUES: dict[str, tuple[str, str, str, Fix]] = {
 
 def used(gcode: Path) -> dict[str, Any]:
     """How the print was made, from the G-code's own settings block (end of file) and start code."""
-    out = {"buse": 210, "plateau": 60, "supports": False, "couleurs": 1, "silk": False}
+    out = {"buse": 210, "plateau": 60, "supports": False, "arbre": False, "couleurs": 1, "silk": False}
     if not gcode.exists():
         return out
     with gcode.open("rb") as f:
@@ -89,6 +93,7 @@ def used(gcode: Path) -> dict[str, Any]:
     if m := re.search(r"^; nozzle_temperature = (\d+)", tail, re.M):
         out["buse"] = int(m.group(1))
     out["supports"] = bool(re.search(r"^; enable_support = 1", tail, re.M))
+    out["arbre"] = bool(re.search(r"^; support_type = tree", tail, re.M))
     if m := re.search(r"^; filament_settings_id = (.*)$", tail, re.M):
         out["silk"] = "silk" in m.group(1).lower()
     out["couleurs"] = max(1, len(set(re.findall(r"^T(\d+)\s*$", head + tail, re.M))))
@@ -101,13 +106,163 @@ def tips(entry: dict[str, Any]) -> list[str]:
     u["couleurs"] = max(u["couleurs"], len(library.load_index().get(entry["fichier"], {}).get("couleurs") or []))
     out = [f"Attends que le plateau redescende sous 35 °C (il était à {u['plateau']} °C) : la pièce se décolle alors "
            "presque seule. Sinon, retire la plaque et plie-la doucement."]
-    if u["supports"]:
+    plan = supports_plan(config.MODELS_DIR / entry["fichier"]) if u["supports"] else None
+    if plan:
+        out += plan["tips"]
+    elif u["supports"]:
         out.append("Supports : retire-les pièce froide, à la pince coupante, en commençant par les plus fins.")
     if u["couleurs"] > 1:
         out.append("Plusieurs couleurs : vide le bac de purge à l'arrière avant la prochaine impression.")
     if u["silk"]:
         out.append("PLA Silk : ne ponce pas, il perd sa brillance. Les petits défauts partent au cutter, les fils au pistolet à chaleur.")
     out.append("Avant d'en lancer une autre : plateau vide et propre (l'atelier le vérifie à la caméra).")
+    return out
+
+
+# --- where the supports are, from the G-code ----------------------------------------------------------
+_MOVE = re.compile(rb"^G[123] [^\n]*?X(-?[\d.]+) Y(-?[\d.]+)[^\n]*? E(\d*\.?\d+)", re.M)   # an extruding move
+CELL = 4.0           # mm: supports are mapped on a grid this coarse, which is plenty to say "left, front, low"
+MIN_SHARE = 0.04     # a zone under this share of the supports is not worth a line
+_plans: dict[tuple[str, int, int], dict[str, Any] | None] = {}
+
+
+def _extruded(raw: bytes, kinds: dict[bytes, str]) -> dict[str, np.ndarray]:
+    """Every extruding move of the given ``;TYPE:`` sections as rows (x, y, z, filament mm)."""
+    rows: dict[str, list[np.ndarray]] = {k: [] for k in kinds.values()}
+    for chunk in raw.split(b";LAYER_CHANGE")[1:]:
+        m = re.search(rb";Z:([\d.]+)", chunk)
+        if not m:
+            continue
+        z = float(m.group(1))
+        for sec in chunk.split(b";TYPE:")[1:]:
+            name, _, body = sec.partition(b"\n")
+            kind = kinds.get(name.strip())
+            if kind and (found := _MOVE.findall(body)):
+                a = np.array(found, dtype="S").astype(float)
+                rows[kind].append(np.column_stack([a[:, 0], a[:, 1], np.full(len(a), z), a[:, 2]]))
+    return {k: np.vstack(v) if v else np.empty((0, 4)) for k, v in rows.items()}
+
+
+def _word(f: float, words: tuple[str, str, str]) -> str:
+    return words[0] if f < 1 / 3 else words[2] if f > 2 / 3 else words[1]
+
+
+def supports_plan(gcode: Path) -> dict[str, Any] | None:
+    """Where the supports of a printed G-code sit, as zones with a plain description each and a top view for the page.
+    Seen from the front of the printer: x grows to the right, y towards the back."""
+    if not gcode.exists():
+        return None
+    st = gcode.stat()
+    key = (str(gcode), st.st_mtime_ns, st.st_size)
+    if key not in _plans:
+        _plans[key] = _supports_plan(gcode)
+        while len(_plans) > 8:
+            _plans.pop(next(iter(_plans)))
+    return _plans[key]
+
+
+def _supports_plan(gcode: Path) -> dict[str, Any] | None:
+    pts = _extruded(gcode.read_bytes(), {b"Support": "s", b"Support interface": "i", b"Outer wall": "p"})
+    sup = np.vstack([pts["s"], pts["i"]])
+    if len(sup) < 20 or not len(pts["p"]):
+        return None
+    contact = pts["i"]
+    part = pts["p"]
+    x0, y0 = np.floor(np.minimum(sup[:, :2].min(0), part[:, :2].min(0)) / CELL).astype(int)
+    x1, y1 = np.floor(np.maximum(sup[:, :2].max(0), part[:, :2].max(0)) / CELL).astype(int)
+    grid = np.zeros((y1 - y0 + 1, x1 - x0 + 1))
+    cx, cy = (np.floor(sup[:, 0] / CELL) - x0).astype(int), (np.floor(sup[:, 1] / CELL) - y0).astype(int)
+    np.add.at(grid, (cy, cx), sup[:, 3])
+    total = float(grid.sum())
+    px0, py0 = part[:, :2].min(0)
+    px1, py1 = part[:, :2].max(0)
+    # the supports of a figure fill the whole footprint: seen from above they are one block. Each third of their
+    # height is cut into separate columns instead, which is what one removes in one go
+    edges = np.linspace(sup[:, 2].min(), sup[:, 2].max() + 1e-6, 4)
+    ci_x = (np.floor(contact[:, 0] / CELL) - x0).astype(int).clip(0, grid.shape[1] - 1)
+    ci_y = (np.floor(contact[:, 1] / CELL) - y0).astype(int).clip(0, grid.shape[0] - 1)
+    zones = []
+    for lo, hi in zip(edges[:-1], edges[1:]):
+        inb = (sup[:, 2] >= lo) & (sup[:, 2] < hi)
+        g = np.zeros_like(grid)
+        np.add.at(g, (cy[inb], cx[inb]), sup[inb, 3])
+        label, count = ndimage.label(ndimage.binary_dilation(g > 0, iterations=1), structure=np.ones((3, 3)))
+        label = np.where(g > 0, label, 0)
+        for n in range(1, count + 1):
+            mask = label == n
+            share = float(g[mask].sum()) / total
+            if share < MIN_SHARE:
+                continue
+            sz = sup[inb & mask[cy, cx]]
+            w = sz[:, 3]
+            ci = contact[(contact[:, 2] >= lo) & (contact[:, 2] < hi) & mask[ci_y, ci_x]] if len(contact) else contact
+            zones.append({"share": share, "x": float((sz[:, 0] * w).sum() / w.sum()), "y": float((sz[:, 1] * w).sum() / w.sum()),
+                          "zlo": float(sz[:, 2].min()), "zhi": float(sz[:, 2].max()),
+                          "contact": (float(ci[:, 2].min()), float(ci[:, 2].max())) if len(ci) else None})
+    if not zones:
+        return None
+    zones.sort(key=lambda z: -z["share"])
+    zones = zones[:5]
+    shown = sum(z["share"] for z in zones)
+    lines = []
+    for i, z in enumerate(zones, 1):
+        z["n"] = i
+        bits = [f"Zone {i}", f"{z['share'] / shown * 100:.0f} % des supports",
+                _word((z["x"] - px0) / max(px1 - px0, 1), ("à gauche", "au centre", "à droite")),
+                _word((z["y"] - py0) / max(py1 - py0, 1), ("à l'avant", "au milieu", "à l'arrière"))]
+        if z["zlo"] < 0.8:
+            bits.append(f"du plateau jusqu'à {z['zhi']:.0f} mm de haut")
+        else:
+            bits.append(f"de {z['zlo']:.0f} à {z['zhi']:.0f} mm de haut")
+        if z["contact"]:
+            a, b = z["contact"]
+            bits.append(f"touche la pièce entre {a:.0f} et {b:.0f} mm" if b - a >= 1 else f"touche la pièce vers {b:.0f} mm")
+        lines.append(" · ".join(bits))
+    u = used(gcode)
+    how = ("Ils se retirent du haut vers le bas : coupe d'abord les branches fines près de la pièce, au ras, puis le tronc. "
+           "Ne tire jamais sur une branche : tiens la pièce dans la main et coupe de l'autre."
+           if u["arbre"] else
+           "Glisse un cutter ou la pince sous un coin du bloc et soulève-le d'un seul morceau, sans tirer sur la pièce.")
+    # the page draws them: part outline and support zones, cells of CELL mm, y up
+    top = [[int((x + x0) * CELL), int((y + y0) * CELL)] for y, x in zip(*np.nonzero(_occupied(part, x0, y0, grid.shape)))]
+    return {
+        "tips": [f"Supports : {len(zones)} zone{'s' if len(zones) > 1 else ''} à retirer, en orange sur la vue 3D. {how}", *lines,
+                 "Il reste de petits points là où les supports touchaient : passe le cutter à plat, sans appuyer."],
+        "map": {"cell": CELL, "part": top, "supports": [[int((x + x0) * CELL), int((y + y0) * CELL)] for y, x in zip(*np.nonzero(grid))]},
+    }
+
+
+def _occupied(part: np.ndarray, x0: int, y0: int, shape: tuple[int, int]) -> np.ndarray:
+    m = np.zeros(shape, bool)
+    m[(np.floor(part[:, 1] / CELL) - y0).astype(int), (np.floor(part[:, 0] / CELL) - x0).astype(int)] = True
+    return m
+
+
+# question key: (what the user rates 0 to 5, the defect a low mark ticks)
+QUESTIONS: dict[str, tuple[str, str | None]] = {
+    "global": ("Dans l'ensemble", None),
+    "surface": ("Surfaces lisses (dessus, côtés)", "dessus"),
+    "details": ("Détails fins nets", "fils"),
+    "supports": ("Supports faciles à enlever", "supports"),
+    "couleurs": ("Couleurs propres", "couleurs"),
+    "solidite": ("Solidité", "fragile"),
+}
+
+
+def questions(entry: dict[str, Any]) -> list[dict[str, str | None]]:
+    """The questions to rate for this print: the ones about supports and colours only when it had some."""
+    u = used(config.MODELS_DIR / entry["fichier"])
+    u["couleurs"] = max(u["couleurs"], len(library.load_index().get(entry["fichier"], {}).get("couleurs") or []))
+    skip = {"supports"} if not u["supports"] else set()
+    skip |= {"couleurs"} if u["couleurs"] < 2 else set()
+    return [{"key": k, "title": t, "issue": i} for k, (t, i) in QUESTIONS.items() if k not in skip]
+
+
+def clean_notes(notes: dict[str, Any]) -> dict[str, int]:
+    out: dict[str, int] = {}
+    for k, v in (notes or {}).items():
+        if k in QUESTIONS and isinstance(v, (int, float)) and not isinstance(v, bool):
+            out[k] = max(0, min(5, int(v)))
     return out
 
 
@@ -127,12 +282,13 @@ def corrections(entry: dict[str, Any], issues: list[str]) -> dict[str, Any]:
     return out
 
 
-def review(entry: dict[str, Any], issues: list[str], note: str = "") -> dict[str, Any]:
+def review(entry: dict[str, Any], issues: list[str], note: str = "", notes: dict[str, Any] | None = None) -> dict[str, Any]:
     """Keep the review on the print and the corrections on its source model; returns both."""
     issues = [k for k in issues if k in ISSUES]
+    marks = clean_notes(notes or {})
     fix = corrections(entry, issues)
     source = library.load_index().get(entry["fichier"], {}).get("source")
-    if source and (issues or note):
-        library.annotate(source, retour={"date": int(time.time()), "issues": issues, "note": note[:300],
+    if source and (issues or note or marks):
+        library.annotate(source, retour={"date": int(time.time()), "issues": issues, "note": note[:300], "notes": marks,
                                          "titres": [ISSUES[k][0] for k in issues], **fix})
-    return {"issues": issues, "fix": fix, "source": source}
+    return {"issues": issues, "fix": fix, "source": source, "notes": marks}

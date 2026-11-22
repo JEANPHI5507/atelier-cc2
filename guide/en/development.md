@@ -17,7 +17,7 @@ src/elegoo_lab/
   slicer.py         OrcaSlicer on the command line, CC2 profiles, M6211 purge
   printprep.py      from model to G-code: colours, size, position, multicolour modes, cutting, copies
   colors.py         a model's colours, conversion for the CANVAS, sized purge, simplification
-  colorize.py       assembling parts into a multicolour 3MF
+  colorize.py       assembling parts into a multicolour 3MF; compose.py (several models on one plate)
   mesh.py, orient.py, cut.py, advisor.py, optimize.py   mesh, positions, cutting, advisor, "Optimiser"
   parametric.py, parametric_more.py, addtext.py          the "Créer" parts
   forme.py          drill or add a shape; couches.py (variable layer height)

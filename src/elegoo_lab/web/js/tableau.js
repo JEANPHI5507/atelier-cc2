@@ -319,7 +319,7 @@
     if (!('wakeLock' in navigator)) return;
     navigator.wakeLock.request('screen').then(function (w) { wake = w; }).catch(function () {});
   }
-  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') { keepAwake(); camera(); } });
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') { keepAwake(); camera(); status(); } });
   $('back').onclick = function () {
     var ex = document.exitFullscreen || document.webkitExitFullscreen;
     if (ex && (document.fullscreenElement || document.webkitFullscreenElement)) try { ex.call(document); } catch (e) {}
@@ -337,6 +337,9 @@
     if (!ctx.control) $('ctl-note').textContent = 'Lecture seule : l\'atelier tourne sans --control.';
   }).catch(function () {}).then(function () {
     camera(); status(); spools(); ai(); idle(); alerts();
-    setInterval(status, 3000); setInterval(spools, 20000); setInterval(ai, 10000); setInterval(idle, 120000);
+    // a sleeping tablet still gets its timers: the polls just skip their turn while hidden
+    function checkHidden(fn) { return function () { if (!document.hidden) fn(); }; }
+    setInterval(checkHidden(status), 3000); setInterval(checkHidden(spools), 20000);
+    setInterval(checkHidden(ai), 10000); setInterval(checkHidden(idle), 120000);
   });
 })();

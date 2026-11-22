@@ -47,7 +47,7 @@ cc2 models list                                   # the library
 cc2 models info model.glb                         # dimensions, watertight, does it fit on the plate?
 cc2 models prepare model.glb --height 60          # repaired STL, laid on the plate, 60 mm high
 cc2 colors model.3mf                              # colours found and the spool suggested for each
-cc2 slice model.3mf                               # slice (multicolour mode Économie by default)
+cc2 slice model.3mf                               # slice (multicolour mode Équilibré by default)
 cc2 slice-profiles                                # available nozzles, qualities and filaments
 ```
 
@@ -65,6 +65,8 @@ cc2 slice-profiles                                # available nozzles, qualities
 | `--decouper` | cut into pieces with dowels if too large |
 | `--nozzle 0.6` | another nozzle (plain single-colour slicing) |
 | `--upload --start` | upload then start (with `cc2 --control slice …`) |
+
+The result also shows the nozzle and bed temperatures of Elegoo's profile (matched to the filament).
 
 Examples:
 

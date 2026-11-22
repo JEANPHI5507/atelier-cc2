@@ -175,7 +175,8 @@
   .panel-head { padding: 18px 20px 12px; display: flex; gap: 8px; align-items: flex-start; }
   .panel-head > div { min-width: 0; flex: 1; }
   .panel-head .t { font-size: 16px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .panel-head .s { color: var(--faint); font-size: 13px; }
+  .panel-head .s, .p-sub { color: var(--faint); font-size: 13px; }
+  .p-sub { padding: 0 20px 12px; margin-top: -8px; }   /* the size on its own line: named sides need the width */
   .sect { padding: 16px 20px; border-top: 1px solid var(--line); }
   .sect-h { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
   .num { width: 22px; height: 22px; border-radius: 50%; background: var(--raised); border: 1px solid var(--line-strong); display: grid; place-items: center; font-size: 12px; font-weight: 650; color: var(--dim); }
@@ -470,20 +471,31 @@
   .clean-row small { display: block; color: var(--faint); }
 
   /* 3D viewer toolbar */
-  .vtools { position: absolute; top: 12px; right: 12px; z-index: 2; display: flex; gap: 2px; padding: 3px; border-radius: 10px;
+  .vtools { position: absolute; top: 12px; right: 12px; z-index: 2; display: flex; gap: 1px; padding: 3px; border-radius: 10px;
             background: var(--chip-bg); border: 1px solid var(--line); backdrop-filter: blur(6px); flex-wrap: wrap; justify-content: flex-end; max-width: calc(100% - 24px); }
-  .vtools button { border: 0; background: none; color: var(--dim); font: inherit; font-size: 12.5px; font-weight: 550; height: 30px; min-width: 32px; padding: 0 8px;
+  .vtools button { border: 0; background: none; color: var(--dim); font: inherit; font-size: 12px; font-weight: 550; height: 30px; min-width: 30px; padding: 0 4px;
                    border-radius: 7px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
   .vtools button:hover { color: var(--txt); background: var(--raised); } .vtools button.on { background: var(--acc); color: var(--acc-ink); }
-  .vtools .vsep { width: 1px; background: var(--line); margin: 4px 2px; }
+  /* the piece chosen on the plate: its size */
+  .pc-panel { position: absolute; left: 12px; bottom: 12px; z-index: 2; width: min(300px, calc(100% - 24px)); padding: 10px 12px; border-radius: 12px;
+    background: var(--surface); border: 1px solid var(--line-strong); box-shadow: 0 8px 24px var(--shadow); font-size: 13px; }
+  .pc-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; } .pc-h b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pc-panel label { display: block; color: var(--dim); font-size: 12px; margin-bottom: 4px; }
+  .pc-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; } .pc-row input[type=range] { flex: 1; min-width: 0; }
+  .pc-row input[type=number] { width: 64px; } .pc-row .btn { flex: 1; padding: 0 6px; min-width: 0; }
+  .addp-row { cursor: pointer; } .addp-row:hover { background: var(--acc-soft); }
+  .vtools .vsep { width: 1px; background: var(--line); margin: 4px 1px; }
   .viewtabs:not([hidden]) ~ .vdims { top: 52px; }
   .vdims { position: absolute; left: 12px; top: 12px; padding: 4px 12px; border-radius: 99px; background: var(--chip-bg);
            border: 1px solid var(--line); font-size: 13px; font-weight: 600; z-index: 1; }
+  .vmeas { position: absolute; transform: translate(-50%, -150%); padding: 3px 10px; border-radius: 99px; background: var(--chip-bg);
+           border: 1px solid #00cfd4; color: #00cfd4; font-size: 13px; font-weight: 700; z-index: 2; pointer-events: none; white-space: nowrap; }
+  .vmeas[hidden] { display: none; }
   .paintbar { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 3; display: flex; flex-wrap: wrap; gap: 8px 10px;
               align-items: center; justify-content: center; padding: 10px 12px; border-radius: 12px; background: var(--chip-bg);
               border: 1px solid var(--line); backdrop-filter: blur(6px); max-width: calc(100% - 24px); }
   .paintbar[hidden] { display: none; }
-  .pb-sw { display: flex; gap: 6px; }
+  .pb-sw { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; max-width: 100%; }
   .pb-sw button { width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--line); cursor: pointer; padding: 0; }
   .pb-sw button.on { border-color: var(--acc); box-shadow: 0 0 0 2px var(--acc); }
   .pb-sw button.erase { background: var(--raised); color: var(--txt); display: grid; place-items: center; }
@@ -749,6 +761,25 @@
   .chip-btn { font: inherit; font-size: 12.5px; color: var(--dim); background: var(--bg); border: 1px solid var(--line-strong); border-radius: 99px; padding: 6px 12px; cursor: pointer; }
   .chip-btn.on { color: var(--acc-ink); background: var(--acc); border-color: var(--acc); }
   #bl-why { display: grid; gap: 8px; }
+  .bl-map, .bl-3d { margin: 0 0 14px; }
+  .bl-3d .mini-3d { height: clamp(260px, 38vh, 420px); }
+  /* a wide screen: the 3D view big on the left, the advice and the marks beside it */
+  @media (min-width: 1000px) {
+    dialog.bilan-dlg:has(.bl-side > :not([hidden])) { width: min(1400px, calc(100vw - 48px)); }
+    dialog.bilan-dlg:has(.bl-side > :not([hidden])) .bl-cols { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(360px, 1fr); gap: 24px; max-height: 80vh; overflow: hidden; }
+    .bl-main { overflow: auto; min-height: 0; padding-right: 4px; }
+    .bl-side { min-height: 0; }
+    .bl-side .bl-3d .mini-3d { height: calc(80vh - 90px); }
+  }
+  .bl-map svg { width: 100%; max-height: 260px; display: block; }
+  .bl-map .mp { fill: var(--line-strong); }
+  .bl-map .ms { fill: var(--acc); }
+  .bl-map text { fill: var(--dim); }
+  .bl-rate { display: grid; gap: 8px; margin-bottom: 12px; }
+  .rate-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; font-size: 13px; color: var(--dim); }
+  .rate-n { display: inline-flex; gap: 4px; }
+  .rate-n button { font: inherit; font-size: 13px; min-width: 34px; height: 34px; color: var(--dim); background: var(--bg); border: 1px solid var(--line-strong); border-radius: 8px; cursor: pointer; }
+  .rate-n button.on { color: var(--acc-ink); background: var(--acc); border-color: var(--acc); }
   @media (max-width: 600px) { .chip-btn { min-height: 40px; } }
 
   /* launch dialog: the camera check of the plate */
@@ -775,3 +806,38 @@
   .tl.cmd span { color: var(--acc); }
   .tl.ok span { color: var(--ok); } .tl.warn span { color: var(--warn); } .tl.bad span { color: var(--bad); }
   .tl.alerte span { font-weight: 600; }
+  /* the assistant (Mistral acting through the workshop's own tools) */
+  #chat-log { display: flex; flex-direction: column; gap: 6px; max-height: 320px; overflow-y: auto; margin: 8px 0; }
+  .chat-msg { max-width: 92%; padding: 8px 10px; border-radius: 10px; font-size: 13.5px; line-height: 1.45; }
+  .chat-msg.user { align-self: flex-end; background: var(--acc-soft); }
+  .chat-msg.assistant { align-self: flex-start; background: var(--raised); }
+  .chat-msg small { display: block; margin-top: 4px; color: var(--dim); }
+  .chat-msg.activity { align-self: flex-start; background: none; color: var(--dim); font-size: 12.5px; padding: 2px 6px; }
+  .chat-msg.activity code { color: var(--fg); background: var(--raised); padding: 1px 5px; border-radius: 6px; }
+  .chat-row { display: flex; gap: 8px; }
+  #chat-zone { display: flex; align-items: center; gap: 8px; margin: 8px 0; padding: 6px 10px; border-radius: 10px;
+               background: var(--raised); font-size: 12.5px; color: var(--dim); }
+  #chat-zone[hidden] { display: none; }
+  #chat-zone input { width: 52px; }   /* the target's radius in mm */
+  #chat-zone-x { border: 0; background: none; color: var(--dim); cursor: pointer; padding: 2px 4px; }
+  #chat-zone-x:hover { color: var(--fg); }
+  #chat-in { flex: 1; }
+  .chat-sug { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .chat-sug[hidden] { display: none; }
+  .chat-sug button { border: 1px solid var(--line); background: var(--raised); color: var(--dim); font: inherit;
+                     font-size: 12px; padding: 4px 10px; border-radius: 99px; cursor: pointer; }
+  .chat-sug button:hover { color: var(--txt); border-color: var(--line-strong); }
+  /* the assistant sits IN the 3D stage, under the view toolbar, over the piece */
+  #chat-sec { position: absolute; top: 52px; right: 12px; z-index: 2; width: min(340px, calc(100% - 24px));
+              max-height: calc(100% - 70px); display: flex; flex-direction: column; padding: 10px 12px 12px;
+              border: 1px solid var(--line); border-radius: 12px; background: var(--chip-bg);
+              backdrop-filter: blur(6px); font-size: 13px; box-shadow: 0 8px 24px var(--shadow); }
+  #chat-sec[hidden] { display: none; }
+  #chat-sec .sect-h { margin-bottom: 8px; } #chat-sec .sect-h h3 { font-size: 13.5px; }
+  #chat-sec .note { margin-bottom: 8px; font-size: 12px; }
+  #chat-sec #chat-log { flex: 1 1 auto; min-height: 40px; }
+  #chat-sec.folded > :not(.sect-h) { display: none; }
+  #chat-fold { border: 0; background: none; color: var(--dim); cursor: pointer; font: inherit; font-size: 14px; padding: 2px 6px; }
+  #chat-fold:hover { color: var(--txt); }
+  @media (max-width: 860px) { #chat-sec { top: 100px; } }   /* the toolbar wraps higher there */
+  @media (max-width: 600px) { #chat-sec { width: min(300px, calc(100% - 24px)); max-height: 55vh; } }

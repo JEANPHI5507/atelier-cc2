@@ -69,8 +69,11 @@ def _part(result: mf.Manifold, source: threemf.Part, origin: int) -> threemf.Par
 
 
 def apply(src: Path, *, shape: str, op: str, size: tuple[float, float, float], at: tuple[float, float, float],
-          axis: str = "z", colour: int = 1, out: Path | None = None) -> dict[str, Any]:
-    """``at``: the shape's centre from the model's centre (mm, the model's own axes, z up). ``colour``: for
+          axis: str = "z", colour: int = 1, out: Path | None = None,
+          file_at: tuple[float, float, float] | None = None) -> dict[str, Any]:
+    """``at``: the shape's centre from the model's centre (mm, the model's own axes, z up). ``file_at``:
+    the shape's centre in the FILE's own coordinates (as the page's « Cibler » reports it) — it wins
+    over ``at`` when given, so a zone picked on the 3D view lands exactly there. ``colour``: for
     « ajouter », the colour index the shape takes (one past the model's colours = a new one)."""
     if op not in OPS:
         raise ValueError(f"opération inconnue « {op} » ({', '.join(OPS)})")
@@ -81,7 +84,8 @@ def apply(src: Path, *, shape: str, op: str, size: tuple[float, float, float], a
     pr = colors._load(src)
     parts = colors._parts(pr)
     allv = np.vstack([p.vertices for p in parts])
-    centre = (allv.min(0) + allv.max(0)) / 2 + np.asarray(at, float)
+    centre = (np.asarray(file_at, float) if file_at is not None
+              else (allv.min(0) + allv.max(0)) / 2 + np.asarray(at, float))
     cutter = _shape(shape, size, axis).translate(centre.tolist()).as_original()
     rgb_mode = any(p.face_rgb is not None for p in parts)
     if op == "percer" and all((_solid(p)[0] ^ cutter).is_empty() for p in parts):

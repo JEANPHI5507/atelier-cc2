@@ -45,7 +45,7 @@ def build_3mf(parts: list[tuple[Path, int]], out: Path, *, filaments: int | None
     lo = np.min([m.bounds[0] for _, _, m in meshes], axis=0)
     hi = np.max([m.bounds[1] for _, _, m in meshes], axis=0)
     if (hi - lo).max() > mesh.BED_MM:
-        raise ValueError(f"l'assemblage ({(hi - lo).round(1).tolist()} mm) dépasse le plateau de {mesh.BED_MM:.0f} mm")
+        raise ValueError(f"l'assemblage ({mesh.size_text(hi - lo)}) dépasse le plateau de {mesh.BED_MM:.0f} mm")
     shift = np.array([BED_CENTER - (lo[0] + hi[0]) / 2, BED_CENTER - (lo[1] + hi[1]) / 2, -lo[2]])
 
     obj_id = len(meshes) + 1

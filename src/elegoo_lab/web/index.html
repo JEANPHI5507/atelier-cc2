@@ -34,6 +34,7 @@
   <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5"/></symbol>
   <symbol id="i-phone" viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 17h2"/></symbol>
   <symbol id="i-cube" viewBox="0 0 24 24"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z"/><path d="m4 7.5 8 4.5 8-4.5M12 12v9"/></symbol>
+  <symbol id="i-regle" viewBox="0 0 24 24"><path d="M16.5 3.5 20.5 7.5 7.5 20.5 3.5 16.5Z"/><path d="m8.5 11.5 1.5 1.5M11.5 8.5 13 10M14.5 5.5 16 7"/></symbol>
   <symbol id="i-fit" viewBox="0 0 24 24"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/><circle cx="12" cy="12" r="2.5"/></symbol>
   <symbol id="i-full" viewBox="0 0 24 24"><path d="M4 10V4h6M14 4h6v6M20 14v6h-6M10 20H4v-6"/></symbol>
   <symbol id="i-text" viewBox="0 0 24 24"><path d="M5 6V4h14v2M12 4v16m-3 0h6"/></symbol>
@@ -63,8 +64,8 @@
     <aside class="lib">
       <div class="lib-head"><h2>Bibliothèque</h2><div style="display:flex;gap:2px"><button class="btn ghost" id="make-open" title="Créer une pièce sur mesure (boîte, étiquette, crochet…)"><svg class="i"><use href="#i-plus"/></svg>Créer</button><button class="btn ghost" id="asm-open" title="Assembler plusieurs pièces, une couleur chacune"><svg class="i"><use href="#i-puzzle"/></svg>Assembler</button></div></div>
       <div class="lib-add">
-      <label class="drop" id="drop"><svg class="i"><use href="#i-upload"/></svg><br><b class="d-desk">Déposer des fichiers</b><span class="d-desk"> ou cliquer</span><b class="d-touch">Ajouter un fichier</b><br><span class="d-fmt">STL · 3MF · OBJ · GLB · PLY · G-code</span>
-        <input id="up" type="file" accept=".stl,.3mf,.glb,.gltf,.obj,.gcode,.ply" hidden multiple></label>
+      <label class="drop" id="drop"><svg class="i"><use href="#i-upload"/></svg><br><b class="d-desk">Déposer des fichiers</b><span class="d-desk"> ou cliquer</span><b class="d-touch">Ajouter un fichier</b><br><span class="d-fmt">STL · 3MF · STEP · OBJ · GLB · PLY · ZIP · G-code</span>
+        <input id="up" type="file" accept=".stl,.3mf,.glb,.gltf,.obj,.gcode,.ply,.off,.dae,.step,.stp,.zip" hidden multiple></label>
       <button class="btn ghost link-open" id="link-open" type="button"><svg class="i"><use href="#i-download"/></svg><span class="d-desk">Importer depuis un lien</span><span class="d-touch">Lien</span></button>
       </div>
       <div class="search"><svg class="i"><use href="#i-search"/></svg><input id="q" type="text" placeholder="Rechercher" aria-label="Rechercher un fichier"></div>
@@ -95,15 +96,27 @@
         <span class="vsep"></span>
         <button data-vt="over" title="Montrer en rouge ce qui aura besoin de supports">Surplombs</button>
         <button data-vt="dims" title="Afficher les dimensions">Cotes</button>
+        <button data-vt="cible" title="Clique sur la vue 3D l'endroit précis à confier à l'assistant (le marqueur suit la pièce, l'assistant reçoit les coordonnées)">Cibler</button>
+        <button data-vt="mesure" title="Touche deux points du modèle : la distance entre eux s'affiche en mm (réelle, même si la pièce pivote). Un nouveau clic recommence." aria-label="Mesurer"><svg class="i"><use href="#i-regle"/></svg></button>
         <button data-vt="paint" title="Retoucher les couleurs au pinceau">Pinceau</button>
         <button data-vt="marks" title="Peindre où mettre des supports (ou jamais), et où placer la couture">Supports</button>
         <button data-vt="move" title="Glisser chaque pièce sur le plateau pour la déplacer" hidden>Déplacer</button>
-        <button data-vt="regroup" title="Remet les pièces à leur place d'origine" hidden>Regrouper</button>
+        <button data-vt="regroup" title="Remet les pièces à leur place et à leur taille d'origine" hidden>Regrouper</button>
+        <button data-vt="add" title="Ajouter une autre pièce de la bibliothèque sur ce plateau" hidden>+ Pièce</button>
         <span class="vsep"></span>
         <button data-vt="fit" title="Recentrer"><svg class="i"><use href="#i-fit"/></svg></button>
         <button data-vt="full" title="Plein écran"><svg class="i"><use href="#i-full"/></svg></button>
       </div>
       <div class="vdims" id="vdims" hidden></div>
+      <div class="vmeas" id="vmeas" hidden></div>
+      <div class="pc-panel" id="pc-panel" hidden>
+        <div class="pc-h"><b id="pc-name"></b><button class="btn ghost" id="pc-close" aria-label="Fermer"><svg class="i"><use href="#i-x"/></svg></button></div>
+        <div class="note" id="pc-dims" style="margin:0 0 6px"></div>
+        <label for="pc-size">Taille de cette pièce</label>
+        <div class="pc-row"><input type="range" id="pc-size" min="10" max="300" step="1" value="100"><input type="number" id="pc-pct" min="10" max="500" step="1" value="100" aria-label="Taille en %"><span>%</span></div>
+        <div class="pc-row"><button class="btn" data-pc="50">50 %</button><button class="btn" data-pc="75">75 %</button><button class="btn" data-pc="100">100 %</button><button class="btn" data-pc="150">150 %</button></div>
+        <button class="btn" id="pc-del" title="La pièce quitte le plateau dans un nouveau modèle ; l'original reste dans la bibliothèque">Supprimer cette pièce</button>
+      </div>
       <div class="paintbar" id="paintbar" hidden role="toolbar" aria-label="Retouche des couleurs">
         <div class="pb-sw" id="pb-sw" role="radiogroup" aria-label="Couleur du pinceau"></div>
         <label class="pb-size">Taille <input type="range" id="pb-size" min="1" max="20" value="5" aria-label="Taille du pinceau"></label>
@@ -123,13 +136,31 @@
         <label><input type="checkbox" id="show-tower" checked><i style="background:#8a97a8"></i>Tour</label>
         <label title="Seulement la couche choisie, vue de dessus"><input type="checkbox" id="show-single">Couche seule</label>
       </div>
+      <div class="sect" id="chat-sec" hidden>
+        <div class="sect-h"><span class="num">✦</span><h3>Assistant</h3><b class="grow"></b><button id="chat-fold" title="Replier ou déplier l'assistant" aria-label="Replier ou déplier l'assistant">▾</button></div>
+        <p class="note">Demande avec tes mots : « perce un trou de 6 mm pour un aimant en haut », « mets-le à 80 mm de haut ». L'assistant agit lui-même sur le modèle ; avec Blender ouvert, il peut modéliser en vrai CAO. Le bouton « Cibler » pose une épingle : il recevra l'endroit exact avec ton message.</p>
+        <div id="chat-log"></div>
+        <div class="chat-sug" id="chat-sug">
+          <button data-q="Répare-le et mets-le dans la meilleure pose">Réparer et poser</button>
+          <button data-q="Fais-le 30 % plus grand">+ 30 %</button>
+          <button data-q="Perce un trou de 6 mm en haut pour un aimant">Trou aimant</button>
+          <button data-q="Tranche-le et annonce le temps et les grammes">Trancher</button>
+        </div>
+        <div id="chat-zone" hidden>
+          <span id="chat-zone-txt"></span>
+          <label>rayon <input id="chat-zone-r" type="number" min="2" max="80" value="10"> mm</label>
+          <button id="chat-zone-x" title="Retirer la zone ciblée">✕</button>
+        </div>
+        <div class="chat-row"><input id="chat-in" type="text" placeholder="Ex. : perce un trou de 6 mm pour un aimant en haut" autocomplete="off"><button class="btn primary" id="chat-go">Envoyer</button></div>
+      </div>
     </div>
 
     <aside class="panel">
       <div class="muted-box" id="nosel"><div class="big">Rien de sélectionné</div>Choisis un modèle à gauche ou dépose un fichier : ses couleurs sont détectées automatiquement.</div>
 
       <div id="prep" hidden>
-        <div class="panel-head"><div><div class="t" id="p-name"></div><div class="s" id="p-sub"></div></div><button class="btn ghost" id="add-text" title="Ajouter un prénom ou un texte"><svg class="i"><use href="#i-text"/></svg></button><button class="btn ghost" id="add-shape" title="Percer un trou ou ajouter une forme"><svg class="i"><use href="#i-cube"/></svg></button><button class="btn ghost" data-ren title="Renommer"><svg class="i"><use href="#i-edit"/></svg></button><button class="btn ghost" data-del title="Supprimer"><svg class="i"><use href="#i-trash"/></svg></button></div>
+        <div class="panel-head"><div><div class="t" id="p-name"></div></div><button class="btn ghost" id="add-text" title="Ajouter un prénom ou un texte"><svg class="i"><use href="#i-text"/></svg></button><button class="btn ghost" id="add-shape" title="Percer un trou ou ajouter une forme"><svg class="i"><use href="#i-cube"/></svg></button><button class="btn ghost" data-ren title="Renommer"><svg class="i"><use href="#i-edit"/></svg></button><button class="btn ghost" data-del title="Supprimer"><svg class="i"><use href="#i-trash"/></svg></button></div>
+        <div class="p-sub" id="p-sub"></div>
         <div class="opt">
           <button class="btn primary block" id="opt-go"><svg class="i"><use href="#i-spark"/></svg>Optimiser pour la CC2</button>
           <p class="note" id="opt-hint">Répare, met à la bonne taille, choisit la meilleure face, puis supports, bordure et découpe si besoin.</p>
@@ -194,9 +225,11 @@
         <div class="sect">
           <div class="sect-h"><span class="num">3</span><h3>Trancher et imprimer</h3></div>
           <div class="advice" id="advice" hidden></div>
+          <div class="advice" id="ia-note" hidden></div>
           <div id="result"></div>
         </div>
         <div class="prep-foot">
+          <div class="switch" style="margin-bottom:8px"><label for="ia-tranche">L'IA tranche : elle lit la pièce et règle qualité, remplissage, supports (et te dit pourquoi)</label><input id="ia-tranche" type="checkbox"></div>
           <button class="btn primary block" id="go"><svg class="i"><use href="#i-layers"/></svg>Trancher</button>
         </div>
       </div>
@@ -460,25 +493,44 @@
   </div>
 </dialog>
 
-<dialog id="bilan">
+<dialog id="bilan" class="bilan-dlg">
   <div class="dlg-h"><span>Bilan · <b id="bl-t"></b></span><button class="btn ghost" data-close aria-label="Fermer"><svg class="i"><use href="#i-x"/></svg></button></div>
-  <div class="dlg-b">
+  <div class="dlg-b bl-cols">
+    <div class="bl-side" id="bl-side">
+      <div class="bl-3d" id="bl-3d-box" hidden><div class="mini-3d" id="bl-3d"></div>
+        <p class="note" id="bl-3d-note">Lecture du G-code…</p></div>
+      <div class="bl-map" id="bl-map" hidden></div>
+    </div>
+    <div class="bl-main">
     <h4 class="ln-h">Maintenant</h4>
     <ul class="bl-tips" id="bl-tips"></ul>
+    <h4 class="ln-h">Ta note, de 0 à 5</h4>
+    <div class="bl-rate" id="bl-rate"></div>
     <h4 class="ln-h">Comment c'est sorti ?</h4>
     <p class="note">Coche ce que tu vois : l'atelier explique pourquoi et garde la correction pour la prochaine impression de ce modèle.</p>
     <div class="bl-issues" id="bl-issues"></div>
     <div id="bl-why"></div>
     <div class="field" style="margin-top:12px"><label for="bl-note">Note pour toi (facultatif)</label><input id="bl-note" type="text" maxlength="300" placeholder="ex. couleurs à revoir, sinon très bien"></div>
+    </div>
   </div>
   <div class="dlg-f"><button class="btn" data-close>Fermer</button><button class="btn primary" id="bl-go">Garder pour la prochaine fois</button></div>
+</dialog>
+
+<dialog id="addp" class="wide-dlg">
+  <div class="dlg-h">Ajouter une pièce sur ce plateau<button class="btn ghost" data-close aria-label="Fermer"><svg class="i"><use href="#i-x"/></svg></button></div>
+  <div class="dlg-b">
+    <p class="note">Choisis une pièce de la bibliothèque : elle se met à côté de <b id="addp-base"></b>, sur un nouveau plateau (le modèle d'origine ne change pas). Chaque pièce garde ses couleurs ; 4 couleurs au plus en tout.</p>
+    <div class="search" style="margin:0 0 8px"><svg class="i"><use href="#i-search"/></svg><input id="addp-q" type="text" placeholder="Chercher une pièce" aria-label="Chercher une pièce"></div>
+    <div id="addp-list" class="asm-list"></div>
+  </div>
+  <div class="dlg-f"><button class="btn" data-close>Annuler</button></div>
 </dialog>
 
 <dialog id="link">
   <div class="dlg-h">Importer depuis un lien<button class="btn ghost" data-close aria-label="Fermer"><svg class="i"><use href="#i-x"/></svg></button></div>
   <form class="dlg-b" id="link-form" method="dialog">
     <div class="field"><label for="link-url">Lien du fichier ou de la page</label><input id="link-url" type="text" inputmode="url" placeholder="https://…/modele.stl" autocomplete="off" required></div>
-    <p class="note">Marche avec un lien direct vers un STL, 3MF, OBJ, GLB ou un zip, et avec les pages qui donnent ce lien.
+    <p class="note">Marche avec un lien direct vers un STL, 3MF, OBJ, GLB, PLY, STEP, OFF, DAE ou un zip, et avec les pages qui donnent ce lien.
       MakerWorld et Thingiverse demandent d'être connecté : télécharge le fichier puis dépose-le.</p>
     <div class="row-btns" style="justify-content:flex-end"><button class="btn" type="button" data-close>Annuler</button><button class="btn primary" id="link-go" type="submit">Importer</button></div>
   </form>

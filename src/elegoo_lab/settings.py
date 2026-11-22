@@ -38,6 +38,7 @@ CHOICES: dict[str, tuple[str, str, dict[str, tuple[str, str]]]] = {
         "oui": ("1", "Oui"), "non": ("0", "Non")}),
     # no OrcaSlicer key: printprep writes height ranges into the model (couches.py)
     "couches": ("", "Hauteur de couche variable", {
+        "auto": ("auto", "Automatique (plus fines là où les pentes se voient, rien si la pièce est droite)"),
         "non": ("", "Non (même hauteur partout)"), "pentes": ("pentes", "Plus fines sur les pentes (dômes et arrondis plus lisses)"),
         "rapide": ("rapide", "Fines sur les pentes, épaisses sur les parois droites")}),
     "lissage": ("ironing_type", "Lissage du dessus", {
@@ -47,6 +48,12 @@ CHOICES: dict[str, tuple[str, str, dict[str, tuple[str, str]]]] = {
     "bordure": ("brim_type", "Bordure d'adhérence", {
         "auto": ("auto_brim", "Automatique"), "non": ("no_brim", "Aucune"), "exterieure": ("outer_only", "Autour de la pièce"),
         "oreilles": ("brim_ears", "Oreilles aux angles")}),
+    # print one piece entirely before the next: same colours group together, so a plate of pieces
+    # pays one change per colour instead of one change per layer (printprep guards what fits)
+    "ordre": ("print_sequence", "Ordre d'impression", {
+        "couche": ("by layer", "Couche par couche (toutes les pièces avancent ensemble)"),
+        "suite": ("by object", "Pièce par pièce (les mêmes couleurs ensemble, bien moins de changements ; pièces espacées et basses)"),
+    }),
 }
 NUMBERS: dict[str, tuple[str, str, float, float, str]] = {
     # name: (orca key, label, min, max, unit)

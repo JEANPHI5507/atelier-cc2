@@ -2,12 +2,16 @@ import * as THREE from 'three';
 import { OrbitControls } from '../vendor/addons/OrbitControls.js';
 import { STLLoader } from '../vendor/addons/STLLoader.js';
 import { GLTFLoader } from '../vendor/addons/GLTFLoader.js';
-import { $, nice, BUSY, MESH, SLOT, api, cfg, ctx, dur, durSec, esc, euro, fmtG, shortTime, size, spools, toast } from './core.js';
+import { $, nice, BUSY, MESH, SLOT, api, cfg, ctx, dur, durSec, esc, euro, fmtG, shortTime, size, sizeTxt, spools, toast } from './core.js';
 
 /* viewer: optional, the page works without WebGL */
 let files = [], sel = null, analysis = null, mapping = {}, info = null, trays = {}, single = null;
 // colours paired with the loaded spools: one summary line, the detail only on « Modifier »
 let matched = null, colEdit = false;
+// filament left on each loaded spool (g, from the stock) and the "almost empty" threshold
+let stockLeft = {}, stockLow = 0;
+// grams each colour should need, estimated by the server before any slicing ({} when not computable)
+let needs = {};
 let optUndo = null;   // the form before « Optimiser pour la CC2 », to put it back
 // the CC2's plate: Elegoo's own model and markings (from OrcaSlicer's CC2 profile, vendor/cc2), on the textured PEI
 // grain seen on the camera. OrcaSlicer lays the markings over 0..256 x -10..256 mm and centres the model on the bed.
@@ -49,9 +53,13 @@ function loadPlate() {
   }, undefined, () => {});
 }
 const stage = $('stage'); let renderer = null, scene, cam, controls, current = null, plateMat = null, grid = null, refit = false;
+// render on demand: the loop keeps running (damping, wake-ups) but only draws when something changed
+let needRender = true;
+const renderOnce = () => { needRender = true; };
 try {
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-  renderer.setPixelRatio(devicePixelRatio); stage.prepend(renderer.domElement);
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));   // beyond 2 the retina/phone cost is huge for nothing visible
+  stage.prepend(renderer.domElement);
   scene = new THREE.Scene();
   cam = new THREE.PerspectiveCamera(38, 1, 1, 5000); cam.up.set(0, 0, 1); cam.position.set(260, -300, 230);
   controls = new OrbitControls(cam, renderer.domElement); controls.target.set(0, 0, 30); controls.enableDamping = true;
@@ -69,23 +77,45 @@ try {
   const no = new THREE.Mesh(new THREE.PlaneGeometry(10, 20), new THREE.MeshBasicMaterial({ color: 0xff5a4f, transparent: true, opacity: .45 }));
   no.position.set(123, -118, .1); scene.add(no);
   const frame = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(256, 256, 256)), new THREE.LineBasicMaterial({ color: 0x8a96a8, transparent: true, opacity: .35 })); frame.position.z = 128; scene.add(frame);
-  const resize = () => { const w = stage.clientWidth, h = stage.clientHeight; renderer.setSize(w, h); cam.aspect = w / h; cam.updateProjectionMatrix();
+  const resize = () => { const w = stage.clientWidth, h = stage.clientHeight; renderer.setSize(w, h); cam.aspect = w / h; cam.updateProjectionMatrix(); renderOnce();
     if (refit && current && w && h) { refit = false; frame(current); }   // framed while hidden: fit it now
     if (stage.classList.contains('painting')) paintView(); };
   new ResizeObserver(resize).observe(stage); resize();
-  renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, cam); });
+  controls.addEventListener('change', renderOnce);   // damping and orbits redraw only while they move
 } catch { renderer = null; }
+if (renderer) renderer.setAnimationLoop(() => {
+  if (document.hidden || $('lab').hidden || $('make')?.open || $('asm')?.open) return;   // the main view is not the one on screen
+  controls.update();
+  if (mesure.on) mesureUpd();   // the distance label follows the model on screen
+  if (needRender) { needRender = false; renderer.render(scene, cam); }
+});
 
+// freeing the GPU buffers of a removed object (models, paths, helpers): a disposed buffer is
+// re-uploaded on demand, so reusing one elsewhere stays safe
+function disposeObj(obj) {
+  obj.traverse(o => {
+    o.geometry?.dispose?.();
+    const mats = Array.isArray(o.material) ? o.material : o.material ? [o.material] : [];
+    for (const m of mats) { for (const v of Object.values(m)) if (v?.isTexture) v.dispose(); m.dispose(); }
+  });
+}
+// the shown model goes away: remove it and its buffers (the picked-spot marker dies with it)
+function dropCurrent() {
+  if (!current) return;
+  if (cible.marker && cible.marker.parent === current) cible.marker = null;
+  if (mesure.grp) { mesure.grp = null; mesure.b = null; mesure.on = false; $('vmeas').hidden = true; }   // died with the model
+  scene.remove(current); disposeObj(current); current = null; renderOnce();
+}
 function show(obj) {
   current = obj; scene.add(obj);
   const box = new THREE.Box3().setFromObject(obj), c = box.getCenter(new THREE.Vector3());
-  obj.position.sub(new THREE.Vector3(c.x, c.y, box.min.z)); $('hint').hidden = true;
+  obj.position.sub(new THREE.Vector3(c.x, c.y, box.min.z)); $('hint').hidden = true; renderOnce();
 }
 function hint(big, small) { $('hint').hidden = false; $('hint').innerHTML = `<div><div class="big">${big}</div>${small}</div>`; }
 let previewKey = '';
 async function preview(f, map = '') {
   if (!renderer) return hint('Aperçu 3D indisponible', 'WebGL est désactivé dans ce navigateur. Tout le reste fonctionne.');
-  if (f.ext === 'gcode') { if (current) { scene.remove(current); current = null; } return hint('Fichier tranché', 'Pas d\'aperçu des trajectoires. Il est prêt à être envoyé.'); }
+  if (f.ext === 'gcode') { dropCurrent(); return hint('Fichier tranché', 'Pas d\'aperçu des trajectoires. Il est prêt à être envoyé.'); }
   const pal = palString(), key = f.name + '|' + map + '|' + pal;
   if (key === previewKey) return;
   setView('model');
@@ -93,12 +123,12 @@ async function preview(f, map = '') {
   if (!current) hint('Chargement de l\'aperçu…', '');
   try {
     // every format goes through the server: one GLB, coloured per CANVAS slot
-    const g = await new GLTFLoader().loadAsync(`/lab/api/models/${encodeURIComponent(f.name)}/preview.glb?map=${encodeURIComponent(map)}&pal=${encodeURIComponent(pal)}`);
+    const g = await new GLTFLoader().loadAsync(`/lab/api/models/${encodeURIComponent(f.name)}/preview.glb?map=${encodeURIComponent(map)}&pal=${encodeURIComponent(pal)}&v=${Math.round(f.mtime)}`);
     if (previewKey !== key) return;  // a newer request won
     g.scene.traverse(o => { if (o.isMesh) { const ix = o.geometry.index; if (ix && ix.count === o.geometry.attributes.position.count) o.geometry.setIndex(null);   // identity index: triangle i = face i
       if (!o.geometry.attributes.normal) o.geometry.computeVertexNormals(); o.material = overhangAware(new THREE.MeshStandardMaterial({ vertexColors: !!o.geometry.attributes.color, color: o.geometry.attributes.color ? 0xffffff : 0xd7dbe2, roughness: .55 })); o.castShadow = true; } });
     g.scene.rotation.x = Math.PI / 2; g.scene.userData.base = Math.PI / 2;
-    if (current) scene.remove(current);
+    dropCurrent();
     show(g.scene); renderRot(); modelLook(); vtoolsShow(); piecesInit(f);
     if (framedFor !== f.name) { frame(g.scene); framedFor = f.name; }
   } catch (e) { previewKey = ''; hint('Aperçu impossible', esc(e.message)); }
@@ -132,7 +162,7 @@ function place(box, kind, margin = 1.12) {
   }
   const tv = Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2), d = Math.max(h / tv, w / (tv * (a > 0 ? a : 1))) * margin + dz;
   controls.target.copy(c); cam.position.copy(c).addScaledVector(back, d);
-  cam.near = Math.max(.1, d / 200); cam.far = Math.max(5000, d * 20); cam.updateProjectionMatrix();
+  cam.near = Math.max(.1, d / 200); cam.far = Math.max(5000, d * 20); cam.updateProjectionMatrix(); renderOnce();
   $('vtools').querySelectorAll('[data-cam]').forEach(b => b.classList.toggle('on', b.dataset.cam === kind));
 }
 function frame(obj) { place(new THREE.Box3().setFromObject(obj), 'iso'); }   // the 3/4 view, the whole model in sight
@@ -155,6 +185,7 @@ function modelLook() {
     else if (!m.vertexColors) m.color.set(0xd7dbe2);
     m.roughness = silk ? .38 : .55; m.metalness = silk ? .3 : 0; m.envMapIntensity = silk ? .9 : .5; m.needsUpdate = true;
   });
+  renderOnce();
 }
 const mapString = () => Object.entries(mapping).map(([c, s]) => `${c}:${s}`).join(',');
 // the loaded spools' colours (slot 1 first) when the model is repainted with them, else ''
@@ -169,22 +200,26 @@ function vtoolsShow() {
   $('vtools').querySelectorAll('[data-vt="over"], [data-vt="dims"], [data-vt="paint"], [data-vt="marks"]').forEach(b => b.hidden = !model);
   const movable = model && mv.ranges.length >= 1 && sel?.name === mv.file;
   $('vtools').querySelector('[data-vt="move"]').hidden = !movable;
-  $('vtools').querySelector('[data-vt="regroup"]').hidden = !movable || !Object.keys(mv.moves).length;
-  $('vtools').querySelector('[data-vt="paint"]').hidden = !model || !sel || !['glb', 'gltf', 'obj', 'ply'].includes(sel.ext);   // painted formats only
+  $('vtools').querySelector('[data-vt="regroup"]').hidden = !movable || !(Object.keys(mv.moves).length || Object.keys(mv.scales).length);
+  $('vtools').querySelector('[data-vt="add"]').hidden = !model || !sel || sel.ext === 'gcode';
+  $('vtools').querySelector('[data-vt="paint"]').hidden = !model || !sel || sel.ext === 'gcode';   // the server colours every format: all can be touched up
+  $('vtools').querySelector('[data-vt="cible"]').hidden = !model || !sel || sel.ext === 'gcode';
+  $('vtools').querySelector('[data-vt="mesure"]').hidden = !model || !sel || sel.ext === 'gcode';
+  if (cible.on && $('vtools').querySelector('[data-vt="cible"]').hidden) setCible(false);   // no target on a gcode view
   if (!model) { OVER.value = 0; setDims(false); $('vtools').querySelector('[data-vt="over"]').classList.remove('on'); }
 }
 function setDims(on) {
-  if (dimsBox) { scene.remove(dimsBox); dimsBox = null; }
+  dimsBox = dropBox(dimsBox);
   $('vdims').hidden = !on; $('vtools').querySelector('[data-vt="dims"]').classList.toggle('on', on);
   if (!on || !current) return;
   const box = new THREE.Box3().setFromObject(current), sz = box.getSize(new THREE.Vector3());
   const h = +$('height').value, k = h && sz.z ? h / sz.z : 1;     // the size it will be printed at
-  dimsBox = new THREE.Box3Helper(box, 0xffd98a); scene.add(dimsBox);
-  $('vdims').textContent = `L ${Math.round(sz.x * k)} × P ${Math.round(sz.y * k)} × H ${Math.round(sz.z * k)} mm`;
+  dimsBox = new THREE.Box3Helper(box, 0xffd98a); scene.add(dimsBox); renderOnce();
+  $('vdims').textContent = sizeTxt([sz.x * k, sz.y * k, sz.z * k]);
 }
 document.querySelectorAll('#vtools [data-cam]').forEach(b => b.onclick = () => camTo(b.dataset.cam));
 $('vtools').querySelector('[data-vt="over"]').onclick = e => {
-  OVER.value = OVER.value ? 0 : 1; e.currentTarget.classList.toggle('on', !!OVER.value);
+  OVER.value = OVER.value ? 0 : 1; e.currentTarget.classList.toggle('on', !!OVER.value); renderOnce();
   if (!OVER.value || !current) return;
   const box = new THREE.Box3().setFromObject(current);
   FLOOR.value = box.min.z + (box.max.z - box.min.z) * 0.01;      // the face lying on the plate is not an overhang
@@ -197,30 +232,87 @@ $('vtools').querySelector('[data-vt="full"]').onclick = () => {
   if (document.fullscreenElement) document.exitFullscreen(); else stage.requestFullscreen?.().catch(() => {});
 };
 /* move pieces: drag one object of a multi-object model across the plate; the server applies the same moves */
-const mv = { file: '', ranges: [], moves: {}, on: false, drag: null };
+const mv = { file: '', ranges: [], moves: {}, scales: {}, orig: null, sel: -1, on: false, drag: null };
 const pieceMesh = () => { let m = null; current?.traverse(o => { if (o.isMesh && !m) m = o; }); return m; };
 async function piecesInit(f) {
   if (mv.file !== f.name) {
-    Object.assign(mv, { file: f.name, ranges: [], moves: {} }); setMove(false);
+    Object.assign(mv, { file: f.name, ranges: [], moves: {}, scales: {}, orig: null, sel: -1 }); setMove(false); pieceSelect(-1);
     try { const r = await api(`/models/${encodeURIComponent(f.name)}/pieces`); if (mv.file === f.name) mv.ranges = r; } catch { /* one piece: nothing to move */ }
-  } else for (const [k, d] of Object.entries(mv.moves)) shiftPiece(+k, d);   // palette change reloaded the mesh
+  }
+  // the mesh as loaded: every change starts from it (a palette change reloads the same shape: keep the first copy,
+  // the new mesh already took the moves)
+  const m = pieceMesh(), a = m?.geometry.attributes.position.array;
+  if (a && (!mv.orig || mv.orig.length !== a.length)) mv.orig = Float32Array.from(a);
+  if (Object.keys(mv.moves).length || Object.keys(mv.scales).length) renderRot();   // palette change reloaded the mesh
   vtoolsShow();
 }
-// d is in the model's own axes (x, y, z up); the viewer's geometry is Y-up: (x, z, -y)
-function shiftPiece(k, d) {
-  const m = pieceMesh(), r = mv.ranges[k]; if (!m || !r) return;
-  const pos = m.geometry.attributes.position;
-  for (let i = r.first * 3; i < (r.first + r.count) * 3; i++) pos.setXYZ(i, pos.getX(i) + d[0], pos.getY(i) + d[2], pos.getZ(i) - d[1]);
-  pos.needsUpdate = true; m.geometry.computeBoundingBox(); m.geometry.computeBoundingSphere();
+// the pieces from the loaded mesh: moves (in the model's own axes, x y z up; the geometry is Y-up: x, z, -y), then
+// the sizes, about each piece's bottom centre as it lies on the plate (the slicer does the same, after the turns)
+function piecesBase() {
+  const m = pieceMesh(); if (!m || !mv.orig || m.geometry.attributes.position.array.length !== mv.orig.length) return;
+  const pos = m.geometry.attributes.position, a = pos.array; a.set(mv.orig);
+  for (const [k, d] of Object.entries(mv.moves)) {
+    const r = mv.ranges[k]; if (!r) continue;
+    for (let i = r.first * 9; i < (r.first + r.count) * 9; i += 3) { a[i] += d[0]; a[i + 1] += d[2]; a[i + 2] -= d[1]; }
+  }
+  pos.needsUpdate = true; renderOnce();
+}
+function piecesScale() {
+  const m = pieceMesh(); if (!m || !mv.orig) return;
+  m.updateMatrixWorld(true);
+  const pos = m.geometry.attributes.position, a = pos.array, inv = m.matrixWorld.clone().invert(), v = new THREE.Vector3();
+  for (const [k, f] of Object.entries(mv.scales)) {
+    const r = mv.ranges[k]; if (!r || f === 1) continue;
+    const box = new THREE.Box3();
+    for (let i = r.first * 3; i < (r.first + r.count) * 3; i++) box.expandByPoint(v.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld));
+    const c = new THREE.Vector3((box.min.x + box.max.x) / 2, (box.min.y + box.max.y) / 2, box.min.z).applyMatrix4(inv);
+    for (let i = r.first * 9; i < (r.first + r.count) * 9; i += 3) {
+      a[i] = c.x + (a[i] - c.x) * f; a[i + 1] = c.y + (a[i + 1] - c.y) * f; a[i + 2] = c.z + (a[i + 2] - c.z) * f;
+    }
+  }
+  pos.needsUpdate = true; m.geometry.computeBoundingBox(); m.geometry.computeBoundingSphere(); renderOnce();
+}
+// the world box of one piece, as shown
+function pieceBox(k) {
+  const m = pieceMesh(), r = mv.ranges[k], box = new THREE.Box3(); if (!m || !r) return box;
+  m.updateMatrixWorld(true);
+  const pos = m.geometry.attributes.position, v = new THREE.Vector3();
+  for (let i = r.first * 3; i < (r.first + r.count) * 3; i++) box.expandByPoint(v.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld));
+  return box;
+}
+// the chosen piece: a frame around it, its name and its size beside the 3D view
+let selBox = null;
+function dropBox(box) { if (box) { scene?.remove(box); box.geometry?.dispose?.(); box.material?.dispose?.(); } return null; }
+function pieceSelect(k) {
+  mv.sel = k;
+  selBox = dropBox(selBox); renderOnce();
+  const panel = $('pc-panel'); panel.hidden = k < 0 || !mv.ranges[k];
+  if (panel.hidden) return;
+  const box = pieceBox(k), size = box.getSize(new THREE.Vector3());
+  selBox = new THREE.Box3Helper(box, 0xff9f0a); scene.add(selBox);
+  const pct = Math.round((mv.scales[k] || 1) * 100);
+  $('pc-name').textContent = nice(mv.ranges[k].name || `Pièce ${k + 1}`);
+  $('pc-dims').textContent = sizeTxt([size.x, size.y, size.z], 1);
+  $('pc-size').value = pct; $('pc-pct').value = pct;
+  $('pc-del').hidden = mv.ranges.length < 2;
+}
+function pieceResize(pct) {
+  const k = mv.sel; if (k < 0) return;
+  const f = Math.max(10, Math.min(500, Math.round(+pct || 100))) / 100;
+  if (f === 1) delete mv.scales[k]; else mv.scales[k] = f;
+  renderRot(); pieceSelect(k); vtoolsShow(); sizeNote();
 }
 function setMove(on) {
+  if (on && mesure.on) setMesure(false);   // a click then grabs a piece, it does not measure
   mv.on = on && mv.ranges.length >= 1; mv.drag = null; if (controls) controls.enabled = true;
+  if (!mv.on) pieceSelect(-1);
   $('vtools').querySelector('[data-vt="move"]').classList.toggle('on', mv.on);
   stage.style.cursor = mv.on ? 'grab' : '';
-  if (mv.on) { camTo('top'); toast('Glisse une pièce pour la déplacer sur le plateau.'); }
+  if (mv.on) { camTo('top'); toast('Touche une pièce pour la choisir (sa taille se règle à côté), glisse-la pour la déplacer.'); }
 }
 const PLATE_EDGE = 123;   // half the CC2's 256 mm plate (centred on the viewer's origin), less a 5 mm margin
 const moved = () => sel?.name === mv.file && previewKey !== 'cut' && Object.values(mv.moves).some(d => d.some(Boolean));
+const resized = () => sel?.name === mv.file && previewKey !== 'cut' && Object.keys(mv.scales).length > 0;
 const shiftXY = () => { current.updateMatrixWorld(true); const c = new THREE.Box3().setFromObject(current).getCenter(new THREE.Vector3()); return [c.x, c.y]; };
 if (renderer) {
   const dom = renderer.domElement, aim = e => { const r = dom.getBoundingClientRect(); ptr.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1); ray.setFromCamera(ptr, cam); };
@@ -229,6 +321,7 @@ if (renderer) {
     current.updateMatrixWorld(true); aim(e);
     const hit = ray.intersectObject(m, false)[0]; if (!hit) return;
     const k = mv.ranges.findIndex(r => hit.faceIndex >= r.first && hit.faceIndex < r.first + r.count); if (k < 0) return;
+    pieceSelect(k);
     const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -hit.point.z), last = new THREE.Vector3();
     if (!ray.ray.intersectPlane(plane, last)) return;
     // the piece's footprint on the plate (world x, y), so a drag stops at the plate's edge instead of flying off it
@@ -238,8 +331,8 @@ if (renderer) {
     mv.drag = { k, plane, last, box, off: new THREE.Vector3() };
     controls.enabled = false; dom.setPointerCapture(e.pointerId); stage.style.cursor = 'grabbing'; e.stopImmediatePropagation();
   }, true);
-  dom.addEventListener('pointermove', e => {
-    if (!mv.drag) return;
+  // the pointer's samples arrive faster than the screen: one piece update per displayed frame
+  const dragStep = e => {
     aim(e); const w = new THREE.Vector3(); if (!ray.ray.intersectPlane(mv.drag.plane, w)) return;
     const D = mv.drag, want = D.off.clone().add(w.clone().sub(D.last)), edge = PLATE_EDGE;
     D.last = w;
@@ -249,18 +342,194 @@ if (renderer) {
     if (!dw.x && !dw.y) return;
     const m = pieceMesh(), inv = new THREE.Matrix3().setFromMatrix4(m.matrixWorld).invert(), l = dw.applyMatrix3(inv);
     const d = [l.x, -l.z, l.y], cur = mv.moves[mv.drag.k] || [0, 0, 0];
-    mv.moves[mv.drag.k] = cur.map((v, i) => v + d[i]); shiftPiece(mv.drag.k, d);
+    mv.moves[mv.drag.k] = cur.map((v, i) => v + d[i]); piecesBase(); piecesScale(); pieceSelect(mv.drag.k);
+  };
+  dom.addEventListener('pointermove', e => {
+    if (!mv.drag) return;
+    mv.drag.ev = e;
+    if (mv.drag.raf) return;
+    mv.drag.raf = requestAnimationFrame(() => { const D = mv.drag; if (D) { D.raf = 0; if (D.ev) dragStep(D.ev); D.ev = null; } });
   });
   const end = () => {
-    if (!mv.drag) return; mv.drag = null; controls.enabled = true; stage.style.cursor = mv.on ? 'grab' : ''; vtoolsShow();
+    if (!mv.drag) return;
+    if (mv.drag.raf) cancelAnimationFrame(mv.drag.raf);
+    mv.drag = null; controls.enabled = true; stage.style.cursor = mv.on ? 'grab' : ''; vtoolsShow();
     const b = new THREE.Box3().setFromObject(current); if (Math.max(Math.abs(b.min.x), Math.abs(b.max.x), Math.abs(b.min.y), Math.abs(b.max.y)) > PLATE_EDGE + .5) toast('Une pièce sort du plateau : rapproche-la avant d\'imprimer.');
   };
   dom.addEventListener('pointerup', end); dom.addEventListener('pointercancel', end);
 }
 $('vtools').querySelector('[data-vt="move"]').onclick = () => setMove(!mv.on);
+$('pc-size').oninput = () => { $('pc-pct').value = $('pc-size').value; pieceResize($('pc-size').value); };
+$('pc-pct').onchange = () => pieceResize($('pc-pct').value);
+document.querySelectorAll('[data-pc]').forEach(b => b.onclick = () => pieceResize(b.dataset.pc));
+$('pc-close').onclick = () => pieceSelect(-1);
+/* one piece leaves the plate: the server writes a new model with the others, keeping places and sizes */
+$('pc-del').onclick = async () => {
+  const k = mv.sel, base = mv.file; if (k < 0 || !base || base !== sel?.name || $('pc-del').disabled) return;
+  if (!confirm(`Retirer « ${nice(mv.ranges[k]?.name || `pièce ${k + 1}`)} » du plateau ? Un nouveau modèle sera créé sans elle ; l'original reste dans la bibliothèque.`)) return;
+  $('pc-del').disabled = true;
+  try {
+    const r = await api(`/models/${encodeURIComponent(base)}/retirer`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ index: k, moves: mv.moves, scales: mv.scales }) });
+    await loadFiles();
+    const f = files.find(x => x.name === r.name); if (f) await select(f);
+    toast('Pièce retirée du plateau. Le modèle d\'origine reste dans la bibliothèque.', 'ok');
+  } catch (e) { toast('Impossible de retirer la pièce : ' + e.message, 'bad'); $('pc-del').disabled = false; }
+};
+/* the chat's precise target: with Cibler on, a click on the model drops a marker that follows the piece
+   (it is parented to it) and the clicked co-ordinates — the file's own axes as loaded — go with the message */
+const cible = { on: false, pt: null, marker: null };
+function cibleMark(local) {
+  if (!cible.marker) {
+    cible.marker = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14),
+      new THREE.MeshBasicMaterial({ color: 0xff8a3c, transparent: true, opacity: 0.45, depthTest: false }));
+    cible.marker.renderOrder = 20;
+  }
+  cible.marker.position.copy(local);
+  if (cible.marker.parent !== current) { cible.marker.removeFromParent(); current.add(cible.marker); }
+  cible.marker.scale.setScalar(+$('chat-zone-r').value || 10);
+  renderOnce();
+}
+const CHAT_ASK = 'Ex. : perce un trou de 6 mm pour un aimant en haut';
+const CHAT_HERE = 'Que faire à cet endroit ? (ex. : un trou de 6 mm ici, arrondir, renforcer)';
+function setCible(on) {
+  if (on && mesure.on) setMesure(false);   // one pick tool at a time
+  cible.on = on && !!current;
+  $('vtools').querySelector('[data-vt="cible"]').classList.toggle('on', cible.on);
+  stage.style.cursor = cible.on ? 'crosshair' : stage.style.cursor;
+  $('chat-in').placeholder = cible.on ? CHAT_HERE : CHAT_ASK;   // the input asks the right question
+  if (!cible.on) {
+    cible.pt = null; $('chat-zone').hidden = true;
+    if (cible.marker) { cible.marker.removeFromParent(); cible.marker = null; renderOnce(); }   // dies with its model
+  }
+}
+$('vtools').querySelector('[data-vt="cible"]').onclick = () => setCible(!cible.on);
+$('chat-zone-x').onclick = () => setCible(false);
+$('chat-zone-r').oninput = () => { if (cible.marker) { cible.marker.scale.setScalar(+$('chat-zone-r')?.value || 10); renderOnce(); } };
+/* measuring by hand: two picked points on the model, the distance between them in the file's own mm.
+   The dots and the line are parented to the model (like the Cibler marker), so they follow the piece. */
+const mesure = { on: false, grp: null, a: new THREE.Vector3(), b: null };   // b is set once both points are picked
+const MESURE_COL = 0x00cfd4;
+function mesureClear() {
+  const g = mesure.grp;
+  if (g) { g.removeFromParent(); g.traverse(o => { o.geometry?.dispose?.(); o.material?.dispose?.(); }); }
+  mesure.grp = null; mesure.b = null; $('vmeas').hidden = true; renderOnce();
+}
+function setMesure(on) {
+  $('vtools').querySelector('[data-vt="mesure"]').classList.toggle('on', on);
+  if (on && paint) return;                       // while painting, a click paints: not both at once
+  mesure.on = on && !!current;
+  stage.style.cursor = mesure.on ? 'crosshair' : stage.style.cursor;
+  if (!mesure.on) { mesureClear(); return; }
+  if (cible.on) setCible(false);
+  toast('Touche deux points du modèle : la distance s\'affiche entre les deux. Reclique pour mesurer ailleurs.');
+}
+$('vtools').querySelector('[data-vt="mesure"]').onclick = () => setMesure(!mesure.on);
+function mesurePick(local) {
+  if (mesure.grp && mesure.grp.parent !== current) mesureClear();   // another view took the stage
+  if (mesure.grp && mesure.b) { mesureClear(); }              // a measure is done: this click starts the next one
+  if (!mesure.grp) {                                          // first point: dots and line in a group on the model
+    mesure.a = local.clone();
+    mesure.grp = new THREE.Group();
+    const s = new THREE.Box3().setFromObject(current).getSize(new THREE.Vector3()).length() * 0.008 || 2;
+    const mat = { color: MESURE_COL, depthTest: false, transparent: true, opacity: .9 };
+    const dot = v => { const d = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), new THREE.MeshBasicMaterial(mat));
+                       d.position.copy(v); d.scale.setScalar(s); d.renderOrder = 19; return d; };
+    mesure.dotB = dot(local); mesure.dotB.visible = false;
+    mesure.line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([mesure.a, mesure.a]),
+                                 new THREE.LineBasicMaterial({ ...mat, opacity: .85 }));
+    mesure.line.renderOrder = 19;
+    mesure.grp.add(dot(mesure.a), mesure.dotB, mesure.line);
+    current.add(mesure.grp);                                  // follows the piece like the Cibler marker
+    $('vmeas').textContent = '2e point ?'; $('vmeas').hidden = false;
+  } else {                                                    // second point: the line is complete, show the distance
+    mesure.b = local.clone(); mesure.dotB.visible = true;
+    mesure.line.geometry.dispose();
+    mesure.line.geometry = new THREE.BufferGeometry().setFromPoints([mesure.a, mesure.b]);
+    const d = mesure.a.distanceTo(mesure.b);
+    $('vmeas').textContent = `${d.toFixed(1).replace('.', ',')} mm`;
+  }
+  mesureUpd(); renderOnce();
+}
+// the chip sits over the middle of the line (first point alone: over the first dot)
+function mesureUpd() {
+  const el = $('vmeas');
+  if (!mesure.on || !mesure.grp || !current) { el.hidden = true; return; }
+  current.updateMatrixWorld();
+  const p = (mesure.b ? mesure.a.clone().add(mesure.b) : mesure.a.clone().multiplyScalar(2)).multiplyScalar(.5)
+    .applyMatrix4(current.matrixWorld).project(cam);
+  el.style.left = `${((p.x + 1) / 2) * stage.clientWidth}px`;
+  el.style.top = `${(1 - (p.y + 1) / 2) * stage.clientHeight}px`;
+}
+if (renderer) {   // a click that is not a drag picks a point, exactly like Cibler
+  let mdown = null;
+  const dom = renderer.domElement;
+  dom.addEventListener('pointerdown', e => { mdown = mesure.on && e.button === 0 ? [e.clientX, e.clientY] : null; });
+  dom.addEventListener('pointerup', e => {
+    if (!mesure.on || !mdown || e.button !== 0 || !current) { mdown = null; return; }
+    const dragged = Math.hypot(e.clientX - mdown[0], e.clientY - mdown[1]); mdown = null;
+    if (dragged > 5) return;                                  // an orbit, not a pick
+    const r = dom.getBoundingClientRect();
+    ptr.set((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+    ray.setFromCamera(ptr, cam);
+    const hit = ray.intersectObject(current, true)[0]; if (!hit) return;
+    mesurePick(current.worldToLocal(hit.point.clone()));
+  });
+}
+if (renderer) {
+  const dom = renderer.domElement;
+  let down = null;
+  const spot = e => { const r = dom.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  dom.addEventListener('pointerdown', e => { down = cible.on && e.button === 0 && current ? spot(e) : null; });
+  dom.addEventListener('pointerup', e => {
+    if (!cible.on || !down || !current) return;
+    const at = spot(e), w = down[0] === undefined ? 99 : Math.hypot(at[0] - down[0], at[1] - down[1]); down = null;
+    if (w > 5) return;                                    // an orbit drag, not a pick
+    const r = dom.getBoundingClientRect();
+    ptr.set(at[0] / r.width * 2 - 1, -(at[1] / r.height * 2) + 1);
+    ray.setFromCamera(ptr, cam);
+    const hit = ray.intersectObject(current, true)[0]; if (!hit) return;
+    const local = current.worldToLocal(hit.point.clone());
+    // the GLB viewer holds the model Y-up: back to the file's own axes (x, y, z)
+    const pt = [+local.x.toFixed(1), +(-local.z).toFixed(1), +local.y.toFixed(1)];
+    cible.pt = pt;
+    cibleMark(local);
+    $('chat-zone-txt').textContent = `Zone ciblée : (${pt.join(', ')}) mm — l'assistant la recevra avec le prochain message`;
+    $('chat-zone').hidden = false;
+  });
+}
+/* another library piece on this plate: the server writes a new model holding both, side by side */
+function renderAddp() {
+  const q = $('addp-q').value.toLowerCase();
+  const list = files.filter(f => f.name !== sel?.name && !['gcode'].includes(f.ext) && f.kind !== 'technique' && (!q || f.name.toLowerCase().includes(q)))
+    .sort((a, b) => b.mtime - a.mtime).slice(0, 200);
+  $('addp-list').innerHTML = list.length ? list.map(f => `<div class="asm-row addp-row" role="button" tabindex="0" data-addp="${esc(f.name)}">
+    <img class="fthumb" loading="lazy" alt="" src="/lab/api/models/${encodeURIComponent(f.name)}/thumb.png?v=${Math.round(f.mtime)}" onerror="this.style.visibility='hidden'">
+    <span class="fname" title="${esc(f.name)}">${esc(pretty(f.name))}</span><span class="note" style="margin:0">${f.ext.toUpperCase()}</span></div>`).join('')
+    : '<p class="note" style="padding:10px">Aucune pièce ne correspond.</p>';
+  $('addp-list').querySelectorAll('[data-addp]').forEach(r => {
+    r.onclick = () => addToPlate(r.dataset.addp);
+    r.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); addToPlate(r.dataset.addp); } };
+  });
+}
+$('vtools').querySelector('[data-vt="add"]').onclick = () => {
+  if (!sel) return;
+  $('addp-base').textContent = pretty(sel.name); $('addp-q').value = ''; renderAddp(); $('addp').showModal();
+};
+let addpTimer = 0;
+$('addp-q').oninput = () => { clearTimeout(addpTimer); addpTimer = setTimeout(renderAddp, 150); };
+async function addToPlate(name) {
+  const base = sel?.name; if (!base) return;
+  $('addp').close(); toast('Mise en place des deux pièces sur un plateau…');
+  try {
+    const r = await api('/composer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ names: [base, name] }) });
+    await loadFiles();
+    const f = files.find(x => x.name === r.name); if (f) await select(f);
+    toast(`Plateau prêt : ${r.pieces} pièces. Avec « Déplacer », touche une pièce pour la placer ou changer sa taille.`, 'ok');
+  } catch (e) { toast('Impossible de les mettre ensemble : ' + e.message, 'bad'); }
+}
 $('vtools').querySelector('[data-vt="regroup"]').onclick = () => {
-  for (const [k, d] of Object.entries(mv.moves)) shiftPiece(+k, d.map(v => -v));
-  mv.moves = {}; vtoolsShow();
+  mv.moves = {}; mv.scales = {}; renderRot(); pieceSelect(mv.sel); vtoolsShow(); sizeNote();
 };
 /* colour touch-up: a brush repaints faces with one of the model's own colours; saved beside the model */
 let paint = null;   // { mode, mesh, geo, pos, nor, col, orig, centres, hex, rgb, strokes, dirty, brush, down, busy }
@@ -269,7 +538,18 @@ const ray = renderer ? new THREE.Raycaster() : null, ptr = new THREE.Vector2();
 const MARKS = [{ kind: 'support', hex: '#2ECC71', label: 'Support ici' }, { kind: 'sans_support', hex: '#E5484D', label: 'Jamais de support ici' },
   { kind: 'couture', hex: '#3B82F6', label: 'Couture ici (début de chaque couche)' }, { kind: '', hex: '', label: 'Gomme' }];
 const vtFor = mode => $('vtools').querySelector(mode === 'marks' ? '[data-vt="marks"]' : '[data-vt="paint"]');
+// the colours of the spools loaded in the CANVAS right now, one per slot: the brush paints with them too
+async function canvasColours() {
+  try {
+    return (await api('/canvas/bobines')).filter(t => /^#[0-9A-Fa-f]{6}$/.test(t.hex || ''))
+      .map(t => ({ slot: +t.slot || 1, hex: String(t.hex).toUpperCase(), name: t.name || '' }));
+  } catch {   // printer away: the last spools read at match time
+    return Object.values(trays || {}).filter(t => t?.hex)
+      .map(t => ({ slot: +t.slot || 1, hex: String(t.hex).toUpperCase(), name: t.name || '' }));
+  }
+}
 async function paintOn(mode = 'colour') {
+  if (mesure.on) setMesure(false);   // left button paints, not measured
   const mesh = (() => { let m = null; current?.traverse(o => { if (o.isMesh && !m) m = o; }); return m; })();
   const geo = mesh?.geometry;
   if (!geo?.attributes.color || geo.index) return toast('Ce modèle ne peut pas être retouché au pinceau (aperçu indisponible).', 'bad');
@@ -279,7 +559,16 @@ async function paintOn(mode = 'colour') {
   const brush = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: .28, depthWrite: false }));
   brush.visible = false; scene.add(brush);
   const col = geo.attributes.color;
-  paint = { mode, mesh, geo, pos, nor: geo.attributes.normal, col, orig: mode === 'marks' ? col.clone() : null, centres, hex: null,
+  /* one colour: the part is shown in its spool's flat colour, so face paint is invisible on screen;
+     while painting, show the vertices instead, seeded with the flat colour the user already sees */
+  let flat = null;
+  if (mesh.material && !mesh.material.vertexColors) {
+    flat = '#' + mesh.material.color.getHexString();
+    const fc = [1, 3, 5].map(i => parseInt(flat.slice(i, i + 2), 16) / 255);
+    for (let v = 0; v < pos.count; v++) col.setXYZ(v, fc[0], fc[1], fc[2]);
+    mesh.material.vertexColors = true; mesh.material.color.set(0xffffff); mesh.material.needsUpdate = true;
+  }
+  paint = { mode, mesh, geo, pos, nor: geo.attributes.normal, col, orig: mode === 'marks' ? col.clone() : null, centres, hex: null, flat,
             strokes: [], dirty: new Map(), brush, down: false, busy: false, hit: null };
   controls.mouseButtons.LEFT = -1; controls.mouseButtons.RIGHT = THREE.MOUSE.ROTATE;   // left paints, right turns
   controls.touches.ONE = -1; controls.touches.TWO = THREE.TOUCH.DOLLY_ROTATE;
@@ -289,9 +578,17 @@ async function paintOn(mode = 'colour') {
   camTo('iso'); paintView();
   const swatches = mode === 'marks' ? MARKS.map(m => ({ key: m.kind, hex: m.hex, label: m.label }))
     : analysis.colours.map(c => ({ key: c.hex, hex: c.hex, label: `Peindre en ${c.hex}` }));
-  $('pb-sw').innerHTML = swatches.map(w => `<button data-key="${w.key}" class="${w.hex ? '' : 'erase'}" style="${w.hex ? `background:${w.hex}` : ''}" title="${esc(w.label)}" aria-label="${esc(w.label)}" role="radio" aria-checked="false">${w.hex ? '' : '<svg class="i"><use href="#i-x"/></svg>'}</button>`).join('');
-  $('pb-sw').querySelectorAll('button').forEach(b => b.onclick = () => pickBrush(b.dataset.key));
-  pickBrush(swatches[0].key); paintButtons();
+  const renderSw = () => {
+    $('pb-sw').innerHTML = swatches.map(w => `<button data-key="${w.key}" class="${w.hex ? '' : 'erase'}" style="${w.hex ? `background:${w.hex}` : ''}" title="${esc(w.label)}" aria-label="${esc(w.label)}" role="radio" aria-checked="false">${w.hex ? '' : '<svg class="i"><use href="#i-x"/></svg>'}</button>`).join('');
+    $('pb-sw').querySelectorAll('button').forEach(b => b.onclick = () => pickBrush(b.dataset.key));
+  };
+  renderSw(); pickBrush(swatches[0].key); paintButtons();
+  if (mode === 'colour') {   // the CANVAS's own spool colours are brush choices too, added once read
+    const have = new Set(swatches.map(s => String(s.hex).toUpperCase()));
+    for (const t of await canvasColours())
+      if (!have.has(t.hex)) { swatches.push({ key: t.hex, hex: t.hex, label: `Peindre en ${t.hex} · Bobine ${t.slot}${t.name ? ' ' + t.name : ''}` }); have.add(t.hex); }
+    if (paint) { renderSw(); pickBrush(paint.hex); }   // keep the brush already picked
+  }
   if (mode === 'marks') {   // show what is already painted
     try {
       const saved = await api(`/models/${encodeURIComponent(sel.name)}/marks`), P = paint;
@@ -300,18 +597,22 @@ async function paintOn(mode = 'colour') {
         const [r, g, b] = [1, 3, 5].map(i => parseInt(m.hex.slice(i, i + 2), 16) / 255);
         for (const f of saved[m.kind] || []) for (let k = 0; k < 3; k++) col.setXYZ(3 * f + k, r, g, b);
       }
-      col.needsUpdate = true;
+      col.needsUpdate = true; renderOnce();
     } catch { /* nothing painted yet */ }
   }
 }
 function pickBrush(key) {
   const mark = paint.mode === 'marks' ? MARKS.find(m => m.kind === key) : null, hex = mark ? mark.hex : key;
   paint.hex = key; paint.rgb = hex ? [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255) : null;   // null: the eraser
+  paint.brush.material.color.set(hex || 0xffffff);   // the brush cursor shows the chosen colour on the model
   $('pb-sw').querySelectorAll('button').forEach(b => { const on = b.dataset.key === key; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); });
 }
 function paintOff(keep) {
   if (!paint) return;
-  scene.remove(paint.brush);
+  if (paint.flat) {   // back to the spool's flat colour (one-colour part)
+    paint.mesh.material.vertexColors = false; paint.mesh.material.color.set(paint.flat); paint.mesh.material.needsUpdate = true;
+  }
+  scene.remove(paint.brush); renderOnce(); paint.brush.geometry.dispose(); paint.brush.material.dispose();
   controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE; controls.mouseButtons.RIGHT = THREE.MOUSE.PAN; controls.touches.ONE = THREE.TOUCH.ROTATE; controls.touches.TWO = THREE.TOUCH.DOLLY_PAN;
   stage.classList.remove('painting'); $('paintbar').hidden = true; vtFor(paint.mode).classList.remove('on');
   paintView();
@@ -323,6 +624,7 @@ function paintView() {
   const bar = $('paintbar'), w = stage.clientWidth, h = stage.clientHeight;
   const cover = paint && !bar.hidden && w ? Math.max(0, stage.getBoundingClientRect().bottom - bar.getBoundingClientRect().top) : 0;
   if (cover > h * 0.15) cam.setViewOffset(w, h, 0, cover / 2, w, h); else cam.clearViewOffset();
+  renderOnce();
 }
 function paintButtons() { $('pb-undo').disabled = !paint?.strokes.length; $('pb-save').disabled = !paint?.dirty.size; }
 function paintHit(ev) {
@@ -350,7 +652,7 @@ function dab(hit, stroke) {
     }
     P.dirty.set(f, P.hex);
   }
-  P.col.needsUpdate = true; paintButtons();
+  P.col.needsUpdate = true; paintButtons(); renderOnce();
 }
 function paintMove(ev) {
   if (!paint || paint.busy) return;
@@ -360,6 +662,7 @@ function paintMove(ev) {
     paint.busy = false;
     const hit = paintHit(ev);
     paint.brush.visible = !!hit;
+    renderOnce();
     if (!hit) return;
     const sc = new THREE.Vector3().setFromMatrixScale(paint.mesh.matrixWorld).x;
     paint.brush.position.copy(hit.point); paint.brush.scale.setScalar(paint.geo.boundingSphere.radius * $('pb-size').value / 50 * sc);
@@ -373,7 +676,7 @@ function paintUndo() {
     for (let k = 0; k < 3; k++) paint.col.setXYZ(3 * f + k, r, g, b);
     if (h) paint.dirty.set(f, h); else paint.dirty.delete(f);
   });
-  paint.col.needsUpdate = true; paintButtons();
+  paint.col.needsUpdate = true; paintButtons(); renderOnce();
 }
 async function paintSave(clear = false) {
   if (paint?.mode === 'marks') return marksSave(clear);
@@ -403,7 +706,7 @@ if (renderer) {
   $('pb-close').onclick = () => { if (!paint?.dirty.size || confirm('Abandonner la retouche non enregistrée ?')) paintOff(); };
   $('pb-reset').onclick = () => { if (confirm(paint?.mode === 'marks' ? 'Effacer toutes les zones peintes (supports, couture) de ce modèle ?' : 'Effacer toutes les retouches de ce modèle ?')) paintSave(true); };
 }
-if (renderer) setInterval(vtoolsShow, 700);   // cheap: follows whatever the stage shows
+if (renderer) setInterval(() => { if (!document.hidden) vtoolsShow(); }, 700);   // cheap: follows whatever the stage shows
 
 async function marksSave(clear) {
   const body = clear ? { clear: true } : { add: {}, erase: [] };
@@ -431,7 +734,7 @@ async function showPaths(name) {
   let d;
   try { d = await api(`/models/${encodeURIComponent(name)}/paths`); } catch (e) { return hint('Aperçu du tranchage impossible', esc(e.message)); }
   const { group, parts } = buildPaths(d), nl = d.layers.length;
-  if (current) scene.remove(current);
+  dropCurrent();
   current = group; scene.add(group); $('hint').hidden = true;
   paths = { parts, layers: d.layers }; pathsFor = name;
   stopPlay(); $('layer').max = nl; $('layer').value = nl; drawLayers(); vtoolsShow();
@@ -474,6 +777,7 @@ function drawLayers() {
     p.lines.geometry.setDrawRange(from, p.start[l] * 2 - from);
   });
   $('lv').textContent = `Couche ${l} / ${nl} · Z ${paths.layers[l - 1]?.toFixed(2)} mm`;
+  renderOnce();
 }
 $('layer').oninput = drawLayers;
 ['show-model', 'show-support', 'show-tower'].forEach(id => $(id).onchange = drawLayers);
@@ -486,6 +790,7 @@ $('lplay').onclick = () => {
   const step = Math.max(1, Math.round(+r.max / 240));            // about 10 s for the whole print
   $('lplay').innerHTML = '<svg class="i"><use href="#i-pause"/></svg>';
   playTimer = setInterval(() => {
+    if (document.hidden) return;   // a hidden tab must not burn through the layers
     r.value = Math.min(+r.max, +r.value + step); drawLayers();
     if (+r.value >= +r.max) stopPlay();
   }, 40);
@@ -590,7 +895,9 @@ document.querySelectorAll('[data-ren]').forEach(b => b.onclick = async () => {
     toast('Renommé en ' + r.name, 'ok'); await loadFiles(); select(files.find(f => f.name === r.name));
   } catch (e) { toast(e.message, 'bad'); }
 });
-$('q').oninput = renderFiles;
+// typing filters, not every keystroke rebuilds the whole library (thumbnails included)
+let qTimer = 0;
+$('q').oninput = () => { clearTimeout(qTimer); qTimer = setTimeout(renderFiles, 150); };
 
 /* a name added to a flat model, in a second colour */
 $('add-text').onclick = () => { if (sel) { $('txt-v').value = ''; $('txt').showModal(); $('txt-v').focus(); } };
@@ -622,7 +929,7 @@ function shpDraw() {
   $('shp-h-f').querySelector('label').textContent = kind === 'cube' ? 'Hauteur (mm)' : 'Longueur (mm)';
   $('shp-col-f').hidden = v.operation !== 'ajouter';
   const mesh = pieceMesh(); if (!mesh || !renderer) return;
-  if (shpGhost) { shpGhost.parent?.remove(shpGhost); shpGhost.geometry.dispose(); }
+  if (shpGhost) { shpGhost.parent?.remove(shpGhost); shpGhost.geometry.dispose(); shpGhost.material.dispose(); }
   // the viewer's geometry is Y-up: the model's (x, y, z) is (x, z, -y) here; its length runs along Y like the model's Z
   const [w, d, h] = v.taille, geo = kind === 'cube' ? new THREE.BoxGeometry(w, h, d) : kind === 'sphere' ? new THREE.SphereGeometry(w / 2, 40, 24)
     : new THREE.CylinderGeometry(w / 2, w / 2, h, 48);
@@ -631,9 +938,9 @@ function shpDraw() {
   mesh.geometry.computeBoundingBox();
   const c = mesh.geometry.boundingBox.getCenter(new THREE.Vector3()), [x, y, z] = v.position;
   shpGhost.position.set(c.x + x, c.y + z, c.z - y); shpGhost.renderOrder = 2;
-  mesh.parent.add(shpGhost);
+  mesh.parent.add(shpGhost); renderOnce();
 }
-function shpClear() { if (shpGhost) { shpGhost.parent?.remove(shpGhost); shpGhost.geometry.dispose(); shpGhost = null; } }
+function shpClear() { if (shpGhost) { shpGhost.parent?.remove(shpGhost); shpGhost.geometry.dispose(); shpGhost.material.dispose(); shpGhost = null; renderOnce(); } }
 $('add-shape').onclick = () => {
   if (!sel || sel.ext === 'gcode') return;
   const cols = analysis?.colours || [];
@@ -649,7 +956,7 @@ $('shp-go').onclick = async () => {
   b.disabled = true; b.textContent = 'Calcul…';
   try {
     const r = await api('/models/' + encodeURIComponent(f.name) + '/forme', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(shpValues()) });
-    $('shp').close(); toast(`Nouveau fichier : ${r.name} (${r.size_mm.join(' × ')} mm)`, 'ok');
+    $('shp').close(); toast(`Nouveau fichier : ${r.name} (${sizeTxt(r.size_mm, 1)})`, 'ok');
     await loadFiles(); select(files.find(x => x.name === r.name));
   } catch (e) { toast(e.message, 'bad'); }
   b.disabled = false; b.textContent = 'Créer le fichier';
@@ -659,7 +966,8 @@ async function upload(list) {
   const added = [];
   for (const file of list) {
     const fd = new FormData(); fd.append('file', file);
-    try { const r = await api('/models', { method: 'POST', body: fd }); added.push(r.name); toast(r.name === file.name ? 'Ajouté : ' + r.name : `Ajouté sous le nom ${r.name} (le nom existait déjà)`, 'ok'); } catch (e) { toast(file.name + ' : ' + e.message, 'bad'); }
+    try { const r = await api('/models', { method: 'POST', body: fd }); added.push(...(r.names || [r.name]));
+      toast((r.names || []).length > 1 ? `${r.names.length} modèles ajoutés` : (r.name === file.name ? 'Ajouté : ' + r.name : `Ajouté sous le nom ${r.name} (le nom existait déjà)`), 'ok'); } catch (e) { toast(file.name + ' : ' + e.message, 'bad'); }
   }
   await loadFiles();
   if (added.length === 1) select(files.find(f => f.name === added[0]));
@@ -690,7 +998,7 @@ document.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
 });
 function clearSelection() {
   sel = null; $('prep').hidden = $('ready').hidden = true; $('nosel').hidden = false; $('chips').innerHTML = '';
-  if (current) { scene.remove(current); current = null; } hint('Choisis un modèle dans la bibliothèque', 'Glisser pour tourner · molette pour zoomer');
+  if (current) dropCurrent(); hint('Choisis un modèle dans la bibliothèque', 'Glisser pour tourner · molette pour zoomer');
   document.querySelectorAll('#mnav button:not([data-m="lib"])').forEach(b => b.disabled = true); $('mnext').hidden = true; mview('lib');
 }
 
@@ -710,11 +1018,12 @@ mview('lib');
 
 async function select(f) {
   if (!f) return;
-  paintOff(true); defects?.removeFromParent(); defects = null;
+  paintOff(true); if (defects) { disposeObj(defects); defects = null; }
   document.querySelectorAll('#mnav button:not([data-m="lib"])').forEach(b => b.disabled = false);
   $('mnext').hidden = f.ext === 'gcode';
   if (phone.matches) mview(f.ext === 'gcode' ? 'prep' : 'view');
-  sel = f; renderFiles(); $('nosel').hidden = true; $('result').innerHTML = ''; $('chips').innerHTML = '';
+  sel = f; renderFiles(); setCible(false);   // a fresh model: the picked spot has no meaning any more
+  $('nosel').hidden = true; $('result').innerHTML = ''; $('chips').innerHTML = '';
   lastGcode = ''; $('viewtabs').hidden = true; setView('model'); rotation = [0, 0, 0]; $('opt-res').innerHTML = ''; optUndo = null; $('mirror').checked = false; ['sx', 'sy', 'sz'].forEach(id => $(id).value = 100); renderRot();
   if (f.ext !== 'gcode') preview(f);
   if (f.ext === 'gcode') {
@@ -728,6 +1037,11 @@ async function select(f) {
   $('ready').hidden = true; $('prep').hidden = false;
   $('p-name').textContent = f.name; $('p-sub').textContent = 'Analyse du modèle…'; $('height').value = ''; $('h-now').textContent = '';
   $('c-note').textContent = 'Détection des couleurs…'; $('c-list').innerHTML = $('c-spools').innerHTML = '';
+  needs = {}; stockLeft = {};
+  $('chat-sec').hidden = false;
+  $('ia-note').hidden = true;
+  if (chatSel !== f.name) { chatHist = []; $('chat-log').innerHTML = ''; chatConvNew(); $('chat-sug').hidden = false; }   // the conversation follows the model
+  chatSel = f.name;
   const [inf, col] = await Promise.allSettled([api(`/models/${encodeURIComponent(f.name)}/info`), api(`/models/${encodeURIComponent(f.name)}/colors`)]);
   if (sel !== f) return;
   info = inf.status === 'fulfilled' ? inf.value : null;
@@ -740,11 +1054,11 @@ async function select(f) {
   matchSpools(true);
   if (info?.size_mm) {
     const [x, y, z] = info.size_mm;
-    $('p-sub').textContent = info.unitless ? 'Modèle IA sans unité réelle' : `${x} × ${y} × ${z} mm`;
+    $('p-sub').textContent = info.unitless ? 'Modèle IA sans unité réelle' : sizeTxt([x, y, z], 1).replace(/,0\b/g, '');
     $('h-now').textContent = info.unitless ? 'proposée : 60' : `actuelle : ${z}`;
     if (info.unitless) $('height').value = 60;
     sizeNote();
-    $('chips').innerHTML = (info.unitless ? '<span class="chip">Taille d\'origine sans unité : 60 mm de haut proposés</span>' : `<span class="chip"><b>${x} × ${y} × ${z}</b> mm</span>`)
+    $('chips').innerHTML = (info.unitless ? '<span class="chip">Taille d\'origine sans unité : 60 mm de haut proposés</span>' : `<span class="chip"><b>${sizeTxt([x, y, z], 1).replace(/,0\b/g, '')}</b></span>`)
       + (info.unitless ? '' : info.fits_bed ? '<span class="chip ok">Tient sur le plateau</span>' : '<span class="chip bad">Plus grand que le plateau (256 mm)</span>')
       + (info.watertight || !['glb', 'gltf', 'obj', 'ply', 'stl'].includes(f.ext) ? (info.watertight ? '' : '<span class="chip bad">Maillage non fermé</span>')
         : '<button class="chip bad" data-repair title="Créer une copie fermée, couleurs gardées">Maillage non fermé · <b>Réparer</b></button>');
@@ -768,20 +1082,49 @@ function renderColours() {
       + `<button class="btn ghost c-edit" id="c-edit">${compact ? 'Modifier' : 'Réduire'}</button>`;
     $('c-edit').onclick = () => { colEdit = !colEdit; renderColours(); };
   }
-  $('c-list').innerHTML = multi ? cs.map(c => `<div class="crow"><span class="sw" style="background:${c.hex}" title="${c.hex}"></span><span class="pct">${c.share} %</span>
-    <div class="slots" role="radiogroup" aria-label="Bobine pour ${c.hex}">${[1, 2, 3, 4].map(s => `<button class="slot ${mapping[c.index] === s ? 'on' : ''}" data-c="${c.index}" data-s="${s}" title="Bobine ${s}${trays[s] ? ' · ' + esc(trays[s].name) : ''}" role="radio" aria-checked="${mapping[c.index] === s}" ${trays[s] ? `style="box-shadow:inset 0 -3px 0 ${trays[s].hex}"` : ''}>${s}</button>`).join('')}</div></div>`).join('') : '';
-  $('c-list').querySelectorAll('.slot').forEach(b => b.onclick = () => { mapping[b.dataset.c] = +b.dataset.s; renderColours(); });
+  const bell = c => {   // the estimated need, next to the colour's share, red when the mapped spool holds less
+    const g = needs[c.index], left = mapping[c.index] != null ? stockLeft[mapping[c.index]] : null;
+    if (!g) return '';
+    const low = left != null && left < g;
+    return `<span class="pct" style="${low ? 'color:var(--bad);font-weight:600' : ''}" title="${low
+      ? `besoin ~${g} g, il reste ~${Math.round(left)} g sur la bobine` : `besoin estimé : ~${g} g`}">~${g} g</span>`;
+  };
+  $('c-list').innerHTML = multi ? cs.map(c => `<div class="crow"><span class="sw" style="background:${c.hex}" title="${c.hex}"></span><span class="pct">${c.share} %</span>${bell(c)}
+    <div class="slots" role="radiogroup" aria-label="Bobine pour ${c.hex}">${[1, 2, 3, 4].map(s => `<button class="slot ${mapping[c.index] === s ? 'on' : ''}" data-c="${c.index}" data-s="${s}" title="Bobine ${s}${trays[s] ? ' · ' + esc(trays[s].name) : ''}" role="radio" aria-checked="${mapping[c.index] === s}" ${trays[s] ? `style="background:${trays[s].hex}44;box-shadow:inset 0 -3px 0 ${trays[s].hex}"` : ''}>${s}</button>`).join('')}</div></div>`).join('') : '';
+  $('c-list').querySelectorAll('.slot').forEach(b => b.onclick = () => { const c = +b.dataset.c; mapping[c] = +b.dataset.s;
+    const h = (analysis.colours.find(x => x.index === c) || {}).hex;
+    if (h) saveChoice(h, +b.dataset.s); renderColours(); });
   if (sel) preview(sel, mapString());
   const used = new Set(Object.values(mapping)), top = Math.max(...used);
   $('mode-box').hidden = top < 2;
   const opts = v => (cfg?.filaments || ['PLA']).map(x => `<option ${x === v ? 'selected' : ''}>${esc(x)}</option>`).join('');
+  const left = s => { const g = stockLeft[s]; return g == null ? ''
+    : `<div class="note" style="margin:3px 0 0${g < stockLow ? ';color:var(--bad)': ''}">il reste ~${Math.round(g)} g${g < stockLow ? ' · presque vide' : ''}</div>`; };
   // the swatch of each slot shows the model colour that prints from it
   const slotHex = s => trays[s]?.hex || cs.filter(c => mapping[c.index] === s).sort((a, b) => b.share - a.share)[0]?.hex || SLOT[s - 1];
   $('c-spools').innerHTML = (multi ? '<p class="note" style="margin-top:14px">Filament à charger dans chaque bobine</p>' : '')
     + Array.from({ length: top }, (_, i) => i + 1).map(s => `<div class="spool"><span class="tag" title="${esc(trays[s]?.name || '')}"><i style="background:${slotHex(s)}"></i>${single ? single.pos + 1 : s}</span>
-      <div><select data-s="${s}" aria-label="Filament bobine ${s}">${opts(spools[s] || 'PLA')}</select>${trays[s] ? `<div class="note" style="margin:3px 0 0">chargée : ${esc(trays[s].name)}</div>` : ''}</div></div>`).join('')
+      <div><select data-s="${s}" aria-label="Filament bobine ${s}">${opts(spools[s] || 'PLA')}</select>${trays[s] ? `<div class="note" style="margin:3px 0 0">chargée : ${esc(trays[s].name)}</div>` : ''}${trays[s] ? left(s) : ''}</div></div>`).join('')
     + ([...Array(top).keys()].some(i => !used.has(i + 1) && !trays[i + 1]) ? '<p class="note" style="margin-top:6px">Une bobine intermédiaire est inutilisée : elle doit quand même être chargée.</p>' : '');
   $('c-spools').querySelectorAll('select').forEach(s => { spools[s.dataset.s] = s.value; s.onchange = () => spools[s.dataset.s] = s.value; });
+}
+
+// the spool the user chose for a colour, remembered per model: applied again on every rematch
+const choiceKey = () => sel ? 'cc2-cols:' + sel.name : '';
+function savedChoices() { try { return JSON.parse(localStorage.getItem(choiceKey()) || '{}'); } catch { return {}; } }
+function saveChoice(hex, slot) {
+  if (!sel || !hex) return;
+  try { const m = savedChoices(); m[hex] = { slot, tray: trays[slot]?.hex || null };
+    localStorage.setItem(choiceKey(), JSON.stringify(m)); } catch { /* private browsing */ }
+}
+function keepChoices() {
+  if (single || !analysis?.colours) return;
+  const saved = savedChoices(), byHex = Object.fromEntries(Object.entries(trays).map(([s, t]) => [t.hex, +s]));
+  for (const c of analysis.colours) {
+    const ch = saved[c.hex]; if (!ch) continue;
+    const s = (ch.tray && byHex[ch.tray]) || +ch.slot;   // the remembered spool if it is still loaded, else the remembered slot
+    if (s >= 1 && s <= 4) mapping[c.index] = s;
+  }
 }
 
 $('supports').onchange = () => { $('plate-row').hidden = $('supports').value === 'aucun'; };
@@ -793,7 +1136,7 @@ const MODE_NOTE = {
   sans_purge: 'Aucune purge ni tour : le changement de couleur est juste le changement de bobine. Le plus économe et le plus rapide, mais un court mélange des deux couleurs apparaît après chaque changement. Essai à surveiller.',
   qualite: 'Tour d\'essuyage et purge maximale à chaque changement, quelles que soient les couleurs : le plus sûr, le plus de filament.',
 };
-let printMode = 'economie';
+let printMode = 'equilibre';   // quality first: the wipe tower; Économie is one click away
 function renderMode() {
   document.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('on', b.dataset.mode === printMode));
   $('mode-note').textContent = MODE_NOTE[printMode];
@@ -822,7 +1165,7 @@ function sizeNote() {
   const sz = rotatedSize(info.size_mm), h = +$('height').value, z = sz[2] || 1, k = h ? h / z : 1, dims = sz.map(d => d * k), lim = 246;
   const n = dims.reduce((a, d) => a * Math.max(1, Math.ceil(d / lim)), 1);
   $('split-note').hidden = n < 2;
-  $('split-note').innerHTML = n < 2 ? '' : `${dims.map(d => Math.round(d)).join(' × ')} mm : plus grand que le plateau → <b>environ ${n} pièces</b>${$('split').checked ? ' · <a href="#" id="see-cut">voir la découpe</a>' : ' (découpe désactivée : le tranchage sera refusé)'}.`;
+  $('split-note').innerHTML = n < 2 ? '' : `${sizeTxt(dims)} : plus grand que le plateau → <b>environ ${n} pièces</b>${$('split').checked ? ' · <a href="#" id="see-cut">voir la découpe</a>' : ' (découpe désactivée : le tranchage sera refusé)'}.`;
   const link = $('see-cut'); if (link) link.onclick = ev => { ev.preventDefault(); showCut(); };
 }
 async function showCut() {
@@ -833,13 +1176,13 @@ async function showCut() {
     const plan = await api(`/models/${encodeURIComponent(f.name)}/cut-plan?${q}`);
     if (sel !== f) return;
     $('split-note').innerHTML = `Coupes aux endroits les plus fins : ${plan.planes.map(p => `${p.axis} = ${p.mm} mm`).join(', ')} → <b>${plan.pieces.length} pièces</b>, ${plan.pins} chevilles. `
-      + plan.pieces.map((p, i) => `Pièce ${i + 1} : ${p.size_mm.map(Math.round).join(' × ')} mm`).join(' · ') + ' · <a href="#" id="see-model">revoir le modèle</a>';
+      + plan.pieces.map((p, i) => `Pièce ${i + 1} : ${sizeTxt(p.size_mm)}`).join(' · ') + ' · <a href="#" id="see-model">revoir le modèle</a>';
     $('see-model').onclick = ev => { ev.preventDefault(); previewKey = ''; preview(sel, mapString()); sizeNote(); };
     if (!renderer) return;
     const g = await new GLTFLoader().loadAsync(`/lab/api/models/${encodeURIComponent(f.name)}/cut-preview.glb?${q}`);
     g.scene.traverse(o => { if (o.isMesh) { o.geometry.computeVertexNormals(); o.material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .55 }); } });
     g.scene.rotation.x = Math.PI / 2; previewKey = 'cut';
-    if (current) scene.remove(current);
+    dropCurrent();
     show(g.scene); frame(g.scene);
   } catch (e) { $('split-note').textContent = 'Découpe impossible : ' + e.message; }
 }
@@ -891,7 +1234,7 @@ async function repairModel(f, btn) {
 /* where a mesh is open (red) or has edges shared by too many faces (orange), drawn on the model */
 let defects = null;
 async function toggleDefects(btn) {
-  if (defects?.parent) { defects.removeFromParent(); defects = null; btn.textContent = 'Voir les défauts'; return; }
+  if (defects?.parent) { defects.removeFromParent(); defects = null; btn.textContent = 'Voir les défauts'; renderOnce(); return; }
   if (!current || !sel) return;
   btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Recherche…';
   try {
@@ -903,7 +1246,7 @@ async function toggleDefects(btn) {
       const dots = new THREE.Points(geo, new THREE.PointsMaterial({ color, size: 6, sizeAttenuation: false, depthTest: false, transparent: true }));
       line.renderOrder = dots.renderOrder = 20; g.add(line, dots);
     }
-    current.add(g); defects = g; btn.textContent = 'Masquer les défauts';
+    current.add(g); defects = g; btn.textContent = 'Masquer les défauts'; renderOnce();
     const parts = [d.holes ? `${d.holes} trou${d.holes > 1 ? 's' : ''} (${d.open_edges} bords ouverts, en rouge)` : '',
                    d.nonmanifold_edges ? `${d.nonmanifold_edges} arêtes partagées par trop de faces (en orange)` : ''].filter(Boolean);
     toast(parts.length ? parts.join(' · ') : 'Aucun défaut de surface trouvé : seule l\'orientation des faces posait problème.', parts.length ? '' : 'ok');
@@ -951,22 +1294,37 @@ async function plateCheck() {
   if ($('pl-empty')) $('pl-empty').onclick = e => empty(e.currentTarget);
 }
 
-/* the review of this model's last print (Galerie → Bilan): its corrections, one click away */
+/* the review of this model's last print (Galerie → Bilan): its corrections are applied as soon as the
+   model is selected, one click to take them back out */
 function showRetour(f, r) {
   if (!r || !(r.issues?.length || r.note)) return;
   const when = new Date(r.date * 1000).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
-  $('opt-res').innerHTML = `<div class="opt-card warn"><b>Retour de ta dernière impression (${when})</b>
+  const auto = r.issues?.length && !!document.querySelectorAll('[data-adv]').length;   // advanced fields rendered
+  let prev = null;
+  if (r.issues?.length) {
+    prev = optState();   // what the corrections change, to put it back
+    if (auto) {
+      const adv = { ...prev.adv }; for (const [k, v] of Object.entries(r.advanced || {})) if (k in adv) adv[k] = v;
+      const prevMode = printMode;
+      optApply({ ...prev, supports: r.supports || prev.supports, usage: r.usage || prev.usage, adv });
+      if (r.mode) { printMode = r.mode; renderMode(); }
+      prev.mode = prevMode;
+    }
+  }
+  $('opt-res').innerHTML = `<div class="opt-card warn"><b>${auto
+    ? `Corrections de ta dernière impression (${when}) appliquées`
+    : `Retour de ta dernière impression (${when})`}</b>
     ${(r.titres || []).map(t => `<div class="opt-step left"><span>!</span><div><b>${esc(t)}</b></div></div>`).join('')}
     ${r.note ? `<p class="note" style="margin:0">« ${esc(r.note)} »</p>` : ''}
-    ${r.issues?.length ? '<button class="btn" id="retour-go">Appliquer les corrections</button>' : ''}</div>`;
-  if ($('retour-go')) $('retour-go').onclick = () => {
-    const st = optState(); optUndo = st;
-    const adv = { ...st.adv }; for (const [k, v] of Object.entries(r.advanced || {})) if (k in adv) adv[k] = v;
-    optApply({ ...st, supports: r.supports || st.supports, usage: r.usage || st.usage, adv });
+    ${r.issues?.length ? `<button class="btn${auto ? ' ghost' : ''}" id="retour-drop">${auto ? 'Enlever les corrections' : 'Appliquer les corrections'}</button>` : ''}</div>`;
+  if ($('retour-drop')) $('retour-drop').onclick = auto ? () => {
+    optApply(prev); if (prev.mode !== undefined) { printMode = prev.mode; renderMode(); }
+    $('retour-drop').outerHTML = '<p class="note" style="margin:0">Corrections enlevées.</p>';
+  } : () => {
+    const adv = { ...prev.adv }; for (const [k, v] of Object.entries(r.advanced || {})) if (k in adv) adv[k] = v;
+    optApply({ ...prev, supports: r.supports || prev.supports, usage: r.usage || prev.usage, adv });
     if (r.mode) { printMode = r.mode; renderMode(); }
-    $('adv').open = true;
-    $('retour-go').outerHTML = '<p class="note" style="margin:0">✓ Corrections appliquées (réglages avancés ouverts ci-dessous).</p>';
-    toast('Corrections de la dernière impression appliquées', 'ok');
+    $('retour-drop').outerHTML = '<p class="note" style="margin:0">✓ Corrections appliquées.</p>';
   };
 }
 
@@ -1007,8 +1365,12 @@ async function matchSpools(auto = false) {
   if (!sel || sel.ext === 'gcode') return;
   const f = sel, b = $('use-spools'); b.disabled = true;
   try {
-    const r = await api(`/models/${encodeURIComponent(f.name)}/match-spools`);
+    const [r, st] = await Promise.all([api(`/models/${encodeURIComponent(f.name)}/match-spools?usage=${printUsage}`),
+      api('/bobines').catch(() => null)]);
     if (sel !== f) return;
+    stockLow = st?.low_g || 0;
+    stockLeft = Object.fromEntries((st?.trays || []).map(t => [t.tray + 1, t.restant_g]));   // stock numbers the trays 0-3
+    needs = r.needs || {};
     // one colour slices as T0 whatever the spool: slot 1 then stands for the spool chosen in the CANVAS
     single = r.single || null;
     trays = single ? { 1: r.trays.find(t => t.slot === single.pos + 1) } : Object.fromEntries(r.trays.map(t => [t.slot, t]));
@@ -1016,6 +1378,7 @@ async function matchSpools(auto = false) {
     // repainted with the spools: the colours listed are the spools' own, one per spool used
     if (r.palette) analysis = { ...analysis, colours: r.colours, palette: r.palette };
     mapping = Object.fromEntries(Object.entries(r.mapping).map(([k, v]) => [k, +v]));
+    if (auto) keepChoices();   // the user's earlier picks win over the automatic rematch
     r.filaments.forEach((fil, i) => { spools[i + 1] = fil; });
     const t1 = single && trays[1];
     matched = { line: (t1 ? `Imprimé avec la bobine chargée <b>${single.pos + 1}</b> · <span class="dot" style="background:${t1.hex};display:inline-block;width:9px;height:9px;border-radius:50%"></span> ${esc(t1.name)} (${esc(t1.filament)})`
@@ -1027,6 +1390,7 @@ async function matchSpools(auto = false) {
   } catch (e) {
     if (!auto) toast(e.message, 'bad');
     else { $('c-match').hidden = false; $('c-match').textContent = 'Bobines du CANVAS non lues (imprimante injoignable) : proposition automatique.'; }
+    keepChoices(); renderColours();
   }
   b.disabled = false;
 }
@@ -1047,6 +1411,91 @@ async function watchCanvas() {
 }
 setInterval(watchCanvas, 15000);
 
+/* the assistant: the CLI brain acting through the workshop's own tools (repair, size, turn, shape, slice…) */
+let chatHist = [], chatSel = null, chatBusy = false, chatConv = '';
+function chatConvNew() { chatConv = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())); }
+function chatAdd(role, html, small) {
+  const d = document.createElement('div');
+  d.className = 'chat-msg ' + role;
+  d.innerHTML = html + (small ? `<small>${esc(small)}</small>` : '');
+  $('chat-log').appendChild(d); $('chat-log').scrollTop = 1e9;
+  return d;
+}
+async function chatSend() {
+  const v = $('chat-in').value.trim();
+  if (!v || !sel || chatBusy) return;
+  chatBusy = true; $('chat-go').disabled = true; $('chat-in').value = '';
+  $('chat-sug').hidden = true;   // one real turn: the ready-made ideas step aside
+  chatAdd('user', esc(v) + (cible.pt ? ` <small>— zone (${cible.pt.join(', ')})</small>` : ''));
+  const wait = chatAdd('assistant', '<i style="color:var(--dim)">…</i>');
+  const step = chatAdd('activity', '');
+  const done = [];
+  try {
+    const rsp = await fetch('/lab/api' + `/models/${encodeURIComponent(sel.name)}/assistant/stream`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: v, history: chatHist, conversation: chatConv,
+                             zone: cible.pt ? { point: cible.pt, rayon: +$('chat-zone-r').value || 10 } : undefined })
+    });
+    if (!rsp.ok || !rsp.body) {
+      let msg = `code ${rsp.status}`;
+      try { msg = (await rsp.json()).detail || msg; } catch {}
+      throw new Error(msg);
+    }
+    const rd = rsp.body.getReader(), dec = new TextDecoder();
+    let buf = '', r = null;
+    for (;;) {
+      const { value, done: end } = await rd.read();
+      if (value) buf += dec.decode(value, { stream: true });
+      const lines = buf.split('\n'); buf = lines.pop();          // SSE: "data: {json}" per line
+      for (const L of lines) {
+        if (!L.startsWith('data: ')) continue;
+        let ev; try { ev = JSON.parse(L.slice(6)); } catch { continue; }
+        if (ev.type === 'outil') {
+          done.push(ev.outil);
+          step.innerHTML = `<b>${esc(ev.outil)}</b> — l'atelier travaille sur la pièce…`;
+        } else if (ev.type === 'outil_ok') {
+          step.innerHTML = `<b>${esc(ev.outil)}</b> — fait${ev.fichier ? ` : <code>${esc(ev.fichier)}</code>` : ''}`;
+        } else if (ev.type === 'cli') {
+          step.innerHTML = `via l'agent CLI : <code>${esc(ev.cible)}</code>`;
+        } else if (ev.type === 'recharge') {          // the agent exported its own work (Blender…)
+          step.innerHTML = `l'agent a exporté la pièce : <code>${esc(ev.fichier)}</code>`;
+          await loadFiles();
+          const f = files.find(x => x.name === ev.fichier);
+          if (f && f.ext !== 'gcode') await select(f);
+        } else if (ev.type === 'etape') {
+          step.innerHTML = esc(ev.texte) + '…';
+        } else if (ev.type === 'erreur') {
+          throw new Error(ev.texte);
+        } else if (ev.type === 'final') {
+          r = ev;
+        }
+      }
+      if (end) break;
+    }
+    if (!r) throw new Error('le moteur n\'a pas répondu');
+    step.remove();
+    wait.innerHTML = esc(r.reply || '…').replace(/\n/g, '<br>') + (r.outils?.length ? `<small>${r.outils.join(' · ')}</small>` : '');
+    chatHist.push({ role: 'user', content: v }, { role: 'assistant', content: r.reply || '' });
+    chatHist = chatHist.slice(-10);
+    if (r.file && (r.file !== sel.name || r.maj)) {            // a new model, or the same one changed under the page
+      await loadFiles();
+      const f = files.find(x => x.name === r.file);
+      if (f && !/\.gcode$/i.test(f.name)) select(f);
+      else if (f) { select(f); toast(`L'assistant a tranché : ${nice(f.name)}`, 'ok'); }
+    }
+  } catch (e) {
+    step.remove();
+    wait.innerHTML = `<span style="color:var(--bad)">${esc(e.message)}</span>`;
+  }
+  chatBusy = false; $('chat-go').disabled = false;
+}
+$('chat-go').onclick = chatSend;
+$('chat-in').onkeydown = e => { if (e.key === 'Enter') chatSend(); };
+/* folded by default on a phone, so the piece stays visible */
+$('chat-fold').onclick = () => { const f = $('chat-sec').classList.toggle('folded'); $('chat-fold').textContent = f ? '▴' : '▾'; };
+$('chat-sug').onclick = e => { const b = e.target.closest('[data-q]'); if (b && !chatBusy) { $('chat-in').value = b.dataset.q; chatSend(); } };
+if (matchMedia('(max-width: 600px)').matches) { $('chat-sec').classList.add('folded'); $('chat-fold').textContent = '▴'; }
+
 /* plate, orientation, copies, advanced settings */
 let rotation = [0, 0, 0];
 function renderRot() {
@@ -1054,6 +1503,7 @@ function renderRot() {
   const base = pos ? pos.label.toLowerCase() : ['X', 'Y'].map((a, i) => rotation[i] ? `${a} ${rotation[i]}°` : '').filter(Boolean).join(' · ') || 'telle quelle';
   $('rot-v').textContent = base + (rotation[2] ? ` · tournée de ${rotation[2]}° sur le plateau` : '');
   if (current && previewKey !== 'cut' && !paths?.parts?.some(p => p.lines.parent === current)) {
+    if (sel?.name === mv.file) piecesBase();
     current.rotation.set(THREE.MathUtils.degToRad(rotation[0]), THREE.MathUtils.degToRad(rotation[1]), THREE.MathUtils.degToRad(rotation[2]), 'ZYX');
     if (current.userData.base) current.rotation.x += current.userData.base;
     // mirror and per-axis scale act along the plate's axes, after the turns (as sliced); turns are quarter turns,
@@ -1066,11 +1516,20 @@ function renderRot() {
     }));
     const h = +$('height').value;   // shown at the size it will print, on the plate at its real scale
     if (h) { current.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(current), z = b.max.z - b.min.z; if (z > 0) current.scale.multiplyScalar(h / z); }
-    current.position.z = 0;
+    if (sel?.name === mv.file) { current.position.set(0, 0, 0); piecesScale(); }   // after the height, as the slicer does
+    // centred on the plate, as the slicer places it: a file's own coordinates (often the slicer plate's, 0 to 256)
+    // would show it in a corner, and turns about its origin would swing it away. The pivot is its centre when
+    // loaded, kept in the model's own axes: a piece moved since then keeps its place next to the others
+    current.position.set(0, 0, 0); current.updateMatrixWorld(true);
+    const u = current.userData;
+    u.pivot ||= current.worldToLocal(new THREE.Box3().setFromObject(current).getCenter(new THREE.Vector3()));
+    const at = current.localToWorld(u.pivot.clone());
+    current.position.set(-at.x, -at.y, 0);
     const box = new THREE.Box3().setFromObject(current); current.position.z -= box.min.z;
     const tall = box.max.z - box.min.z, was = current.userData.tall;   // much bigger or smaller: frame it again
     current.userData.tall = tall;
     if (was && (tall / was > 1.4 || was / tall > 1.4)) frame(current);
+    renderOnce();
   }
 }
 document.querySelectorAll('[data-rot]').forEach(b => b.onclick = () => {
@@ -1174,23 +1633,51 @@ function prepBody() {
       slot_colours: Object.keys(trays).length ? Object.fromEntries(Object.entries(trays).map(([k, t]) => [k, t.hex])) : null,
       palette: analysis?.palette || null,
       simplify_colours: $('simplify').value,
-      ...(moved() ? { moves: mv.moves, shift: shiftXY() } : {}),
+      ...(moved() ? { moves: mv.moves, shift: shiftXY() } : {}), ...(resized() ? { scales: mv.scales } : {}),
       pauses_mm: $('pauses').value.trim().split(/[;\s]+|,\s+/).map(v => +v.replace(',', '.')).filter(v => v > 0) };
+}
+/* AI picks and justifies the slicing settings before the cut; the panel fields show exactly what it chose */
+function iaApply(r) {
+  const faits = [];
+  if (r.usage) setUsage(r.usage, true);
+  if (r.qualite && cfg.qualities.includes(r.qualite)) { $('quality').value = r.qualite; faits.push('qualité ' + r.qualite); }
+  if (typeof r.remplissage === 'number') { $('infill').value = r.remplissage; $('infill').oninput(); faits.push('remplissage ' + r.remplissage + ' %'); }
+  if (r.supports) { $('supports').value = r.supports; $('supports').dispatchEvent(new Event('change')); faits.push('supports ' + r.supports); }
+  if (r.reglages && Object.keys(r.reglages).length) {
+    for (const [k, v] of Object.entries(r.reglages)) { const el = $('adv-' + k); if (el) el.value = v; }
+    advCount(); $('adv').open = true;
+    faits.push(Object.keys(r.reglages).length + ' réglage' + (Object.keys(r.reglages).length > 1 ? 's' : '') + ' fin' + (Object.keys(r.reglages).length > 1 ? 's' : ''));
+  }
+  if (Array.isArray(r.rotate) && (r.rotate[0] || r.rotate[1] || r.rotate[2])) faits.push('rotation ' + r.rotate.map(a => Math.round(a) + '°').join(' '));
+  return faits;
+}
+function iaNote(r, faits) {
+  const n = $('ia-note');
+  n.hidden = false; n.className = 'advice';
+  n.innerHTML = `<div class="ah"><span class="dot"></span>${faits.length ? "L'IA a réglé le tranchage : " + esc(faits.join(' · ')) : "L'IA n'a pas changé les réglages"}</div>`
+    + (r.explication ? `<p class="note">${esc(r.explication)}</p>` : '');
 }
 $('go').onclick = async () => {
   const top = Math.max(...Object.values(mapping)), go = $('go'), f = sel;
   go.disabled = true; go.innerHTML = '<span class="spin"></span>Tranchage en cours…'; $('result').innerHTML = '';
   try {
+    if ($('ia-tranche').checked) {
+      go.innerHTML = '<span class="spin"></span>L\'IA lit la pièce et règle le tranchage…';
+      const r = await api(`/models/${encodeURIComponent(f.name)}/slice-brain`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(prepBody()) });
+      iaNote(r, iaApply(r));
+      go.innerHTML = '<span class="spin"></span>Tranchage en cours…';
+    }
     const r = await api(`/models/${encodeURIComponent(f.name)}/prepare-print`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(prepBody()) });
     if (r.split) { renderPieces(r); return; }
     const max = Math.max(...r.slots.map(s => s.metres), .01), g = r.gcode[0];
     $('result').innerHTML = `<div class="result"><div class="stats"><div class="stat"><div class="v">${esc(shortTime(r.time))}</div><div class="k">durée estimée</div></div>
       <div class="stat"><div class="v">${r.layers ?? '–'}</div><div class="k">couches</div></div><div class="stat"><div class="v">${r.usage ? fmtG(r.usage.g) : (r.total_m ?? r.filament_m ?? '–') + ' m'}</div><div class="k">${r.usage ? 'filament · ' + euro(r.usage.eur) : 'filament'}</div></div></div>
-      ${r.slots.length > 1 ? `<p class="note" style="margin:0 0 8px">${r.colour_changes} changements de couleur · dont purge ${(r.purge_m || []).reduce((a, b) => a + b, 0).toFixed(1)} m · mode ${({ economie: 'Économie', equilibre: 'Équilibré', qualite: 'Qualité', sans_purge: 'Sans purge' })[r.mode] || ''}</p>` : ''}
-      ${r.slots.map(s => `<div class="use"><span class="tag"><i style="background:${s.colour}"></i>${s.slot}</span><span class="fn">${esc(s.filament)}</span><span class="bar"><i style="width:${100 * s.metres / max}%;background:${s.colour}"></i></span><span style="width:52px;text-align:right">${s.metres} m</span></div>`).join('')}
+      ${r.slots.length > 1 ? `<p class="note" style="margin:0 0 8px">${r.colour_changes} changements de couleur · dont purge ${(r.purge_m || []).reduce((a, b) => a + b, 0).toFixed(1)} m · mode ${({ economie: 'Économie', equilibre: 'Équilibré', qualite: 'Qualité', sans_purge: 'Sans purge' })[r.mode] || ''}${r.ordre === 'suite' ? ' · pièces les unes après les autres' : ''}</p>` : ''}
+      ${r.temps && (r.temps.bed || (r.temps.nozzle || []).length) ? `<p class="note" style="margin:0 0 8px">${(r.temps.nozzle || []).length ? `buse ${[...new Set(r.temps.nozzle)].join(' / ')} °C` : ''}${(r.temps.nozzle || []).length && r.temps.bed ? ' · ' : ''}${r.temps.bed ? `plateau ${r.temps.bed} °C (première couche)` : ''} — températures du profil Elegoo donc optimales</p>` : ''}
+      ${r.slots.map(s => `<div class="use"><span class="tag"><i style="background:${s.colour}"></i>${s.slot}</span><span class="fn" ${s.buse ? `title="buse ${s.buse} °C"` : ''}>${esc(s.filament)}${s.buse ? ` · ${s.buse} °C` : ''}</span><span class="bar"><i style="width:${100 * s.metres / max}%;background:${s.colour}"></i></span><span style="width:52px;text-align:right">${s.metres} m</span></div>`).join('')}
       ${stockLines(r.usage)}
       ${r.colour_changes > 150 && printMode === 'economie' ? `<div class="warnline">⚠ ${r.colour_changes} changements de couleur : sans tour d'essuyage, des bavures et un marbrage sont probables. Le mode Équilibré (tour d'essuyage) les évite.</div>` : ''}
-      ${(r.pauses || []).map(p => `<div class="warnline" style="color:var(--dim)">⏸ Pause après la couche ${p.layer - 1} (pièce à ${p.z} mm), demandée à ${p.mm} mm</div>`).join('')}
+      ${(r.pauses || []).map(p => `<div class="warnline" style="color:var(--dim)">⏸ Pause après la couche ${p.layer - 1} (${p.run > 1 ? `pièce ${p.run} · ` : ''}pièce à ${p.z} mm), demandée à ${p.mm} mm</div>`).join('')}
       ${r.warnings.map(w => `<div class="warnline">⚠ ${esc(w)}</div>`).join('')}
       <p class="note" style="margin:10px 0 0">Fichier : ${esc(g)}</p>
       <button class="btn block" id="see-paths" style="margin-top:10px"><svg class="i"><use href="#i-layers"/></svg>Voir le tranchage couche par couche</button>${sendBlock(g)}</div>`;
@@ -1213,7 +1700,7 @@ function renderPieces(r) {
     <div class="stat"><div class="v">${dur(time)}</div><div class="k">au total</div></div><div class="stat"><div class="v">${r.usage ? fmtG(r.usage.g) : r.total_m + ' m'}</div><div class="k">${r.usage ? 'filament · ' + euro(r.usage.eur) : 'filament'}</div></div></div>
     ${stockLines(r.usage)}
     <p class="note">Coupes : ${r.planes.map(p => `${p.axis} = ${p.mm} mm`).join(', ')}. Imprime les pièces une par une, puis assemble-les avec les chevilles et un peu de colle.</p>
-    ${r.pieces.map((p, i) => row(`Pièce ${i + 1}`, p, `${p.size_mm.map(Math.round).join(' × ')} mm · `)).join('')}
+    ${r.pieces.map((p, i) => row(`Pièce ${i + 1}`, p, `${sizeTxt(p.size_mm)} · `)).join('')}
     ${r.pins ? row(r.pins.small_pieces ? `Petites pièces (${r.pins.small_pieces}) + ${r.pins.count} chevilles` : `${r.pins.count} chevilles`, r.pins, r.pins.count ? `Ø ${r.pins.diameter_mm} × ${r.pins.length_mm} mm · ` : '') : ''}
     ${r.warnings.map(w => `<div class="warnline">⚠ ${esc(w)}</div>`).join('')}
     ${ctx.control ? '' : '<p class="note" style="margin:8px 0 0">Lecture seule : relance avec <code>cc2 --control dash</code> pour envoyer.</p>'}</div>`;
@@ -1384,7 +1871,7 @@ async function pollJobs() {
   clearTimeout(jobTimer); const jobs = await api('/jobs').catch(() => []);
   $('jobs').innerHTML = jobs.map(j => `<div class="crow" style="flex-wrap:wrap"><span>${esc(WF_LABEL[j.workflow] || j.workflow)}</span><span style="margin-left:auto" class="note">${j.state === 'running' ? 'en cours…' : j.state === 'done' ? '✔ ' + esc(j.files.join(', ') || 'image prête') : '<span style="color:var(--bad)">' + esc(j.error) + '</span>'}</span>
     ${(j.images || []).map(im => `<img src="/lab/api/references/${encodeURIComponent(im)}" alt="Figurine intermédiaire" style="width:100%;border-radius:8px;margin-top:6px;border:1px solid var(--line)">`).join('')}</div>`).join('');
-  if (jobs.some(j => j.state === 'running')) jobTimer = setTimeout(pollJobs, 3000); else loadFiles();
+  if (jobs.some(j => j.state === 'running')) jobTimer = setTimeout(() => { if (!document.hidden) pollJobs(); }, 3000); else loadFiles();
 }
 
 /* made-to-measure parts: pick a kind, set the sizes, the 3D preview follows as you type */
@@ -1431,10 +1918,18 @@ function miniViewer(hostId, dialogId) {   // dialogId: the dialog it lives in, o
   const size = () => { const w = host.clientWidth, h = host.clientHeight; if (w && h) { r.setSize(w, h, false); c.aspect = w / h; c.updateProjectionMatrix(); } };
   new ResizeObserver(size).observe(host); size();
   const seen = typeof dialogId === 'function' ? dialogId : () => $(dialogId).open;
-  r.setAnimationLoop(() => { if (!seen()) return; ctl.update(); r.render(sc, c); });
+  let need = true;
+  ctl.addEventListener('change', () => { need = true; });
+  r.setAnimationLoop(() => {
+    if (!seen()) { need = true; return; }   // reopen: a first picture right away
+    ctl.update();
+    if (need) { need = false; r.render(sc, c); }
+  });
   const v = { sc, c, ctl, obj: null,
+    render: () => { need = true; },   // callers redraw after moving the nozzle or the layer ranges
     set(obj, refit) {   // swap the shown object; refit the camera only when asked (keeps the user's angle otherwise)
-      if (v.obj) v.sc.remove(v.obj);
+      need = true;
+      if (v.obj) { v.sc.remove(v.obj); disposeObj(v.obj); }
       v.obj = obj; if (!obj) return; v.sc.add(obj);
       if (!refit) return;
       const box = new THREE.Box3().setFromObject(obj), ctr = box.getCenter(new THREE.Vector3()), d = box.getSize(new THREE.Vector3()).length() * 1.6 || 100;
@@ -1450,7 +1945,7 @@ async function makePreview() {
     if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || res.statusText);
     const [x, y, z] = (res.headers.get('X-Size') || '').split(',').map(Number);
     if (seq !== makeSeq) return;
-    $('make-size').className = 'make-size'; $('make-size').textContent = `Sur le plateau : ${Math.round(x)} × ${Math.round(y)} × ${Math.round(z)} mm`;
+    $('make-size').className = 'make-size'; $('make-size').textContent = `Sur le plateau : ${sizeTxt([x, y, z])}`;
     $('make-go').disabled = false;
     if (!v) return;
     const g = await res.arrayBuffer().then(b => new Promise((ok, ko) => new GLTFLoader().parse(b, '', ok, ko)));
@@ -1522,7 +2017,7 @@ async function asmPreview() {
     }
     if (seq !== asmSeq) return;
     const sz = new THREE.Box3().setFromObject(group).getSize(new THREE.Vector3());
-    $('asm-size').textContent = group.children.length ? `${Math.round(sz.x)} × ${Math.round(sz.y)} × ${Math.round(sz.z)} mm (unités du fichier)` : 'Aperçu disponible pour les STL';
+    $('asm-size').textContent = group.children.length ? `${sizeTxt([sz.x, sz.y, sz.z])} (unités du fichier)` : 'Aperçu disponible pour les STL';
     asmView?.set(group, true);
   } catch (e) { if (seq === asmSeq) $('asm-size').textContent = 'Aperçu impossible : ' + e.message; }
 }

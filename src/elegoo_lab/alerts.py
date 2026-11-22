@@ -13,8 +13,10 @@ import contextlib
 import json
 import re
 import logging
+import threading
 import time
 from collections import deque
+from pathlib import Path
 from typing import Any, AsyncIterator, Callable
 
 from . import config
@@ -438,7 +440,24 @@ class Watcher:
             with contextlib.suppress(RuntimeError):
                 asyncio.get_running_loop().create_task(self._photo(ev))
         self._account(name, 1.0, ev["id"])
+        self._warm_review(name)
         self._close("terminee", ev, rec, 100)
+
+    @staticmethod
+    def _warm_review(name: str) -> None:
+        """Read the finished G-code now (supports, paths), so its review opens at once: a big figure takes seconds."""
+        from . import aftercare, gcode_preview
+        src = config.MODELS_DIR / Path(name or "").name
+        if not (name and src.suffix.lower() == ".gcode" and src.exists()):
+            return
+
+        def read() -> None:
+            try:
+                aftercare.supports_plan(src)
+                gcode_preview.cached(src, gcode_preview.REVIEW)
+            except (OSError, ValueError):
+                log.debug("no paths for %s", src, exc_info=True)
+        threading.Thread(target=read, daemon=True).start()
 
     def cool(self, bed: float | None) -> None:
         """After a finished print, one alert when the plate is cold enough to take the part off."""

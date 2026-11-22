@@ -52,13 +52,21 @@ After a print (**Bilan** button in the gallery, or **Faire le bilan** in the end
 
 1. The workshop reminds you what to do now, depending on the part: wait for the plate to cool, remove the supports,
    empty the purge bin after a multicolour print, don't sand Silk PLA…
-2. You tick what went wrong: part came loose, strings, rough top, visible seam, fragile part, supports hard to remove,
+   For supports, the workshop reads the printed G-code: it says **where** they are (left, front, from so many mm to so
+   many mm high, where they touch the part), **how** to remove them (tree: top down, thin branches first; block: lifted
+   off in one piece) and shows them in 3D like the Printer tab's layer view: the part pale, the supports in orange (without WebGL, a top view).
+2. You mark from 0 to 5: overall, smooth surfaces, sharp fine details, supports easy to remove, clean colours, strength
+   (the last two only when they apply to the part). A mark of 2 or less ticks the matching defect, so its fix is
+   offered. The overall mark shows on the gallery card.
+3. You tick what went wrong: part came loose, strings, rough top, visible seam, fragile part, supports hard to remove,
    sagging overhangs, thin lines, colours bleeding, drops at colour changes, wipe tower knocked over, elephant's foot,
    shifted layers.
-3. For each defect: the likely cause, what to do on this part, and the fix for next time, computed from the print's real
+4. For each defect: the likely cause, what to do on this part, and the fix for next time, computed from the print's real
    settings (a nozzle at 230 °C that strings goes to 220 °C, not "10 °C below the profile").
 
-The fixes are kept on the model: the next time you prepare it, the workshop offers them in one click.
+The fixes are kept on the model: the next time you prepare it, the workshop applies them by itself — one click on
+« Remove the corrections » to take them back out. And when a review reported colours bleeding into each other or
+drops at the changes, the next slice purges the worst case at every change, whatever multicolour mode is shown.
 
 ## The cold plate
 

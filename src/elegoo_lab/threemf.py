@@ -11,6 +11,7 @@ Per part we keep: world-space mesh, filament (``extruder``), per-triangle painti
 
 from __future__ import annotations
 
+import html
 import itertools
 import json
 import re
@@ -185,6 +186,7 @@ def _read(path: Path) -> Project:
 
     # extruders from Orca/Bambu model_settings: <object id> default and <part id> override
     obj_ext: dict[str, int] = {}
+    obj_name: dict[str, str] = {}
     part_ext: dict[str, int] = {}
     for om in re.finditer(r'<object id="(\d+)">(.*?)</object>', settings, re.S):
         body = om.group(2)
@@ -192,6 +194,8 @@ def _read(path: Path) -> Project:
         e = re.search(r'key="extruder" value="(\d+)"', head)
         if e:
             obj_ext[om.group(1)] = int(e.group(1))
+        if nm := re.search(r'key="name" value="([^"]*)"', head):     # the slicer's name for the object, shown to the user
+            obj_name[om.group(1)] = html.unescape(nm.group(1))
         for pm in re.finditer(r'<part id="(\d+)"[^>]*>(.*?)</part>', body, re.S):
             e = re.search(r'key="extruder" value="(\d+)"', pm.group(2))
             if e:
@@ -251,7 +255,7 @@ def _read(path: Path) -> Project:
             continue
         oid = item.get("objectid")
         el = cache[root_name][0][oid]
-        name = el.get("name") or f"objet {oid}"
+        name = obj_name.get(oid) or el.get("name") or f"objet {oid}"
         objects.append(Object(name, flatten(root_name, oid, _matrix(item.get("transform")), oid, name)))
     return Project(objects, colours)
 

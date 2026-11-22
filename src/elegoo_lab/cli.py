@@ -338,7 +338,7 @@ def slice_cmd(
     infill: Annotated[Optional[int], typer.Option(help="Remplissage en %.")] = None,
     supports: Annotated[str, typer.Option(help="Supports : aucun, arbre, arbre_fin, arbre_solide, colonnes.")] = "aucun",
     plate_only: Annotated[bool, typer.Option("--plateau-seul", help="Supports seulement depuis le plateau.")] = False,
-    mode: Annotated[str, typer.Option(help="Multicolore : economie (sans tour d'essuyage), sans_purge, equilibre, qualite.")] = printprep.DEFAULT_MODE,
+    mode: Annotated[str, typer.Option(help="Multicolore : equilibre (tour d'essuyage, par défaut), qualite, economie (sans tour), sans_purge.")] = printprep.DEFAULT_MODE,
     split: Annotated[bool, typer.Option("--decouper", help="Découper en pièces avec chevilles si trop grand.")] = False,
     upload: Annotated[bool, typer.Option(help="Envoyer le G-code à l'imprimante (exige --control).")] = False,
     start: Annotated[bool, typer.Option(help="Lancer l'impression après l'envoi (exige --upload).")] = False,
@@ -366,7 +366,7 @@ def slice_cmd(
     if res.get("split"):
         typer.echo("Découpe : " + ", ".join(f"{p['axis']} = {p['mm']} mm" for p in res["planes"]))
         for p in res["pieces"]:
-            typer.echo(f"✔ {p['gcode'][0]}  ({' × '.join(str(x) for x in p['size_mm'])} mm, {p['time']}, {p['total_m']} m)")
+            typer.echo(f"✔ {p['gcode'][0]}  ({mesh.size_text(p['size_mm'])}, {p['time']}, {p['total_m']} m)")
         if res["pins"]:
             pn = res["pins"]
             typer.echo(f"✔ {pn['gcode'][0]}  ({pn['count']} chevilles Ø{pn['diameter_mm']:.0f} × {pn['length_mm']:.0f} mm)")
@@ -379,6 +379,10 @@ def slice_cmd(
     purge = sum(res.get("purge_m") or [])
     typer.echo(f"  {res['layers']} couches · durée estimée {res['time']} · filament {res.get('total_m', res['filament_m'])} m"
                + (f" (dont purge {purge:.1f} m)" if purge else ""))
+    temps = res.get("temps") or {}
+    if temps.get("nozzle"):
+        typer.echo(f"  buse {' / '.join(f'{n} °C' for n in temps['nozzle'])} · plateau {temps.get('bed', '?')} °C"
+                   " (températures du profil Elegoo, selon le filament)")
     if len(res["slots"]) > 1:
         typer.echo(f"  {res['colour_changes']} changements de couleur")
         typer.echo("  Charger le CANVAS: " + " · ".join(f"{s['tool']} {s['filament']} ({s['colour']}, {s['metres']} m)" for s in res["slots"]))
@@ -447,7 +451,7 @@ def multicolor(
         names = filament or ["PLA"] * max(s for _, s in spec)
         out = config.MODELS_DIR / f"{name}.3mf"
         info = colorize.build_3mf(spec, out, filaments=len(names), name=name)
-        typer.echo(f"✔ {out.name}: {len(spec)} pièces, {info['filaments']} filaments, {info['size_mm']} mm")
+        typer.echo(f"✔ {out.name}: {len(spec)} pièces, {info['filaments']} filaments, {mesh.size_text(info['size_mm'])}")
         res = slicer.slice_model(out, config.MODELS_DIR, quality=quality, filament=names, infill=infill)
     except (ValueError, slicer.SliceError) as err:
         typer.secho(str(err), fg="red", err=True)

@@ -21,12 +21,16 @@ appareil de la maison.
 
 ## Ce qu'il fait
 
-- **Préparer** : importer un STL, 3MF, OBJ, GLB, PLY ou un lien vers un fichier (ou une page qui en propose un) ; associer chaque couleur à
+- **Préparer** : importer un STL, 3MF, STEP, OBJ, GLB, PLY, OFF, DAE, un zip ou un lien vers un fichier (ou une page qui en propose un) ; associer chaque couleur à
   une bobine du CANVAS ; « Optimiser pour la CC2 » (réparation, taille, meilleure face au plateau, supports, bordure) ;
   découper une pièce trop grande avec des chevilles ; créer des pièces sans CAO (Gridfinity, visserie, engrenage,
   porte-clés et décoration au prénom, lithophanie…).
 - **Trancher** : OrcaSlicer en ligne de commande, avec les profils Elegoo de la CC2. Temps, grammes, coût et nombre
-  de changements de couleur avant de lancer, comparaison de variantes, purge dosée, modes multicolores.
+  de changements de couleur avant de lancer, comparaison de variantes, purge dosée, modes multicolores, pièces
+  d'un plateau imprimées à la suite pour regrouper les couleurs.
+- **Assistant** : un chat qui modifie le modèle pour toi (réparer, taille, rotation, formes, tranchage) — le CLI
+  agent `vibe` (connecté à ton compte, sans clé API) piloté par les outils de l'atelier, avec accès aux serveurs
+  MCP (Blender pour la vraie CAO).
 - **Imprimer** : envoi à la CC2 avec la bonne bobine pour chaque couleur, vérification à la caméra que le plateau est
   vide, file d'attente, pause à une hauteur donnée.
 - **Suivre** : caméra en direct, IA qui repère les « spaghettis » (modèle d'Obico, calculé chez toi), la pièce qui

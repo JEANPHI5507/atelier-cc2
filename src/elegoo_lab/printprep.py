@@ -6,6 +6,7 @@ Shared by the web workshop and the ``cc2 slice`` command so both behave the same
 from __future__ import annotations
 
 import re
+import time
 
 from pathlib import Path
 from typing import Any
@@ -13,7 +14,7 @@ from typing import Any
 import numpy as np
 import trimesh
 
-from . import colorize, colors, config, couches, cut, mesh, settings, slicer, thumbnail
+from . import colorize, colors, config, couches, cut, library, mesh, settings, slicer, thumbnail
 
 SLICEABLE_AS_IS = {".stl", ".obj"}
 
@@ -33,7 +34,16 @@ MODES = {
     # no tower and no flush at all: the colour change is only the CANVAS switch (see slicer.without_purge)
     "sans_purge": {"smart_flush": True, "overrides": {"enable_prime_tower": "0"}, "no_purge": True},
 }
-DEFAULT_MODE = "economie"
+DEFAULT_MODE = "equilibre"   # quality first: the nozzle wipes on the tower before returning to the part;
+                             # Économie stays one click away, and the result shows what both cost
+BLED = {"couleurs", "gouttes"}   # review issues: the purge between colours was not enough
+
+
+def bled_purge(src: Path) -> bool:
+    """True when this model's last review reported bled or dripping colours: the next slice then
+    purges every change as the worst case (the "qualite" volumes), whatever multicolour mode is shown."""
+    r = (library.load_index().get(src.name) or {}).get("retour") or {}
+    return bool(BLED & set(r.get("issues", [])))
 SMALL_PIECE_MM = 40.0  # cut pieces up to this size share the dowels' plate
 
 # What the part is for decides where the plastic goes. Measured on the CC2 profile (95 mm figurine,
@@ -45,8 +55,9 @@ USAGES: dict[str, dict[str, Any]] = {
                   "overrides": {"sparse_infill_pattern": "lightning", "sparse_infill_density": "8%", "wall_loops": "2",
                                 "top_shell_layers": "5"}},
     "fonctionnel": {"label": "Solide", "quality": "0.20mm Strength",
-                    "hint": "Support, crochet, boîte, pièce qui force : 4 parois et remplissage gyroïde.",
-                    "overrides": {"sparse_infill_pattern": "gyroid", "sparse_infill_density": "15%", "wall_loops": "4"}},
+                    "hint": "Support, crochet, boîte, pièce qui force : 4 parois et remplissage gyroïde, paroi extérieure précise.",
+                    "overrides": {"sparse_infill_pattern": "gyroid", "sparse_infill_density": "15%", "wall_loops": "4",
+                                  "precise_outer_wall": "1"}},
     "detaille": {"label": "Détaillé", "quality": "0.12mm Fine",
                  "hint": "Miniature, petit texte, visage : couches fines (plus long), intérieur allégé.",
                  "overrides": {"sparse_infill_pattern": "lightning", "sparse_infill_density": "10%", "wall_loops": "2"}},
@@ -129,6 +140,7 @@ def prepare_and_slice(
     pauses_mm: list[float] | None = None,
     simplify_colours: bool | str = "leger",
     moves: dict[int, tuple[float, float, float]] | None = None,
+    scales: dict[int, float] | None = None,
     shift: tuple[float, float] | None = None,
     screen_thumbnail: bool = True,
 ) -> dict[str, Any]:
@@ -144,6 +156,15 @@ def prepare_and_slice(
     adv_proc = {**usage_overrides(usage, infill), **adv_proc}   # the advanced fields stay the last word
     if not 1 <= copies <= 50:
         raise ValueError("nombre d'exemplaires entre 1 et 50")
+    # 'suite' = one piece at a time (Orca 'by object'): the pieces of one colour print together and
+    # a plate of pieces pays one change per colour instead of one at nearly every layer. Each copy
+    # would go through every colour again, so copies keep the layer order and share the changes.
+    ordre = ((advanced or {}).get("ordre") or "") if isinstance(advanced, dict) else ""
+    if copies > 1 and ordre == "suite":
+        adv_proc.pop("print_sequence", None)
+        ordre = ""
+        warnings.append("Pièce par pièce ignoré : chaque exemplaire reprendrait toutes les couleurs ; "
+                        "couche par couche, ils se partagent chaque changement.")
     cli = ["--orient", "1"] if orient else []
     rot = colors.rotation(rotate)
     if not height_mm:
@@ -158,6 +179,11 @@ def prepare_and_slice(
     slots = {c["index"]: (mapping or {}).get(c["index"], c["slot"]) for c in info["colours"]}
     n = max(slots.values())
     fil = ((filaments or []) + ["PLA"] * n)[:n]
+    # colours bled at the last print of this model: every change purges the worst case, even in a lighter mode
+    flush = MODES[mode]["smart_flush"] and n > 1 and not MODES[mode].get("no_purge")
+    if flush and bled_purge(src):
+        flush = False
+        warnings.append("Purge renforcée : ta dernière impression signalait des couleurs qui bavent.")
 
     size = np.array(mesh.info(src)["size_mm"], float)
     if rot is not None:
@@ -167,19 +193,26 @@ def prepare_and_slice(
         if copies > 1:
             raise ValueError("plusieurs exemplaires d'un modèle à découper : imprime d'abord un exemplaire")
         if not split:
-            raise ValueError(f"trop grand pour le plateau ({final.round(0).astype(int).tolist()} mm, maximum "
-                             f"{mesh.BED_MM - cut.MARGIN_MM:.0f}) : réduis la hauteur ou active « Découper en pièces »")
+            raise ValueError(f"trop grand pour le plateau ({mesh.size_text(final)}, maximum "
+                             f"{mesh.BED_MM - cut.MARGIN_MM:.0f} mm de chaque côté) : réduis la hauteur ou active « Découper en pièces »")
         if pauses_mm:   # each piece has its own heights: a pause on the whole model has no layer to go to
             warnings.append("Pause ignorée : la pièce est découpée en morceaux, chacun avec sa propre hauteur.")
+        if ordre == "suite":   # the pieces are already separate prints, one after the other
+            adv_proc.pop("print_sequence", None)
+            warnings.append("Pièce par pièce ignoré : la pièce est découpée, chacun de ses morceaux est déjà imprimé l'un après l'autre.")
         return _split_and_slice(src, slots, fil, quality=quality, infill=infill, supports=supports,
                                 plate_only=plate_only, height_mm=height_mm, mode=mode, out_dir=out_dir, warnings=warnings,
-                                slot_colours=slot_colours, adv=(adv_proc, adv_fil), rotate=rotate, palette=palette)
+                                slot_colours=slot_colours, adv=(adv_proc, adv_fil), advanced=advanced, usage=usage, rotate=rotate, palette=palette, smart_flush=flush)
 
     target, slot_hex = src, None
-    layers = settings.CHOICES["couches"][2].get((advanced or {}).get("couches") or "non", ("",))[0]
+    layers = _layer_mode(advanced, usage)
     marks = colors.load_marks(src)
+    ordre_conv: str | None = None
+    if layers and (support_overrides(supports, plate_only)[0] or marks.get("support")):
+        layers = ""       # OrcaSlicer refuses variable layer height with organic supports
+        warnings.append("Hauteur de couche variable ignorée : elle ne marche pas avec les supports en arbre.")
     if (n > 1 or src.suffix.lower() not in SLICEABLE_AS_IS or height_mm or rot is not None or copies > 1 or moves
-            or layers or marks):
+            or scales or layers or marks):
         base = src
         if height_mm and src.suffix.lower() == ".stl":
             base = out_dir / f".{src.stem}_scaled.stl"
@@ -187,12 +220,13 @@ def prepare_and_slice(
         target = out_dir / f"{src.stem}_canvas.3mf"
         try:
             conv = colors.to_canvas(base, target, slots, height_mm=height_mm, rotate=rotate, copies=copies, moves=moves, shift=shift,
-                                    marks_from=src,
-                                    smart_flush=MODES[mode]["smart_flush"], palette=palette,
+                                    marks_from=src, scales=scales,
+                                    smart_flush=flush, palette=palette, ordre=ordre,
                                     simplify=colors.SIMPLIFY_LEVELS.get(simplify_colours, colors.SIMPLIFY_SHARE) if isinstance(simplify_colours, str)
                                     else (colors.SIMPLIFY_SHARE if simplify_colours else 0.0),
-                                    layer_mm=_layer_mm(quality))
+                                    layer_mm=_layer_mm(quality), real_colours=slot_colours)
             slot_hex = conv["slot_colours"]
+            ordre_conv = conv.get("ordre")
             if conv.get("simplified"):
                 warnings.append(f"{conv['simplified']} petite(s) tache(s) de couleur fondue(s) dans la couleur voisine : "
                                 f"autant de changements et de purges en moins (« Simplifier les couleurs »).")
@@ -205,6 +239,19 @@ def prepare_and_slice(
                             f"environ {-more} couches de moins." if more < 0 else "aucune pente douce, hauteur inchangée."))
 
     slot_hex = _real_colours(slot_hex, slot_colours, n)
+    if ordre == "suite":
+        if ordre_conv == "suite":
+            warnings.append("Pièce par pièce : chaque couleur imprime toutes ses pièces à la suite, d'où bien moins de "
+                            "changements et de purge. Pas de tour d'essuyage dans cet ordre : le premier millimètre "
+                            "après chaque changement fond les deux couleurs.")
+        else:   # not convertible (single piece, or every piece wears the same colours): stay layer by layer
+            adv_proc.pop("print_sequence", None)
+            ordre = ""
+            warnings.append("Pièce par pièce ignoré : " + {
+                "meme": "toutes les pièces de ce plateau portent les mêmes couleurs, et couche par couche "
+                        "elles partagent déjà chaque changement.",
+                "seule": "ce plateau ne fait qu'une seule pièce.",
+            }.get(ordre_conv or "", "ce modèle ne fait qu'une seule pièce."))
     sup_on, sup_ov = support_overrides(supports, plate_only)
     if marks.get("support") and not sup_on:   # supports painted by hand, none asked for: only where painted
         sup_on, sup_ov = True, {"support_type": "tree(manual)", **({"support_on_build_plate_only": "1"} if plate_only else {})}
@@ -218,6 +265,9 @@ def prepare_and_slice(
                                  filament_overrides={**(MODES[mode].get("filament", {}) if n > 1 else {}), **adv_fil}, cli_args=cli)
     except slicer.SupportNeeded:   # OrcaSlicer found parts that would hang in the air: tree supports, said in the result
         warnings.append("Supports en arbre ajoutés : OrcaSlicer a trouvé des parties qui flotteraient sans support.")
+        if layers:
+            couches.remove(target)
+            warnings.append("Hauteur de couche variable retirée : elle ne marche pas avec les supports en arbre.")
         res = slicer.slice_model(target, out_dir, quality=quality, filament=fil, infill=infill, supports=True,
                              colours=slot_hex, no_purge=bool(MODES[mode].get("no_purge")) and n > 1, overrides={**(MODES[mode]["overrides"] if n > 1 else {}), **sup_ov,
                                                   # several parts: the CC2 can drop one that fails and finish the others
@@ -229,6 +279,15 @@ def prepare_and_slice(
     palette = slot_hex or colorize.PALETTE
     per = res.per_filament_m + [0.0] * n
     purge = res.purge_m + [0.0] * n
+    from . import spools, stock                       # needs() is what the colours step shows: keep it honest
+    vol = mesh.info(src).get("volume_cm3")
+    if vol and res.per_filament_m:
+        est = sum((spools.needs(vol, info["colours"], usage=usage, mapping=slots, filaments=fil)).values())
+        real = sum(stock.grams(mm + p, f) for mm, p, f in zip(per, purge, fil))
+        try:
+            stock.calibrate_fill(usage, est, real)
+        except Exception:
+            pass                                      # a failed estimate correction must never fail a slice
     out = res.as_dict()
     out["warnings"] = warnings + out["warnings"]
     if pauses_mm:
@@ -238,11 +297,18 @@ def prepare_and_slice(
     return {
         **out,
         "colours": info["colours"],
-        "mode": mode, "usage": usage,
+        "mode": mode, "usage": usage, "ordre": "suite" if ordre == "suite" else "couche",
         "slots": [{"slot": i + 1, "tool": f"T{i}", "filament": f, "colour": palette[i],
-                   "metres": round(per[i] + purge[i], 2), "purge_m": purge[i]}
+                   "metres": round(per[i] + purge[i], 2), "purge_m": purge[i],
+                   **({"buse": res.temps["nozzle"][i]} if i < len(res.temps.get("nozzle", [])) else {})}
                   for i, f in enumerate(fil)],
     }
+
+
+def _layer_mode(advanced: dict[str, str] | None, usage: str | None = None) -> str:
+    """Variable layer height level for couches.apply: automatic (the default) thins slopes, which is a no-op on straight parts."""
+    val = settings.CHOICES["couches"][2].get((advanced or {}).get("couches") or "auto", ("",))[0]
+    return ("" if usage == "profil" else "pentes") if val == "auto" else val   # « Profil Elegoo » = no change at all
 
 
 def _layer_mm(quality: str) -> float:
@@ -261,13 +327,17 @@ def _real_colours(slot_hex: list[str] | None, slot_colours: dict[int, str] | Non
 def _split_and_slice(src: Path, slots: dict[int, int], fil: list[str], *, quality: str, infill: int | None,
                      supports: bool | str, plate_only: bool, height_mm: float | None, mode: str, out_dir: Path,
                      warnings: list[str], slot_colours: dict[int, str] | None = None,
-                     adv: tuple[dict[str, str], dict[str, Any]] = ({}, {}),
-                     rotate: tuple[float, ...] | None = None, palette: colors.Palette | None = None) -> dict[str, Any]:
+                     adv: tuple[dict[str, str], dict[str, Any]] = ({}, {}), advanced: dict[str, str] | None = None, usage: str | None = None,
+                     rotate: tuple[float, ...] | None = None, palette: colors.Palette | None = None,
+                     smart_flush: bool | None = None) -> dict[str, Any]:
     """Cut a too-big model into pieces with dowel holes; one G-code per piece plus one for the dowels."""
+    if smart_flush is None:
+        smart_flush = MODES[mode]["smart_flush"]   # bled_purge already handled by the caller
     v, f, face_slots, slot_hex = colors.solid(src, slots, height_mm=height_mm, rotate=rotate, palette=palette)
     slot_hex = _real_colours(slot_hex, slot_colours, len(slot_hex))
     res = cut.cut(v, f, face_slots, name=src.stem)
     n = len(slot_hex)
+    layer_level = _layer_mode(advanced, usage)
     sup_on, sup_ov = support_overrides(supports, plate_only)
     pieces, failed = [], []
     small, big = [], []
@@ -277,7 +347,9 @@ def _split_and_slice(src: Path, slots: dict[int, int], fil: list[str], *, qualit
     for p, verts, laid in big:
         target = out_dir / f"{p.name}.3mf"
         colors.write_piece(verts, p.faces, p.slots, slot_hex, target, name=p.name,
-                           smart_flush=MODES[mode]["smart_flush"])
+                           smart_flush=smart_flush)
+        if layer_level and not sup_on:
+            couches.apply(target, _layer_mm(quality), layer_level)
         try:
             r = slicer.slice_model(target, out_dir, quality=quality, filament=fil, infill=infill, supports=sup_on,
                                    colours=slot_hex, no_purge=bool(MODES[mode].get("no_purge")) and n > 1, overrides={**(MODES[mode]["overrides"] if n > 1 else {}), **sup_ov, **adv[0]},
@@ -299,7 +371,7 @@ def _split_and_slice(src: Path, slots: dict[int, int], fil: list[str], *, qualit
             items += [(f"cheville{k + 1}", np.asarray(c.vertices), np.asarray(c.faces), None)
                       for k, c in enumerate(res.pins.split(only_watertight=False))]
         plate_file = out_dir / f"{src.stem}_petites_pieces.3mf"
-        colors.write_plate(items, slot_hex, plate_file, smart_flush=MODES[mode]["smart_flush"])
+        colors.write_plate(items, slot_hex, plate_file, smart_flush=smart_flush)
         r = slicer.slice_model(plate_file, out_dir, quality=quality, filament=fil, infill=100 if not small else infill,
                                colours=slot_hex, no_purge=bool(MODES[mode].get("no_purge")) and n > 1, overrides={**(MODES[mode]["overrides"] if n > 1 else {}), **adv[0]},
                                filament_overrides={**(MODES[mode].get("filament", {}) if n > 1 else {}), **adv[1]})
@@ -429,17 +501,22 @@ def add_pauses(gcode: Path, heights_mm: list[float]) -> list[dict[str, Any]]:
     """Stop the print once the model is ``h`` mm tall: a ``PAUSE`` before the first layer above h.
     The CC2 firmware's PAUSE parks over the waste box and drops the nozzle to 100 °C; resuming from the
     screen or the app restores the temperature and purges (CentauriCarbon2 elegoo/extras/pause_resume.cpp).
-    Returns the pauses really placed: {"mm": asked, "z": layer top before the pause, "layer": 1-based layer}."""
+    Pieces printing one at a time each go from the bed up: each one pauses at its own height ("run").
+    Returns the pauses really placed: {"mm": asked, "z": layer top before the pause, "layer": 1-based layer of its piece, "run": which piece}."""
     lines = gcode.read_text(errors="ignore").splitlines(keepends=True)
     marks = [(i, float(lines[i + 1][3:])) for i in range(len(lines) - 1)
              if lines[i].startswith(";LAYER_CHANGE") and lines[i + 1].startswith(";Z:")]
     placed: dict[int, dict[str, Any]] = {}
     for h in sorted(set(heights_mm)):
+        run, crossed, prev, start = 1, set(), None, 0   # a new run starts when Z goes back down: the next piece begins
         for n, (i, z) in enumerate(marks):
-            if z > h + 1e-6:
-                if n and i not in placed:   # never before the first layer: nothing to pause on yet
-                    placed[i] = {"mm": h, "z": marks[n - 1][1], "layer": n + 1}
-                break
+            if prev is not None and z < prev - 1e-6:
+                run, start = run + 1, n
+            if z > h + 1e-6 and (h, run) not in crossed:
+                crossed.add((h, run))   # one crossing per piece: heights stacked on the same layer, or before layer 1, stay dropped
+                if n > start and i not in placed:   # at least one layer of this piece is done: never before it
+                    placed[i] = {"mm": h, "z": prev, "layer": n - start + 1, "run": run}
+            prev = z
     for i in sorted(placed, reverse=True):
         lines.insert(i, f"; pause demandée à {placed[i]['mm']:g} mm\nPAUSE\n")
     if placed:

@@ -44,6 +44,15 @@ path = ""                   # autre slicer compatible OrcaSlicer (par défaut to
 url = "http://127.0.0.1:8188"   # adresse de ComfyUI (voir guide ComfyUI)
 hunyuan = false             # afficher les workflows Hunyuan3D (licence non valable dans l'UE)
 
+[assistant]                 # l'Assistant de l'atelier (panneau chat, étape 4 de la préparation)
+moteur = "cli"              # le cerveau : "cli" (défaut) lance l'agent installé sur la machine, "api" = Mistral.
+commande = "vibe"           # (moteur "cli") le CLI agent à lancer hors écran ; ses serveurs MCP (Blender…) restent actifs.
+reflexion = "off"           # (moteur "cli") sa réflexion : "off" (défaut, rapide) à "high" (CAO complexe, plus lent).
+modele_cli = ""             # (moteur "cli") alias de modèle du CLI ; vide = son modèle habituel.
+api_key = ""                # (moteur "api") clé Mistral (console.mistral.ai), ou variable MISTRAL_API_KEY.
+                            # Sans moteur cli ni clé, l'Assistant répond seulement qu'il lui en manque un.
+model = "mistral-large-latest"   # (moteur "api")
+
 [acces]                     # écrit par l'atelier : empreinte du code d'accès et secret des sessions. Ne pas modifier.
 ```
 

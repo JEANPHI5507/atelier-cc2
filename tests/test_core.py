@@ -256,7 +256,7 @@ def test_variable_layer_height_follows_the_slopes(tmp_path):
         pytest.skip("slicer non installé")
     src = tmp_path / "boule.stl"
     ball.export(src)
-    flat = printprep.prepare_and_slice(src, out_dir=tmp_path / "a")
+    flat = printprep.prepare_and_slice(src, out_dir=tmp_path / "a", advanced={"couches": "non"})
     var = printprep.prepare_and_slice(src, out_dir=tmp_path / "b", advanced={"couches": "pentes"})
     assert zipfile.ZipFile(tmp_path / "b" / "boule_canvas.3mf").read("Metadata/layer_config_ranges.xml").count(b"<range") > 2
     assert var["layers"] > flat["layers"] and any("couches de plus" in w for w in var["warnings"])
@@ -327,6 +327,60 @@ def test_pieces_placed_by_hand_stay_on_the_plate():
         colors.to_canvas(src, out, {1: 1}, shift=(110.0, -110.0))
 
 
+def test_two_models_on_one_plate_then_one_piece_resized(web):
+    """« + Pièce »: two library models side by side in a new model, colours shared; one piece then resized on the plate."""
+    import numpy as np
+    from elegoo_lab import colors, compose, threemf
+    client, lib = web
+    trimesh.creation.box((20, 20, 20)).export(lib / "bloc.stl")
+    trimesh.creation.cylinder(radius=8, height=30).export(lib / "tube.stl")
+    r = client.post("/lab/api/composer", json={"names": ["bloc.stl", "tube.stl"]}).json()
+    assert r["name"] == "bloc + tube.3mf" and r["pieces"] == 2 and len(r["colours"]) == 1    # same default colour: one spool
+    pr = threemf.read(lib / r["name"])
+    a, b = (np.vstack([p.vertices for p in o.parts]) for o in pr.objects)
+    assert [o.name for o in pr.objects] == ["bloc", "tube"]
+    assert b[:, 0].min() - a[:, 0].max() >= compose.GAP_MM - .01 and a[:, 2].min() == 0 == b[:, 2].min()
+    assert client.post("/lab/api/composer", json={"names": ["bloc.stl"]}).status_code == 422
+    out = lib / "bloc_plateau.3mf"
+    colors.to_canvas(lib / r["name"], out, {1: 1}, scales={1: 2.0})
+    a2, b2 = (np.vstack([p.vertices for p in o.parts]) for o in threemf.read(out).objects)
+    assert np.ptp(b2[:, 2]) == pytest.approx(60, abs=.01) and np.ptp(a2[:, 2]) == pytest.approx(20, abs=.01)
+    assert b2[:, 2].min() == pytest.approx(0, abs=.01)                        # resized about its foot: still on the plate
+    assert (b2[:, 0].min() + b2[:, 0].max()) / 2 - (a2[:, 0].min() + a2[:, 0].max()) / 2 == pytest.approx(
+        (b[:, 0].min() + b[:, 0].max()) / 2 - (a[:, 0].min() + a[:, 0].max()) / 2, abs=.01)   # and in the same place
+    body = {"mapping": {"1": 1}, "scales": {"1": 9}}
+    assert client.post(f"/lab/api/models/{r['name']}/prepare-print", json=body).status_code == 422
+
+
+def test_composed_plate_loses_one_piece(web):
+    """« Supprimer cette pièce »: one piece leaves the plate in a new model; the others keep place and size."""
+    import numpy as np
+    from elegoo_lab import threemf
+    client, lib = web
+    trimesh.creation.box((20, 20, 20)).export(lib / "bloc.stl")
+    trimesh.creation.cylinder(radius=8, height=30).export(lib / "tube.stl")
+    r = client.post("/lab/api/composer", json={"names": ["bloc.stl", "tube.stl"]}).json()
+    out = client.post(f"/lab/api/models/{r['name']}/retirer", json={"index": 0, "moves": {}, "scales": {}}).json()
+    assert out["pieces"] == 1 and out["piece"] == "bloc" and out["name"] == "bloc + tube sans bloc.3mf"
+    pr = threemf.read(lib / out["name"])
+    assert [o.name for o in pr.objects] == ["tube"]
+    assert (lib / r["name"]).exists()                        # the original plate stays in the library
+    before = np.vstack([p.vertices for p in threemf.read(lib / r["name"]).objects[1].parts])
+    after = np.vstack([p.vertices for p in pr.objects[0].parts])
+    assert np.allclose(before.max(0), after.max(0), atol=.01) and np.allclose(before.min(0), after.min(0), atol=.01)
+    # the viewer's placements follow the surviving pieces (indexes shift past the removed one)
+    out2 = client.post(f"/lab/api/models/{r['name']}/retirer",
+                       json={"index": 1, "moves": {"0": [15.0, 2.0, 0.0]}, "scales": {"0": 2.0}}).json()
+    assert out2["piece"] == "tube"
+    base = np.vstack([p.vertices for p in threemf.read(lib / r["name"]).objects[0].parts])   # the bloc as composed
+    kept = np.vstack([p.vertices for p in threemf.read(lib / out2["name"]).objects[0].parts])
+    assert np.ptp(kept[:, 2]) == pytest.approx(40, abs=.01) and kept[:, 2].min() == pytest.approx(0, abs=.01)
+    assert kept[:, 0].max() == pytest.approx(base[:, 0].max() + (base[:, 0].max() - base[:, 0].min()) / 2 + 15, abs=.05)
+    assert kept[:, 0].min() == pytest.approx(base[:, 0].min() - (base[:, 0].max() - base[:, 0].min()) / 2 + 15, abs=.05)
+    assert client.post(f"/lab/api/models/{out['name']}/retirer", json={"index": 0}).status_code == 422
+    assert client.post(f"/lab/api/models/{r['name']}/retirer", json={"index": 7}).status_code == 422
+
+
 def test_compact_preview_glb_is_face_for_face():
     import struct
     import numpy as np
@@ -364,6 +418,27 @@ def test_economy_mode_purge_and_tower(tmp_path):
     g_eco = (tmp_path / "e" / eco["gcode"][0]).read_text(errors="ignore")
     assert ";TYPE:Prime tower" not in g_eco and "\nT1\n" in g_eco
     assert eco["total_m"] < qual["total_m"] and sum(eco["purge_m"]) > 0
+
+
+def test_a_bled_review_reinforces_the_purge(tmp_path):
+    import numpy as np
+    from elegoo_lab import colors, library, printprep, slicer
+    if not (slicer.TOOLS / "squashfs-root" / "AppRun").exists():
+        pytest.skip("slicer non installé")
+    m = trimesh.creation.box((20, 20, 20)).subdivide().subdivide()
+    m.visual.face_colors = np.where((m.triangles_center[:, 2] > 0)[:, None], [20, 20, 20, 255], [240, 240, 240, 255])
+    src = tmp_path / "bi.ply"; m.export(src)
+    # white -> slot 1 (printed first), black -> slot 2: the single change is light -> dark, the cheap
+    # direction, so only the reinforced slice pays the worst-case purge
+    a = colors.analyze(src)
+    mapping = {c["index"]: 1 if c["hex"].upper().startswith("#F") else 2 for c in a["colours"]}
+    eco = printprep.prepare_and_slice(src, out_dir=tmp_path / "e", mode="economie", mapping=mapping)
+    library.annotate(src.name, retour={"issues": ["couleurs"]})   # what aftercare.review stores after a bad print
+    fixed = printprep.prepare_and_slice(src, out_dir=tmp_path / "f", mode="economie", mapping=mapping)
+    # the white->black change purges the worst case instead of the cheap smart guess (the start
+    # load's own purge, purge_m[0], does not move)
+    assert fixed["purge_m"][1] > 2 * eco["purge_m"][1]
+    assert any("Purge renforcée" in w for w in fixed["warnings"])
 
 
 def test_cut_oversized_into_pieces_with_dowels():
@@ -497,6 +572,41 @@ def test_spool_matching_follows_loaded_canvas():
     assert any("incompatibles" in w for w in mixed["warnings"])   # PLA + PETG
 
 
+def test_a_colour_needs_grams_before_any_slicing(web):
+    """The colour step says how many grams each colour will use (from the model's volume), so a nearly
+    empty spool is caught before slicing, not when the print is already running."""
+    from types import SimpleNamespace as NS
+    import numpy as np
+    from elegoo_lab import spools
+    # solid 160 cm³, split in two equal colours: Décoratif ≈ 30 g each, Solide ≈ 95 g each
+    model = [{"index": 1, "share": 50.0}, {"index": 2, "share": 50.0}]
+    dec = spools.needs(160.0, model, usage="decoratif")
+    fun = spools.needs(160.0, model, usage="fonctionnel")
+    assert 20 <= dec[1] <= 40 and fun[1] > 3 * dec[1] and spools.needs(None, model) == {}
+
+    client, lib = web
+    m = trimesh.creation.box((100, 40, 40)).subdivide().subdivide()
+    m.visual.face_colors = np.where((m.triangles_center[:, 2] > 0)[:, None], [250, 220, 0, 255], [20, 20, 20, 255])
+    m.export(lib / "bi.ply")
+
+    async def canvas():
+        return NS(raw={"canvas_info": {"canvas_list": [{"canvas_id": 0, "tray_list": [
+            {"tray_id": 0, "status": 1, "filament_color": "#FADC00", "filament_type": "PLA"},
+            {"tray_id": 1, "status": 1, "filament_color": "#141414", "filament_type": "PLA"}]}]}})
+
+    client.app.state.manager = NS(printer=NS(canvas_status=canvas))
+    r = client.get("/lab/api/models/bi.ply/match-spools?usage=decoratif").json()
+    assert set(r["needs"]) == {"1", "2"} and 20 <= int(r["needs"]["1"]) <= 40 and not r["warnings"]
+    strong = client.get("/lab/api/models/bi.ply/match-spools?usage=fonctionnel").json()
+    assert int(strong["needs"]["1"]) > 3 * int(r["needs"]["1"])
+
+    from elegoo_lab import stock
+    stock.calibrate_fill("decoratif", 100.0, 200.0)         # a real slice measured at twice the estimate
+    after = spools.needs(160.0, model, usage="decoratif")
+    assert dec[1] * 1.2 < after[1] <= dec[1] * 2            # the factor moved halfway, never straight to it
+    assert stock.fill_factor("decoratif") == 1.5            # (100 g in, 200 g measured: ratio 2, half step)
+
+
 def test_one_colour_model_takes_a_loaded_spool(tmp_path):
     from elegoo_lab import launch, spools
     trays = spools.loaded({"canvas_info": {"canvas_list": [{"tray_list": [
@@ -542,6 +652,37 @@ def test_advanced_settings_reach_the_gcode(tmp_path):
         printprep.prepare_and_slice(src, out_dir=tmp_path / "b", copies=50, height_mm=60)       # does not fit
 
 
+def test_off_dae_slice_and_the_temps_of_the_profile(tmp_path):
+    """Formats beyond the usual four slice too (OFF, DAE), and the result shows the profile's temperatures."""
+    from elegoo_lab import printprep, slicer
+    if not (slicer.TOOLS / "squashfs-root" / "AppRun").exists():
+        pytest.skip("slicer non installé")
+    box = trimesh.creation.box((20, 20, 20))
+    for ext in (".off", ".dae"):
+        src = tmp_path / f"boite{ext}"
+        box.export(src)
+        res = printprep.prepare_and_slice(src, out_dir=tmp_path / ext[1:])
+        assert res["gcode"]
+    res = printprep.prepare_and_slice(tmp_path / "boite.off", out_dir=tmp_path)
+    assert res["temps"]["nozzle"] and res["temps"]["bed"] > 0   # the profile's temperatures, shown in the result
+
+
+def test_zip_upload_and_broken_step_rejected(web):
+    import io
+    import zipfile
+    client, lib = web
+    stl = trimesh.creation.box((10, 10, 10)).export(file_type="stl")
+    zz = io.BytesIO()
+    with zipfile.ZipFile(zz, "w") as z:
+        z.writestr("un.stl", stl)
+        z.writestr("deux.stl", stl)
+        z.writestr(".cache.txt", b"junk")   # hidden files stay out
+    r = client.post("/lab/api/models", files={"file": ("deux_pieces.zip", zz.getvalue())}).json()
+    assert len(r["names"]) == 2 and (lib / r["names"][0]).exists()
+    bad = client.post("/lab/api/models", files={"file": ("oxe.step", b"pas un STEP")})
+    assert bad.status_code == 422 and not (lib / "oxe.step").exists()
+
+
 @pytest.fixture
 def web(tmp_path, monkeypatch, fake_printer_env):
     """The workshop API on a throw-away library (no printer connection: lifespan not started)."""
@@ -567,6 +708,214 @@ def test_web_refuses_other_sites(web):
     again = client.post("/lab/api/models", files={"file": ("a.stl", stl)})          # CLI/scripts: no Origin
     assert again.json()["name"] == "a (2).stl"                                       # no silent overwrite
     assert client.get("/lab/api/models/..%2F..%2Fconfig.toml").status_code == 404     # stays in the library
+
+
+def test_the_assistant_acts_through_the_workshop_tools(web, monkeypatch):
+    """The chatbot, API engine: Mistral is faked, its tool calls run for real (resize → a new model in the library)."""
+    from types import SimpleNamespace as NS
+    from elegoo_lab import assistant
+    client, lib = web
+    trimesh.creation.box((20, 20, 20)).export(lib / "cube.stl")
+    monkeypatch.setattr(assistant, "moteur", lambda: "api")
+    monkeypatch.setattr(assistant, "api_key", lambda: "k-test")
+    class Fake:
+        status_code = 200
+        text = ""
+        seq = [
+            # round 1: Mistral asks for the facts and resizes; round 2: Mistral answers
+            {"choices": [{"message": {"tool_calls": [
+                {"id": "c1", "function": {"name": "fiche", "arguments": "{}"}},
+                {"id": "c2", "function": {"name": "redimensionner", "arguments": json.dumps({"hauteur": 40})}}]}}]},
+            {"choices": [{"message": {"content": "Fait : « cube_h40mm.ply »."}}]}]
+        def json(self):
+            return Fake.seq.pop(0)
+    monkeypatch.setattr(assistant.httpx, "post", lambda url, **kw: Fake())
+    r = client.post("/lab/api/models/cube.stl/assistant", json={"message": "mets-le à 40 mm de haut"})
+    d = r.json()
+    assert r.status_code == 200 and d["outils"] == ["fiche", "redimensionner"]
+    assert d["file"] == "cube_h40mm.ply" and (lib / "cube_h40mm.ply").exists()
+    assert abs(mesh.info(lib / "cube_h40mm.ply")["size_mm"][2] - 40) < 0.5
+    monkeypatch.setattr(assistant, "api_key", lambda: None)
+    assert client.post("/lab/api/models/cube.stl/assistant", json={"message": "coucou"}).status_code == 422
+    assert client.post("/lab/api/models/absent.stl/assistant", json={"message": "x"}).status_code == 404
+
+
+def test_the_assistant_runs_on_the_local_cli(web, monkeypatch):
+    """The chatbot, CLI engine: a fake headless vibe run thinks and asks the workshop's tools by JSON — no API key."""
+    from elegoo_lab import assistant
+    client, lib = web
+    trimesh.creation.box((20, 20, 20)).export(lib / "cube.stl")
+    monkeypatch.setattr(assistant, "moteur", lambda: "cli")
+    monkeypatch.setattr(assistant, "cli_bin", lambda: "/tmp/bin/vibe")
+    calls: list[list[str]] = []
+
+    def cli_out(obj: dict) -> str:
+        return json.dumps([{"sessionId": "S1", "role": "assistant", "type": "message",
+                            "content": [{"type": "text", "text": json.dumps(obj, ensure_ascii=False)}]}])
+
+    class Ok:
+        returncode = 0
+        stderr = ""
+        def __init__(self, text): self.stdout = text
+    seq = [Ok(cli_out({"outils": [{"outil": "fiche"},
+                                  {"outil": "redimensionner", "arguments": {"hauteur": 40}}]})),
+           Ok(cli_out({"reponse": "Fait : « cube_h40mm.ply » et exporté."}))]
+    fake_system = ""
+    def fake_run(cmd, **kw):
+        calls.append(cmd)
+        nonlocal fake_system
+        if "--system-prompt-file" in cmd:
+            with open(cmd[cmd.index("--system-prompt-file") + 1]) as fh:
+                fake_system = fh.read()
+        return seq.pop(0)
+    monkeypatch.setattr(assistant.subprocess, "run", fake_run)
+    r = client.post("/lab/api/models/cube.stl/assistant", json={"message": "mets-le à 40 mm de haut"})
+    d = r.json()
+    assert r.status_code == 200 and d["outils"] == ["fiche", "redimensionner"]
+    assert d["file"] == "cube_h40mm.ply" and (lib / "cube_h40mm.ply").exists()
+    prompt = calls[0][calls[0].index("-p") + 1]
+    assert "cube.stl" in prompt and "PROTOCOLE" in fake_system
+    assert "--resume" not in calls[0]
+    # round 2 resumes the CLI session instead of resending the whole fiche and history
+    assert calls[1][calls[1].index("--resume") + 1] == "S1" and "--system-prompt-file" not in calls[1]
+    # headless mode: the native tools are off (the workshop does the files itself), MCP (Blender…) stays approved
+    off = {t: i for i, t in enumerate(calls[0])}
+    assert "bash" in calls[0] and calls[0][off["bash"] - 1] == "--disabled-tools"
+    assert "--auto-approve" not in calls[0] and calls[0][off["--approval-policy"] + 1] == "auto-approve"
+    # a CLI that goes away gives a clear error, not a crash
+    monkeypatch.setattr(assistant, "cli_bin", lambda: None)
+    assert client.post("/lab/api/models/cube.stl/assistant", json={"message": "x"}).status_code == 422
+
+
+def test_the_api_engine_guards(web, monkeypatch):
+    """API Mistral: a duplicate tool call is replayed without rerunning (then the answer is forced),
+    a later tool of the same round works on the file the first one created, and a silent model gets one nudge."""
+    from elegoo_lab import assistant
+    client, lib = web
+    trimesh.creation.box((20, 20, 20)).export(lib / "cube.stl")
+    monkeypatch.setattr(assistant, "moteur", lambda: "api")
+    monkeypatch.setattr(assistant, "api_key", lambda: "k-test")
+    runs = {"n": 0}
+    real_run = assistant.run_tool
+
+    def counted(tool, args, name):
+        runs["n"] += 1
+        return real_run(tool, args, name)
+
+    monkeypatch.setattr(assistant, "run_tool", counted)
+
+    def msg(**kw):
+        return {"choices": [{"message": kw}]}
+
+    # guard 1: the same tool twice in a row on the same file — one run, the replay, then a forced answer
+    seq = [msg(tool_calls=[{"id": "c1", "function": {"name": "fiche", "arguments": "{}"}}], content=None),
+           msg(tool_calls=[{"id": "c2", "function": {"name": "fiche", "arguments": "{}"}}], content=None),
+           msg(content="La fiche est là : cube de 20 mm de côté, étanche, 8 cm3.")]
+
+    class Fake:
+        status_code = 200
+        text = ""
+
+        def json(self):
+            return seq.pop(0)
+
+    choices = []
+
+    def fake_post(url, **kw):
+        choices.append(kw["json"]["tool_choice"])
+        return Fake()
+
+    monkeypatch.setattr(assistant.httpx, "post", fake_post)
+    r = client.post("/lab/api/models/cube.stl/assistant", json={"message": "dis-moi tout du cube"})
+    d = r.json()
+    assert r.status_code == 200 and d["reply"].startswith("La fiche est là")
+    assert d["outils"] == ["fiche"] and runs["n"] == 1     # the duplicate fiche was replayed, not rerun
+    assert d["file"] == "cube.stl"
+    assert choices == ["auto", "auto", "none"]       # the all-duplicate round forces a plain answer
+
+    # guard 2: a later tool of the same round works on the file the first one created
+    seq[:] = [msg(tool_calls=[
+                   {"id": "c1", "function": {"name": "redimensionner", "arguments": json.dumps({"hauteur": 40})}},
+                   {"id": "c2", "function": {"name": "redimensionner", "arguments": json.dumps({"hauteur": 50})}}],
+               content=None),
+              msg(content="Voilà le cube à 40 puis 50 mm de haut.")]
+    r = client.post("/lab/api/models/cube.stl/assistant", json={"message": "mets-le à 40 puis 50 mm de haut"})
+    d = r.json()
+    assert d["outils"] == ["redimensionner", "redimensionner"] and runs["n"] == 3
+    assert d["file"] == "cube_h40mm_h50mm.ply" and (lib / "cube_h40mm_h50mm.ply").exists()
+    assert abs(mesh.info(lib / "cube_h40mm_h50mm.ply")["size_mm"][2] - 50) < 0.5
+
+    # guard 3: a silent model after its tools gets one nudge, then it speaks
+    seq[:] = [msg(tool_calls=[{"id": "c1", "function": {"name": "fiche", "arguments": "{}"}}], content=None),
+              msg(content="   "),
+              msg(content="La pièce fait 20 mm de côté : 40 puis 50 mm de haut.")]
+
+    r = client.post("/lab/api/models/cube_h40mm_h50mm.ply/assistant", json={"message": "sa taille ?"})
+    d = r.json()
+    assert r.status_code == 200
+    assert d["reply"].startswith("La pièce fait 20 mm") and choices[-1] == "none"
+
+
+def test_the_aI_picks_the_slice_settings(web, monkeypatch):
+    """slice-brain: the brain reads the part and decides the slicing settings; only valid choices survive."""
+    from elegoo_lab import assistant
+    client, lib = web
+    trimesh.creation.box((20, 20, 20)).export(lib / "cube.stl")
+    monkeypatch.setattr(assistant, "moteur", lambda: "cli")
+    monkeypatch.setattr(assistant, "cli_bin", lambda: "/tmp/bin/vibe")
+
+    text = json.dumps({"reponse": {"qualite": "0.16mm Optimal", "remplissage": 25, "supports": "aucun",
+                                   "reglages": {"couture": "arriere", "cle_hors_profil": 3, "parois": 99},
+                                   "usage": "fonctionnel", "rotate": None,
+                                   "explication": "Pièce simple : 0,16 mm et parois épaisses suffisent."}},
+                      ensure_ascii=False)
+
+    class Ok:
+        returncode = 0
+        stderr = ""
+        stdout = json.dumps([{"role": "assistant", "type": "message", "content": [{"type": "text", "text": text}]}])
+
+    captured = {}
+    def fake_run(cmd, **kw):
+        captured["prompt"] = cmd[cmd.index("-p") + 1]
+        captured["system"] = open(cmd[cmd.index("--system-prompt-file") + 1]).read()
+        return Ok()
+    monkeypatch.setattr(assistant.subprocess, "run", fake_run)
+    r = client.post("/lab/api/models/cube.stl/slice-brain", json={"quality": "0.20mm Standard", "infill": 15})
+    assert r.status_code == 200
+    d = r.json()
+    assert d["qualite"] == "0.16mm Optimal" and d["remplissage"] == 25 and d["supports"] == "aucun"
+    assert d["reglages"] == {"couture": "arriere"}            # unknown key and out-of-range number dropped
+    assert d["usage"] == "fonctionnel" and "explication" in d
+    assert '"taille_mm"' in captured["prompt"]                # the brain sees the part's sheet
+    assert "TRANCHEUR" in captured["system"] and "--resume" not in captured["prompt"]
+
+    # no CLI configured: a clear error, not a crash
+    monkeypatch.setattr(assistant, "cli_bin", lambda: None)
+    assert client.post("/lab/api/models/cube.stl/slice-brain", json={"quality": "0.20mm Standard"}).status_code == 422
+
+
+def test_the_assistant_journals_live_events(web, monkeypatch):
+    """The streaming route: the brain's activity goes out as server-sent events, and the ordinary result lands in the last one."""
+    from elegoo_lab import assistant
+    client, lib = web
+    trimesh.creation.box((20, 20, 20)).export(lib / "b.stl")
+    monkeypatch.setattr(assistant, "moteur", lambda: "cli")
+    monkeypatch.setattr(assistant, "cli_bin", lambda: "/tmp/bin/vibe")
+
+    def fake_chat(name, message, history=None, conversation="", emit=None):
+        assert emit is not None                              # live mode: events go out through emit
+        emit({"type": "outil", "outil": "fiche"})
+        emit({"type": "cli", "cible": "mcp_blender.get_scene_info"})
+        return {"reply": "Voilà.", "file": name, "outils": ["fiche"]}
+
+    monkeypatch.setattr(assistant, "chat", fake_chat)
+    r = client.post("/lab/api/models/b.stl/assistant/stream", json={"message": "décris-la"})
+    assert r.status_code == 200 and "text/event-stream" in r.headers["content-type"]
+    events = [json.loads(L[6:]) for L in r.text.splitlines() if L.startswith("data: ")]
+    assert [e["type"] for e in events] == ["outil", "cli", "final"]
+    assert events[0]["outil"] == "fiche" and events[1]["cible"] == "mcp_blender.get_scene_info"
+    assert events[-1]["reply"] == "Voilà." and events[-1]["outils"] == ["fiche"]
 
 
 def test_web_preview_slice_and_jobs(web):
@@ -970,6 +1319,21 @@ async def test_start_sends_the_spool_map(printer, tmp_path, monkeypatch):
         await printer._cc2_request(1020, bad)
 
 
+def test_printer_name_stays_ascii():
+    """The printer's upload carries the file name in an HTTP header: ASCII only (a Chinese name
+    crashed the send). ASCII names keep theirs so files on the printer stay reachable."""
+    from elegoo_lab import launch
+    assert launch.printer_name("cube_0.20mm_PLA.gcode") == "cube_0.20mm_PLA.gcode"
+    cine = launch.printer_name("洋葱头宝宝_canvas_0.20mm_PLA.gcode")
+    assert cine.isascii() and cine.endswith(".gcode") and len(cine) < 40
+    assert launch.printer_name(cine) == cine                                # deterministic: upload and start agree
+    assert launch.printer_name("洋葱头宝宝.3mf.json") != launch.printer_name("洋葱头宝宝.gcode")
+    # the whole round trip: upload under the translated name, then start names the same file
+    payload = launch.params(launch.printer_name("洋葱头宝宝.gcode"), {}, [])
+    assert payload["filename"] == launch.printer_name("洋葱头宝宝.gcode")
+    assert payload["filename"].isascii()
+
+
 def test_usage_puts_plastic_where_it_matters(tmp_path):
     from elegoo_lab import printprep, slicer, stock
     assert printprep.usage_overrides("decoratif", None)["sparse_infill_pattern"] == "lightning"
@@ -1204,6 +1568,62 @@ def test_hand_retouch_repaints_faces_beside_the_model(tmp_path, monkeypatch):
     colors.save_retouch(tmp_path / new, {green: [0]})
     library.delete([new])
     assert not colors.retouch_file(tmp_path / new).exists()
+
+
+def test_hand_retouch_repaints_a_painted_3mf_and_a_plain_stl(tmp_path, monkeypatch):
+    import numpy as np
+
+    from elegoo_lab import colors, threemf
+    monkeypatch.setattr(config, "MODELS_DIR", tmp_path)
+    # a CANVAS-like 3MF: every other face red (state 1) or green (state 2), like the onion project
+    box = trimesh.creation.box((20, 20, 20)).subdivide()
+    box.apply_translation((50, 50, 10))
+    faces = len(box.faces)
+    p = threemf.Part("oignon", np.asarray(box.vertices, float), np.asarray(box.faces), 1,
+                     [colors.encode_state(1 + i % 2) for i in range(faces)])
+    src = tmp_path / "oignon.3mf"
+    threemf.write(threemf.Project([threemf.Object("oignon", [p])], ["#FF0000", "#00AA00"]),
+                  src, filaments=2, colours=["#FF0000", "#00AA00"])
+    a = colors.analyze(src)
+    assert sorted(c["hex"] for c in a["colours"]) == ["#00AA00", "#FF0000"]
+    before = np.asarray(colors.preview(src).visual.face_colors[1][:3])
+    assert (before == [0, 170, 0]).all()                       # face 1 starts green
+    colors.save_retouch(src, {"#FF0000": [1]})                 # it turns red by hand
+    pv = colors.preview(src)                                   # the preview follows the retouch
+    assert (pv.visual.face_colors[1][:3] == [255, 0, 0]).all()
+    out = tmp_path / "oignon_canvas.3mf"                       # the retouch goes along to the CANVAS
+    colors.to_canvas(src, out, {c["index"]: c["slot"] for c in a["colours"]})
+    pr2 = threemf.read(out)
+    assert colors.paint_states(pr2.objects[0].parts[0].paint[1]) == {1}
+    colors.save_retouch(src, {}, clear=True)
+    pr3 = threemf.read(colors.to_canvas(src, out, {c["index"]: c["slot"] for c in a["colours"]}) and out)
+    assert colors.paint_states(pr3.objects[0].parts[0].paint[1]) == {2}
+    # a colourless STL gains colour families of its own (grey + the painted ones)
+    stl = tmp_path / "plaine.stl"
+    trimesh.creation.box((20, 20, 20)).subdivide().export(stl)
+    colors.save_retouch(stl, {"#0000FF": list(range(5))})
+    a = colors.analyze(stl)
+    assert {c["hex"] for c in a["colours"]} == {"#C0C0C0", "#0000FF"}
+
+
+def test_hand_retouch_keeps_a_colour_the_filaments_do_not_have(tmp_path, monkeypatch):
+    """White painted by hand on an all-yellow 3MF stays white instead of riding the only (yellow)
+    filament and vanishing (洋葱头宝宝): the project turns into face colours."""
+    import numpy as np
+
+    from elegoo_lab import colors, threemf
+    monkeypatch.setattr(config, "MODELS_DIR", tmp_path)
+    box = trimesh.creation.box((20, 20, 20)).subdivide()
+    p = threemf.Part("jaune", np.asarray(box.vertices, float), np.asarray(box.faces), 1)
+    src = tmp_path / "jaune.3mf"
+    threemf.write(threemf.Project([threemf.Object("jaune", [p])], ["#FCE300"]), src,
+                  filaments=1, colours=["#FCE300"])
+    colors.save_retouch(src, {"#E9E9E7": list(range(10, 30))})
+    a = colors.analyze(src)
+    assert "#E9E9E7" in {c["hex"] for c in a["colours"]}
+    pv = np.asarray(colors.preview(src).visual.face_colors)
+    assert (pv[10][:3] == [233, 233, 231]).all()       # the painted faces stay white
+    assert (pv[0][:3] == [252, 227, 0]).all()          # the rest keeps its yellow
 
 
 def test_rebuild_drops_a_flat_sheet_and_closes_a_broken_mesh(tmp_path, monkeypatch):
@@ -1589,9 +2009,112 @@ def test_add_pauses(tmp_path):
     g = tmp_path / "p.gcode"
     g.write_text("G28\n" + "".join(f";LAYER_CHANGE\n;Z:{z}\n;HEIGHT:0.2\nG1 X1 E1\n" for z in (0.2, 0.4, 0.6, 0.8)))
     placed = add_pauses(g, [0.5, 0.55, 0.1, 9])
-    assert placed == [{"mm": 0.5, "z": 0.4, "layer": 3}]
+    assert placed == [{"mm": 0.5, "z": 0.4, "layer": 3, "run": 1}]
     lines = g.read_text().splitlines()
     assert lines.count("PAUSE") == 1 and lines[lines.index("PAUSE") + 2] == ";Z:0.6"
+
+
+def test_add_pauses_each_piece_of_a_piece_by_piece_print(tmp_path):
+    """Pieces printed one at a time restart from the bed: every one pauses at its own height."""
+    from elegoo_lab.printprep import add_pauses
+    g = tmp_path / "p.gcode"
+    g.write_text("G28\n" + "".join(f";LAYER_CHANGE\n;Z:{z}\n;HEIGHT:0.2\nG1 X1 E1\n"
+                                   for z in (0.2, 0.4, 0.6) + (0.2, 0.4, 0.6, 0.8)))
+    placed = add_pauses(g, [0.5])
+    assert [p["run"] for p in placed] == [1, 2] and [p["layer"] for p in placed] == [3, 3]
+    assert g.read_text().count("PAUSE") == 2
+
+
+def _piece_plate(tmp_path, name, gap_mm=10.0, extruders=(1, 2), heights=(20, 20)):
+    """A plate 3MF of two cubes with the given gap, colours and heights (piece by piece in tests)."""
+    import numpy as np
+    from elegoo_lab import colorize, colors, threemf
+    objs, x = [], 0.0
+    for k, (e, h) in enumerate(zip(extruders, heights)):
+        m = trimesh.creation.box((20, 20, h))
+        src = tmp_path / f"cube{k}_{name}.stl"
+        m.export(src)
+        one = tmp_path / f"cube{k}_{name}.3mf"
+        colorize.build_3mf([(src, e)], one)
+        o = threemf.read(one).objects[0]
+        move = np.array([x - min(p.vertices[:, 0].min() for p in o.parts), 0, 0])
+        for p in o.parts:
+            p.vertices = p.vertices + move
+        x = max(p.vertices[:, 0].max() for p in o.parts) + gap_mm
+        objs.append(threemf.Object(f"cube{k}", o.parts))
+    out = tmp_path / f"plateau_{name}.3mf"
+    cols = ["#1E88E5", "#FDD835"][: len(extruders)]
+    threemf.write(threemf.Project(objs, cols), out, filaments=len(cols), colours=cols, flush=colors.flush_matrix(cols))
+    return out, cols
+
+
+def test_piece_by_piece_groups_colours_and_checks_the_head_path(tmp_path):
+    """«Ordre d'impression : pièce par pièce» sorts the pieces by colour, keeps the wipes' place, and
+    asks for the CC2's own clearances: enough space between pieces, low enough pieces."""
+    from elegoo_lab import colors, settings, slicer, threemf
+    radius, height = slicer.clearances()
+    out, _ = _piece_plate(tmp_path, "espaces", gap_mm=radius, extruders=(2, 1))  # first piece wears slot 2
+    conv = colors.to_canvas(out, tmp_path / "suite.3mf", {1: 1, 2: 2}, ordre="suite")
+    assert conv["ordre"] == "suite"
+    assert [o.name for o in threemf.read(tmp_path / "suite.3mf").objects] == ["cube1", "cube0"]   # slot 1 first
+    proche, _ = _piece_plate(tmp_path, "cote", gap_mm=10.0, extruders=(2, 1))
+    with pytest.raises(ValueError, match="l'une de l'autre"):              # 10 mm apart: the head would hit one
+        colors.to_canvas(proche, tmp_path / "trop_proche.3mf", {1: 1, 2: 2}, ordre="suite")
+    out_meme, _ = _piece_plate(tmp_path, "jumeaux", gap_mm=radius, extruders=(1, 1))  # same colours: layer by layer shares
+    assert colors.to_canvas(out_meme, tmp_path / "meme.3mf", {1: 1}, ordre="suite")["ordre"] == "meme"
+    out_haut, _ = _piece_plate(tmp_path, "haut", gap_mm=radius, extruders=(1, 2), heights=(height + 10, 20))
+    with pytest.raises(ValueError, match="de haut"):                       # taller than the head can fly over
+        colors.to_canvas(out_haut, tmp_path / "trop_haut.3mf", {1: 1, 2: 2}, ordre="suite")
+    names = [c["name"] for c in settings.spec()["choices"]]
+    assert "ordre" in names                                                   # the choice reaches the web UI
+
+
+def test_small_pieces_plate_leaves_room_for_the_prime_tower(tmp_path):
+    """write_plate said nothing about the prime tower, so OrcaSlicer put one itself: on a plate filling
+    the bed width it landed in the CC2's unprintable corner and the whole slice failed with -102 (seen
+    on a real cut model). The plate now keeps the tower's place and writes it into the file."""
+    import numpy as np
+    import zipfile
+    from elegoo_lab import colors, printprep, slicer, threemf
+    cols = ["#008755", "#D22630"]
+    items = [(f"petite{k}", np.asarray(trimesh.creation.box((60, 20, 8)).vertices) + [0, 0, 4],
+              np.asarray(trimesh.creation.box((60, 20, 8)).faces).astype(int),
+              np.full(len(trimesh.creation.box((60, 20, 8)).faces), e))
+             for k, e in enumerate((1, 2, 1, 2, 1, 2))]
+    out = tmp_path / "petites.3mf"
+    colors.write_plate(items, cols, out)
+    v = np.vstack([q.vertices for o in threemf.read(out).objects for q in o.parts])
+    assert v[:, 0].max() <= 201.01          # the tower stands at the right, where the CC2 prints
+    with zipfile.ZipFile(out) as z:
+        assert b"wipe_tower_x" in b"".join(z.read(n) for n in z.namelist() if n.startswith("Metadata"))
+    piece = tmp_path / "morceau.3mf"        # one cut piece says its tower's place too
+    m = trimesh.creation.box((30, 30, 20))
+    colors.write_piece(np.asarray(m.vertices) + [0, 0, 10], np.asarray(m.faces).astype(int),
+                       np.ones(len(m.faces), int), cols, piece, name="morceau")
+    with zipfile.ZipFile(piece) as z:
+        assert b"wipe_tower_x" in b"".join(z.read(n) for n in z.namelist() if n.startswith("Metadata"))
+    if not (slicer.TOOLS / "squashfs-root" / "AppRun").exists():
+        pytest.skip("slicer non installé (make slicer)")
+    r = slicer.slice_model(out, tmp_path / "g", quality="0.20mm Standard", filament=["PLA", "PLA"],
+                           overrides=printprep.TOWER["overrides"], timeout=240)
+    assert r.gcode[0].exists()             # this plate died with -102 before the tower had its place
+
+
+def test_piece_by_piece_slices_the_plate_with_far_fewer_changes(tmp_path):
+    """Two one-colour pieces of different colours on (well spaced) one plate: one change per colour
+    instead of one at nearly every layer."""
+    from elegoo_lab import printprep, slicer
+    if not (slicer.TOOLS / "squashfs-root" / "AppRun").exists():
+        pytest.skip("slicer non installé (make slicer)")
+    out, _ = _piece_plate(tmp_path, "espaces", gap_mm=slicer.clearances()[0], extruders=(2, 1))
+    couches = printprep.prepare_and_slice(out, filaments=["PLA", "PLA Matte"], out_dir=tmp_path / "c", screen_thumbnail=False)
+    suite = printprep.prepare_and_slice(out, filaments=["PLA", "PLA Matte"], advanced={"ordre": "suite"},
+                                        out_dir=tmp_path / "s", screen_thumbnail=False)
+    assert couches["ordre"] == "couche" and suite["ordre"] == "suite"
+    assert suite["colour_changes"] * 4 < couches["colour_changes"]
+    g = (tmp_path / "s" / Path(suite["gcode"][0]).name).read_text(errors="ignore")
+    z = [float(l[3:]) for l in g.splitlines() if l.startswith(";Z:")]
+    assert any(z[i] < z[i - 1] - 1e-6 for i in range(1, len(z)))            # one piece finishes, the next starts over
 
 
 def test_mirror_and_axis_scale(tmp_path):
@@ -1734,10 +2257,56 @@ def test_print_review(web):
     d = client.get(f"/lab/api/bilan/{rec.id}").json()
     tips = " ".join(d["tips"])
     assert "65 °C" in tips and "Supports" in tips and "Plusieurs couleurs" in tips and "Silk" in tips
-    r = client.post(f"/lab/api/bilan/{rec.id}", json={"issues": ["fils", "decolle", "inconnu"], "note": "ok"}).json()
+    assert [q["key"] for q in d["questions"]] == ["global", "surface", "details", "supports", "couleurs", "solidite"]
+    r = client.post(f"/lab/api/bilan/{rec.id}", json={"issues": ["fils", "decolle", "inconnu"], "note": "ok",
+                                                      "notes": {"global": 9, "surface": 3, "supports": -2, "autre": 4}}).json()
+    assert r["notes"] == {"global": 5, "surface": 3, "supports": 0}   # clamped to 0..5, unknown questions dropped
     assert r["issues"] == ["fils", "decolle"] and r["fix"]["advanced"]["temp_buse"] == 220 and r["fix"]["advanced"]["temp_plateau"] == 70
     assert client.get("/lab/api/models/orque.stl/info").status_code in (200, 422)
     assert library.load_index()["orque.stl"]["retour"]["issues"] == ["fils", "decolle"]
+
+
+def test_supports_plan_says_where_the_supports_are(tmp_path):
+    """From the printed G-code: columns of supports by height, their place around the part, and a top view."""
+    from elegoo_lab import aftercare
+    lines = ["; support_type = tree(auto)", "; enable_support = 1"]
+    for k in range(1, 31):                                  # 30 layers of 0.2 mm
+        z = k * 0.2
+        lines += [";LAYER_CHANGE", f";Z:{z:.1f}", ";TYPE:Outer wall"]
+        lines += [f"G1 X{100 + i} Y{100 + (i % 3)} E.05" for i in range(40)]            # the part, x 100..140
+        lines += [";TYPE:Support"] + [f"G1 X{90 + i * 0.1} Y{101} E.05" for i in range(10)]   # supports left of it
+        if k % 10 == 0:
+            lines += [";TYPE:Support interface"] + [f"G1 X{90 + i * 0.1} Y{102} E.05" for i in range(5)]
+    g = tmp_path / "x.gcode"
+    g.write_text("\n".join(lines) + "\n")
+    plan = aftercare.supports_plan(g)
+    assert plan and "tronc" in plan["tips"][0]
+    zone = plan["tips"][1]
+    assert zone.startswith("Zone 1 · ") and "à gauche" in zone and "du plateau jusqu'à" in zone and "touche la pièce" in zone
+    assert plan["map"]["part"] and plan["map"]["supports"]
+    assert aftercare.supports_plan(tmp_path / "absent.gcode") is None
+
+
+def test_paths_overview_is_lighter_and_cached(tmp_path):
+    """The review's whole-print view keeps every few layers (and the top one); a second read comes from memory."""
+    import base64
+
+    import numpy as np
+
+    from elegoo_lab import gcode_preview
+    lines = ["M83"]
+    for k in range(1, 11):
+        lines += [";LAYER_CHANGE", f";Z:{k * 0.2:.1f}", ";TYPE:Outer wall", "G0 X10 Y10"] + [f"G1 X{10 + i} Y10 E.05" for i in range(1, 11)]
+    g = tmp_path / "x.gcode"
+    g.write_text("\n".join(lines) + "\n")
+    full = gcode_preview.cached(g)
+    assert full["count"] == 100 and "pas" not in full
+    lite = gcode_preview.cached(g, 40)
+    assert lite["pas"] == 3 and lite["layers"] == full["layers"]
+    lay = np.frombuffer(base64.b64decode(lite["layer"]), "<u2")
+    assert sorted(set(lay.tolist())) == [0, 3, 6, 9]          # every third layer, and the last one
+    assert gcode_preview.cached(g, 40) is lite                  # from memory
+    assert gcode_preview.cached(g, 1000)["count"] == 100       # small enough: whole
 
 
 def test_ntfy_end_of_print_offers_the_review(monkeypatch):

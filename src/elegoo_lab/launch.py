@@ -13,7 +13,9 @@ offset: those stay on its screen.
 
 from __future__ import annotations
 
+import hashlib
 import re
+import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -122,6 +124,21 @@ def plan(path: Path | None, canvas: dict[str, Any] | None) -> dict[str, Any]:
             "trays": [{"tray_id": int(t["tray_id"]), "pos": t["pos"], "colour": t["color"], "name": t.get("filament_name") or t.get("type"),
                        "type": t.get("type")} for t in trays],
             "slot_map": suggestion}
+
+
+def printer_name(name: str) -> str:
+    """The name the printer stores a file under. Its upload carries that name in an HTTP header, which
+    letters like 洋葱头宝宝 cannot ride (pycentauri crashes on non-ASCII): such a name becomes a short
+    ASCII slug. Deterministic, so the upload and the start command (method 1020) name the same file;
+    ASCII names pass unchanged, so files already on the printer keep theirs."""
+    name = Path(name).name
+    if name.isascii():
+        return name
+    suffix = Path(name).suffix
+    stem = name[: -len(suffix)] if suffix else name
+    slug = re.sub(r"[^A-Za-z0-9._-]+", "_", unicodedata.normalize("NFKD", stem)
+                  .encode("ascii", "ignore").decode()).strip("._")
+    return f"{slug or 'piece'}_{hashlib.sha1(name.encode()).hexdigest()[:6]}{suffix}"
 
 
 def params(filename: str, opts: dict[str, Any], slot_map: list[dict[str, int]] | None, canvas_id: int = 0,

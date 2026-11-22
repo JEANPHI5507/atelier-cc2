@@ -16,3 +16,13 @@ port = 8787
 
 [tranchage]
 # niveler = false  # retire le nivellement du G-code : déconseillé, la CC2 nivelle alors tout le plateau elle-même
+
+[assistant]
+# moteur = "cli"    # le cerveau de l'Assistant : "cli" (défaut) lance l'agent installé sur la machine
+                    # (commande ci-dessous, déjà connecté à son compte — aucune clé API) ; "api" = Mistral.
+# commande = "vibe" # le CLI agent à lancer hors écran (`vibe -p …`) ; ses serveurs MCP (Blender…) restent actifs.
+# reflexion = "off" # (moteur "cli") niveau de réflexion du CLI : "off" (défaut, rapide), "low", "medium", "high"
+                    # (mieux pour la CAO complexe, deux fois plus lent).
+# modele_cli = ""   # (moteur "cli") alias de modèle du CLI ; vide = son modèle habituel.
+# api_key = ""      # (moteur "api" seulement) clé Mistral (console.mistral.ai), ou variable MISTRAL_API_KEY.
+# model = "mistral-large-latest"   # (moteur "api" seulement)

@@ -7,6 +7,7 @@ layer index, kind and tool, so a 60 mm multicolour figurine stays a few MB befor
 from __future__ import annotations
 
 import base64
+import math
 import re
 from pathlib import Path
 from typing import Any
@@ -15,6 +16,7 @@ import numpy as np
 
 KINDS = {"model": 0, "support": 1, "tower": 2}
 SCALE = 50  # int16 units per mm (±655 mm range)
+REVIEW = 1_200_000  # segments in the review's whole-print view (gallery.js asks for the same)
 _NUM = re.compile(r"([XYZEF])(-?\d*\.?\d+)")
 
 
@@ -86,3 +88,37 @@ def extract(path: Path) -> dict[str, Any]:
         "tool": base64.b64encode(np.asarray(tl, "u1").tobytes()).decode(),
         "stats": {k: int((np.asarray(knd) == v).sum()) for k, v in KINDS.items()},
     }
+
+
+_cache: dict[tuple[str, int, int, int], dict[str, Any]] = {}
+
+
+def cached(path: Path, most: int = 0) -> dict[str, Any]:
+    """``extract`` kept for the file's current version (a big figure takes seconds to read); ``most`` > 0: ``lite``."""
+    st = path.stat()
+    key = (str(path), st.st_mtime_ns, st.st_size, most)
+    if key not in _cache:
+        full = (str(path), st.st_mtime_ns, st.st_size, 0)
+        d = _cache.get(full) or extract(path)
+        _cache[full] = d
+        if most:
+            _cache[key] = lite(d, most)
+        while len(_cache) > 4:      # a few big prints at most: each is tens of MB
+            _cache.pop(next(iter(_cache)))
+    return _cache[key]
+
+
+def lite(d: dict[str, Any], most: int) -> dict[str, Any]:
+    """The same print with one layer out of every few kept, so a whole big print shows quickly (the review's 3D view).
+    The layer list stays whole: indices still match the printed layers."""
+    if d["count"] <= most:
+        return d
+    step = math.ceil(d["count"] / most)
+    seg = np.frombuffer(base64.b64decode(d["segments"]), "<i2").reshape(-1, 4)
+    lay = np.frombuffer(base64.b64decode(d["layer"]), "<u2")
+    knd = np.frombuffer(base64.b64decode(d["kind"]), "u1")
+    tl = np.frombuffer(base64.b64decode(d["tool"]), "u1")
+    keep = (lay % step == 0) | (lay == lay.max())     # the top layer always: it is what one sees
+    return {**d, "count": int(keep.sum()), "pas": step,
+            "segments": base64.b64encode(seg[keep].tobytes()).decode(), "layer": base64.b64encode(lay[keep].tobytes()).decode(),
+            "kind": base64.b64encode(knd[keep].tobytes()).decode(), "tool": base64.b64encode(tl[keep].tobytes()).decode()}

@@ -85,6 +85,15 @@ def qualities(nozzle: str = DEFAULT_NOZZLE) -> list[str]:
     return sorted(n[: -len(suffix)] for n in _index() if n.endswith(suffix) and n[0].isdigit())
 
 
+def clearances(nozzle: str = DEFAULT_NOZZLE) -> tuple[float, float]:
+    """The CC2's own clearances for printing one piece at a time (Orca ``by object``): how far
+    another finished piece must stand (extruder_clearance_radius) and how tall a piece may be
+    (extruder_clearance_height_to_rod, the X carriage passing over it). OrcaSlicer's command
+    line never checks them, so we do."""
+    m = _flat(f"Elegoo Centauri Carbon 2 {nozzle} nozzle")
+    return (float(m.get("extruder_clearance_radius", 50)), float(m.get("extruder_clearance_height_to_rod", 35)))
+
+
 def filaments() -> list[str]:
     """Elegoo's CC2 filaments, then the user's own profiles (catalog) built on one of them."""
     elegoo = sorted(n[len("Elegoo "): -len(" @ECC2")] for n in _index() if n.startswith("Elegoo ") and n.endswith(" @ECC2"))
@@ -226,12 +235,13 @@ class Result:
     per_filament_m: list[float] = field(default_factory=list)
     colour_changes: int = 0
     purge_m: list[float] = field(default_factory=list)   # firmware purge per filament (not in Orca's totals)
+    temps: dict[str, Any] = field(default_factory=dict)  # nozzle per tool and bed, from the sliced profile
     warnings: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, Any]:
         return {"gcode": [p.name for p in self.gcode], "layers": self.layers, "time": self.time,
                 "filament_m": self.filament_m, "per_filament_m": self.per_filament_m,
-                "colour_changes": self.colour_changes, "purge_m": self.purge_m,
+                "colour_changes": self.colour_changes, "purge_m": self.purge_m, "temps": self.temps,
                 "total_m": round((self.filament_m or 0) + sum(self.purge_m), 2), "warnings": self.warnings}
 
 
@@ -240,7 +250,8 @@ def _header(gcode: Path) -> dict[str, str]:
     changes = 0
     purge: dict[int, float] = {}
     first_load = True
-    want = re.compile(r"; (total layer number|estimated printing time \(normal mode\)|total filament used \[mm\]|filament used \[mm\])\s*[:=]\s*(.+)")
+    want = re.compile(r"; (total layer number|estimated printing time \(normal mode\)|total filament used \[mm\]|filament used \[mm\]"
+                      r"|nozzle_temperature|first_layer_bed_temperature)\s*[:=]\s*(.+)")
     out: dict[str, str] = {}
     with gcode.open("rb") as f:
         for raw in f:
@@ -358,6 +369,10 @@ def slice_model(
         res.colour_changes = int(h.get("colour changes", 0))
         purge = {int(k): v for k, v in json.loads(h.get("purge", "{}")).items()}
         n_fil = len(names)
+        if h.get("nozzle_temperature") or h.get("first_layer_bed_temperature"):
+            bed = re.match(r"[\d.]+", h.get("first_layer_bed_temperature") or "")
+            res.temps = {"nozzle": [int(float(x)) for x in re.findall(r"[\d.]+", h.get("nozzle_temperature", ""))][:n_fil],
+                         "bed": int(float(bed.group())) if bed else None}
         res.purge_m = [round(purge.get(i, 0.0) / 1000, 2) for i in range(n_fil)] if purge else []
         if any(fw_purge):      # the firmware's own count: higher than OrcaSlicer's whenever changes ask for under 23 mm
             res.purge_m = [round(x, 2) for x in fw_purge]

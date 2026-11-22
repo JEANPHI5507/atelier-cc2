@@ -19,6 +19,7 @@ state in 2 bits, or ``0b11`` + 4 bits (state - 3) for states >= 3. State 0 =
 from __future__ import annotations
 
 import copy
+import itertools
 import json
 import os
 import re
@@ -32,7 +33,7 @@ import trimesh
 from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import connected_components
 
-from . import colorize, config, mesh, threemf
+from . import colorize, config, mesh, slicer, threemf
 
 MAX_SLOTS = 4
 MIN_SHARE = 0.01   # colours covering less than 1 % of the surface join their nearest colour
@@ -260,23 +261,86 @@ def _apply_marks(path: Path, parts: list[threemf.Part]) -> None:
                 setattr(p, field, codes)
 
 
-def _apply_retouch(path: Path, parts: list[threemf.Part]) -> None:
+FILAMENT_DE = 25.0  # beyond this ΔE a project filament is visibly another colour (spools.FAR_DE)
+
+
+def _beyond_filaments(paint: dict[str, list[int]], pr: threemf.Project) -> bool:
+    """True when a hand-painted colour would have to ride a project filament of another colour
+    (white on an all-yellow 3MF): it must stay itself instead of turning that wrong colour."""
+    cols = np.array([_rgb(h) for h in (pr.colours or []) if HEX.match(str(h))]) if pr.colours else None
+    if cols is None or not len(cols):
+        return True
+    lab = _to_lab(cols)
+    return any(float(np.linalg.norm(lab - _to_lab(_rgb(h).reshape(1, -1)))) > FILAMENT_DE for h in paint)
+
+
+def _seed_face_colours(pr: threemf.Project) -> None:
+    """Give every part face colours of its look today (one filament colour per paint state), so a hand
+    paint can use exact colours the project's own filaments cannot render."""
+    pal = [None] + [_rgb(h) if HEX.match(str(h)) else None for h in (pr.colours or [])]
+    for p in _parts(pr):
+        if p.face_rgb is not None:
+            continue
+        base = pal[p.extruder] if p.extruder < len(pal) else None
+        rgb = np.tile(base if base is not None else np.full(3, 192.0), (len(p.faces), 1))
+        for i, code in enumerate(p.paint or []):
+            st = min(paint_states(code) - {0}, default=0) if code else 0   # first override, else the base
+            c = pal[st] if st and st < len(pal) else base
+            if c is not None:
+                rgb[i] = c
+        p.face_rgb = rgb
+
+
+def _apply_retouch(path: Path, pr: threemf.Project) -> None:
+    """Hand painting into the loaded parts, face numbers as in the viewer: face colours where the file
+    carries them, else paint states pointing at the project's own filament of that colour (3MF), else
+    colour families beside the model's plain grey (a plain STL gains colours it never had)."""
     paint = load_retouch(path)
+    parts = _parts(pr)
     if not paint or not parts:
         return
     starts = np.cumsum([0] + [len(p.faces) for p in parts])
+    # a painted colour no project filament comes close to (white on an all-yellow 3MF) must not ride a
+    # filament of another colour: the project becomes a face-coloured mesh, the exact colour kept
+    if not _rgb_mode(pr) and _beyond_filaments(paint, pr):
+        _seed_face_colours(pr)
+    if _rgb_mode(pr) or not (pr.colours or any(p.paint for p in parts)):
+        grey = np.full(3, 192.0)
+        for h, idx in paint.items():
+            rgb = _rgb(h)
+            ids = np.asarray(idx, dtype=int)
+            ids = ids[(ids >= 0) & (ids < starts[-1])]
+            which = np.searchsorted(starts, ids, side="right") - 1
+            for k, p in enumerate(parts):
+                local = ids[which == k] - starts[k]
+                if not len(local):
+                    continue
+                if p.face_rgb is None:
+                    p.face_rgb = np.repeat(grey, len(p.faces), axis=0).reshape(len(p.faces), 3)
+                p.face_rgb[local] = rgb
+                if p.locked is None:
+                    p.locked = np.zeros(len(p.faces), bool)
+                p.locked[local] = True
+        return
+    # a 3MF colours by filament: the face takes the project's filament matching that colour
+    codes: dict[str, str] = {}
+    pal = [(i + 1, _rgb(h)) for i, h in enumerate(pr.colours or [])]
     for h, idx in paint.items():
-        rgb = _rgb(h)
+        if not pal:
+            continue
+        rgb, state = _rgb(h), min(pal, key=lambda c: float(np.linalg.norm(c[1] - _rgb(h))))[0]
+        code = codes.setdefault(h, encode_state(state))
         ids = np.asarray(idx, dtype=int)
         ids = ids[(ids >= 0) & (ids < starts[-1])]
         which = np.searchsorted(starts, ids, side="right") - 1
         for k, p in enumerate(parts):
             local = ids[which == k] - starts[k]
-            if len(local) and p.face_rgb is not None:
-                p.face_rgb[local] = rgb
-                if p.locked is None:
-                    p.locked = np.zeros(len(p.faces), bool)
-                p.locked[local] = True
+            if not len(local):
+                continue
+            if p.paint is None:
+                p.paint = [None] * len(p.faces)
+            for i in local.tolist():
+                p.paint[i] = code
 
 
 def _mesh_project(path: Path) -> threemf.Project:
@@ -310,7 +374,6 @@ def _mesh_project(path: Path) -> threemf.Project:
         parts.append(threemf.Part(path.stem, verts, np.asarray(g.faces), 1, None, fc))
     if not parts:
         raise ValueError(f"{path.name}: aucun maillage")
-    _apply_retouch(path, parts)
     if path.suffix.lower() in {".glb", ".gltf"}:  # Y-up -> Z-up
         rot = trimesh.transformations.rotation_matrix(np.pi / 2, [1, 0, 0])[:3, :3]
         for p in parts:
@@ -320,8 +383,11 @@ def _mesh_project(path: Path) -> threemf.Project:
 
 def _load(path: Path) -> threemf.Project:
     if path.suffix.lower() == ".3mf":
-        return threemf.read(path)
-    return threemf.cached(path, _load_mesh)
+        pr = threemf.read(path)
+    else:
+        pr = threemf.cached(path, _load_mesh)
+    _apply_retouch(path, pr)
+    return pr
 
 
 def _load_mesh(path: Path) -> threemf.Project:
@@ -656,7 +722,7 @@ def grid(footprint: tuple[float, float], copies: int, bed: float = mesh.BED_MM) 
     per_row = max(0, int((bed + COPY_GAP_MM) // (w + COPY_GAP_MM)))
     per_col = max(0, int((bed + COPY_GAP_MM) // (d + COPY_GAP_MM)))
     if per_row * per_col < copies:
-        raise ValueError(f"{copies} exemplaires de {w:.0f} × {d:.0f} mm ne tiennent pas sur le plateau "
+        raise ValueError(f"{copies} exemplaires de largeur {w:.0f} × profondeur {d:.0f} mm ne tiennent pas sur le plateau "
                          f"(maximum {per_row * per_col}) : réduis la taille ou le nombre")
     return [((i % per_row) * (w + COPY_GAP_MM), (i // per_row) * (d + COPY_GAP_MM)) for i in range(copies)]
 
@@ -665,12 +731,17 @@ def to_canvas(path: Path, out: Path, mapping: dict[int, int], *, height_mm: floa
               smart_flush: bool = True, rotate: tuple[float, ...] | None = None,
               copies: int = 1, palette: Palette | None = None, simplify: float = 0.0, layer_mm: float = 0.2,
               moves: dict[int, tuple[float, float, float]] | None = None,
-              shift: tuple[float, float] | None = None, marks_from: Path | None = None) -> dict[str, Any]:
+              shift: tuple[float, float] | None = None, marks_from: Path | None = None,
+              scales: dict[int, float] | None = None, real_colours: dict[int, str] | None = None,
+              ordre: str | None = None) -> dict[str, Any]:
     """Write a clean CANVAS 3MF where source colour ``i`` prints from slot ``mapping[i]`` (1..4),
     centred on the bed, optionally rotated, rescaled to ``height_mm`` and repeated ``copies`` times.
     ``moves``: object index -> translation in the model's own axes (pieces dragged apart in the viewer);
     ``shift``: where the middle of the result sits, from the bed centre (None = centred);
-    ``marks_from``: the model whose painted supports and seam apply (``path`` itself when None)."""
+    ``scales``: object index -> size factor, about the bottom centre of that object as it lies on the plate;
+    ``marks_from``: the model whose painted supports and seam apply (``path`` itself when None);
+    ``real_colours``: slot -> colour of the spool really loaded: the purge follows what goes through the nozzle;
+    ``ordre``: 'suite' asks for one piece at a time (see _piece_par_piece)."""
     if any(not 1 <= s <= MAX_SLOTS for s in mapping.values()):
         raise ValueError("chaque couleur doit aller dans une bobine de 1 à 4")
     info = analyze(path, palette)
@@ -714,9 +785,18 @@ def to_canvas(path: Path, out: Path, mapping: dict[int, int], *, height_mm: floa
         for p in parts:
             p.vertices = p.vertices * k
         allv = allv * k
+    for k, f in (scales or {}).items():   # one piece bigger or smaller: it stays where it stood, on the plate
+        if 0 <= k < len(pr.objects) and f != 1:
+            v = np.vstack([p.vertices for p in pr.objects[k].parts])
+            a, b = v.min(0), v.max(0)
+            c = np.array([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, a[2]])
+            for p in pr.objects[k].parts:
+                p.vertices = c + (p.vertices - c) * f
+    if scales:
+        allv = np.vstack([p.vertices for p in parts])
     lo, hi = allv.min(0), allv.max(0)
     if (hi - lo)[:2].max() > mesh.BED_MM or (hi - lo)[2] > mesh.BED_MM:
-        raise ValueError(f"le modèle ({(hi - lo).round(1).tolist()} mm) dépasse le volume de {mesh.BED_MM:.0f} mm")
+        raise ValueError(f"le modèle ({mesh.size_text(hi - lo)}) dépasse le volume de {mesh.BED_MM:.0f} mm")
     simplified = 0
     if simplify > 0 and rgb:   # placed and scaled now: layers are known
         simplified = simplify_layers(parts, face_states, layer_mm, simplify)
@@ -746,9 +826,53 @@ def to_canvas(path: Path, out: Path, mapping: dict[int, int], *, height_mm: floa
             if ((v[:, 0] > x0) & (v[:, 1] < y1)).any():
                 raise ValueError("une pièce déplacée touche le coin avant droit du plateau, où la CC2 n'imprime pas : "
                                  "éloigne-la de ce coin (en rouge dans la vue 3D)")
-    tower = tower_spot(lo[:2] + offset[:2], hi[:2] + offset[:2]) if n > 1 else None
-    threemf.write(pr, out, filaments=n, colours=slot_hex, offset=offset, flush=flush_matrix(slot_hex, smart_flush), tower=tower)
-    return {"file": out.name, "filaments": n, "slot_colours": slot_hex, "simplified": simplified}
+    endroit = _piece_par_piece(pr, offset) if ordre == "suite" else None
+    tower = None if endroit else (tower_spot(lo[:2] + offset[:2], hi[:2] + offset[:2]) if n > 1 else None)
+    threemf.write(pr, out, filaments=n, colours=slot_hex, offset=offset, flush=flush_matrix([(real_colours or {}).get(i + 1, h) for i, h in enumerate(slot_hex)], smart_flush), tower=tower)
+    return {"file": out.name, "filaments": n, "slot_colours": slot_hex, "simplified": simplified, "ordre": endroit}
+
+
+def _colour_key(o: threemf.Object) -> tuple[int, ...]:
+    """The spools a piece prints with: its own extruder and every colour its paint uses."""
+    s = {p.extruder for p in o.parts} | {st for p in o.parts for c in p.paint or [] if c for st in paint_states(c)}
+    return tuple(sorted(s - {0}))
+
+
+def _piece_par_piece(pr: threemf.Project, offset: np.ndarray) -> str | None:
+    """Print one piece entirely before the next ('by object'), pieces grouped by their colours: one
+    change per colour around the plate instead of one change at nearly every layer. OrcaSlicer's
+    command line accepts any layout — even one the print head would hit — so the CC2's own
+    clearances are checked here. Returns None when the pieces all wear the same colours (layer
+    by layer, they share each change) or when there is nothing to reorder.
+
+    The piece order is the 3MF's object order, and pieces sharing a colour end up side by side:
+    a spool prints every piece that wants it, then the next spool takes over."""
+    if len(pr.objects) < 2:
+        return "seule"
+    keys = [_colour_key(o) for o in pr.objects]
+    if len(set(keys)) == 1:
+        return "meme"
+    radius, height = slicer.clearances()
+    boxes = []
+    for o, k in zip(pr.objects, keys):
+        label = o.name.split(" · ")[-1]
+        v = np.vstack([p.vertices for p in o.parts]) + offset if o.parts else np.zeros((1, 3)) + offset
+        lo, hi = v.min(0), v.max(0)
+        if hi[2] - lo[2] > height + 1e-3:
+            raise ValueError(f"Pièce par pièce : « {label} » fait {hi[2] - lo[2]:.0f} mm de haut, plus que les {height:.0f} mm "
+                             f"que la tête peut survoler en allant à la pièce suivante : imprime-la à part, ou en couche par couche.")
+        boxes.append((o, k, label, lo, hi))
+    for (oa, _, na, la, ha), (ob, _, nb, lb, hb) in itertools.combinations(boxes, 2):
+        dx = max(lb[0] - ha[0], la[0] - hb[0], 0.0)
+        dy = max(lb[1] - ha[1], la[1] - hb[1], 0.0)
+        gap = (dx * dx + dy * dy) ** 0.5
+        if gap + 1e-3 < radius:
+            raise ValueError(f"Pièce par pièce : « {na} » et « {nb} » ne sont qu'à {gap:.0f} mm l'une de l'autre, et il en faut "
+                             f"{radius:.0f} : en imprimant l'une la tête passe sur l'autre, déjà finie. Écarte les pièces "
+                             f"en mode Déplacer, ou reviens en couche par couche.")
+    order = sorted(range(len(pr.objects)), key=lambda i: (keys[i], i))
+    pr.objects = [pr.objects[i] for i in order]
+    return "suite"
 
 
 TOWER_W, TOWER_D = 20.0, 12.0   # printprep.TOWER's 20 mm width; about 11 mm deep on a small model
@@ -958,17 +1082,24 @@ def write_piece(v: np.ndarray, f: np.ndarray, slots: np.ndarray, slot_hex: list[
     lo, hi = v.min(0), v.max(0)
     offset = np.array([mesh.BED_MM / 2 - (lo[0] + hi[0]) / 2, mesh.BED_MM / 2 - (lo[1] + hi[1]) / 2, -lo[2]])
     offset = avoid_exclude(lo, hi, offset)
+    # same as write_plate: the prime tower's place must be told to OrcaSlicer, or it picks its own
+    tower = tower_spot((lo[:2] + offset[:2]), (hi[:2] + offset[:2])) if n > 1 else None
     threemf.write(threemf.Project([threemf.Object(name, [part])], slot_hex), out, filaments=n,
-                  colours=slot_hex, offset=offset, flush=flush_matrix(slot_hex, smart_flush))
+                  colours=slot_hex, offset=offset, flush=flush_matrix(slot_hex, smart_flush), tower=tower)
 
 
 def write_plate(items: list[tuple[str, np.ndarray, np.ndarray, np.ndarray | None]], slot_hex: list[str], out: Path, *,
                 smart_flush: bool = True, gap: float = COPY_GAP_MM) -> None:
     """Several small parts on one plate: ``items`` = (name, vertices, faces, slot per face or None for slot 1).
-    Shelf packing from the back-left corner; ValueError if they do not fit."""
+    Shelf packing from the back-left corner; ValueError if they do not fit.
+
+    A multicolour plate prints a prime tower, and the tower's place must be in the file: with none
+    OrcaSlicer puts it where it likes, and on a plate that fills the bed width it chose the corner the
+    CC2 cannot print (246-256 x 0-20 mm), so the slice ended in error -102 after slicing it."""
     n = len(slot_hex)
     codes = {s: encode_state(s) for s in range(1, MAX_SLOTS + 1)}
-    usable_x, usable_y = mesh.BED_MM - 10, mesh.BED_MM - EXCLUDE[3] - 10
+    usable_x = (mesh.BED_MM - 15 - TOWER_W - TOWER_GAP) if n > 1 else (mesh.BED_MM - 10)   # room for the tower
+    usable_y = mesh.BED_MM - EXCLUDE[3] - 10
     order = sorted(items, key=lambda it: -float(np.ptp(it[1][:, 1])))
     objects, x, y, shelf = [], 5.0, EXCLUDE[3] + 5.0, 0.0
     for name, v, f, slots in order:
@@ -984,5 +1115,7 @@ def write_plate(items: list[tuple[str, np.ndarray, np.ndarray, np.ndarray | None
         objects.append(threemf.Object(name, [threemf.Part(name, placed, f, extruder, paint)]))
         x += w + gap
         shelf = max(shelf, d)
+    allv = np.vstack([p.vertices for o in objects for p in o.parts])
+    tower = tower_spot(allv.min(0)[:2], allv.max(0)[:2]) if n > 1 else None
     threemf.write(threemf.Project(objects, slot_hex), out, filaments=n, colours=slot_hex,
-                  offset=np.zeros(3), flush=flush_matrix(slot_hex, smart_flush))
+                  offset=np.zeros(3), flush=flush_matrix(slot_hex, smart_flush), tower=tower)

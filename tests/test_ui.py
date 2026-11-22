@@ -248,6 +248,61 @@ def test_interface_files_are_revalidated(site):
         assert r.headers["Cache-Control"] == "no-cache", path      # an update reaches the tablet at once
 
 
+def test_a_turned_part_stays_on_the_plate(page, site):
+    """A part away from its file's origin shows centred on the plate; laid down or turned, it stays there, resting on it."""
+    tour = trimesh.creation.box((10, 10, 80))
+    tour.apply_translation((60, 40, 40))                     # away from the file's origin, like most exported 3MF
+    tour.export(site["lib"] / "tour.stl")
+    page.reload()
+    page.click("#files .file[data-n='tour.stl']")
+    page.wait_for_selector("#orients [data-orient]", timeout=30000)
+    page.wait_for_timeout(1000)
+    where = """() => Promise.all([import('/lab/js/lab.js'), import('three')]).then(([m, T]) => {
+               const b = new T.Box3().setFromObject(m.current), c = b.getCenter(new T.Vector3()); return [c.x, c.y, b.min.z, b.max.z - b.min.z]; })"""
+    x0, y0, z0, h0 = page.evaluate(where)
+    assert abs(x0) < .5 and abs(y0) < .5 and abs(z0) < .1 and h0 > 70     # centred on the plate, as sliced
+    for k in range(page.locator("#orients [data-orient]").count()):   # every way to lay it, then turned on the plate
+        page.click(f"#orients [data-orient='{k}']")
+        page.click("#rot [data-rot='2']")
+        x, y, z, h = page.evaluate(where)
+        assert abs(x - x0) < .5 and abs(y - y0) < .5 and abs(z) < .1, (k, x, y, z)
+    assert page.errors == []
+
+
+def test_add_a_piece_then_resize_it_on_the_plate(page, site):
+    """« + Pièce » puts another library model beside this one; in « Déplacer » a touched piece gets its size slider."""
+    trimesh.creation.cylinder(radius=6, height=30).export(site["lib"] / "pion.stl")
+    page.reload()
+    page.click("#files .file[data-n='cube.stl']")
+    page.wait_for_selector("#vtools [data-vt='add']:not([hidden])", timeout=30000)
+    page.click("#vtools [data-vt='add']")
+    page.click("#addp-list [data-addp='pion.stl']")
+    page.wait_for_selector("#files .file.sel[data-n='cube + pion.3mf']", timeout=30000)
+    page.wait_for_selector("#vtools [data-vt='move']:not([hidden])", timeout=30000)
+    page.wait_for_timeout(800)
+    page.click("#vtools [data-vt='move']")
+    page.wait_for_timeout(800)
+    # touch the cylinder: aim at its centre on screen
+    xy = page.evaluate("""() => Promise.all([import('/lab/js/lab.js'), import('three')]).then(([m, T]) => {
+        const g = m.current; g.updateMatrixWorld(true); let mesh; g.traverse(o => { if (o.isMesh && !mesh) mesh = o; });
+        const r = m.mview ? null : null, box = new T.Box3(), v = new T.Vector3(), pos = mesh.geometry.attributes.position;
+        return fetch('/lab/api/models/' + encodeURIComponent('cube + pion.3mf') + '/pieces').then(x => x.json()).then(rs => {
+          const p = rs[1]; for (let i = p.first * 3; i < (p.first + p.count) * 3; i++) box.expandByPoint(v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld));
+          const c = box.getCenter(new T.Vector3()); c.z = box.max.z; c.project(m.cam);
+          const rect = document.querySelector('#stage canvas').getBoundingClientRect();
+          return [rect.left + (c.x + 1) / 2 * rect.width, rect.top + (1 - c.y) / 2 * rect.height]; }); })""")
+    page.mouse.click(*xy)
+    page.wait_for_selector("#pc-panel:not([hidden])")
+    assert page.inner_text("#pc-name") == "pion"
+    page.click("#pc-panel [data-pc='150']")
+    assert page.input_value("#pc-pct") == "150"
+    body = page.evaluate("() => import('/lab/js/lab.js').then(m => m.prepBody())")
+    assert body["scales"] == {"1": 1.5}
+    page.click("#vtools [data-vt='regroup']")
+    assert page.input_value("#pc-pct") == "100"
+    assert page.errors == []
+
+
 def test_pick_how_the_part_lies(page):
     page.click("#files .file[data-n='cube.stl']")
     page.wait_for_selector("#orients [data-orient]", timeout=30000)
@@ -317,7 +372,7 @@ def test_viewer_tools(page, site):
     page.click("#vtools [data-cam='face']")
     assert "on" in page.get_attribute("#vtools [data-cam='face']", "class")
     page.click("#vtools [data-vt='dims']")
-    assert page.inner_text("#vdims") == "L 20 × P 20 × H 20 mm"
+    assert page.inner_text("#vdims") == "largeur 20 × profondeur 20 × hauteur 20 mm"
     page.click("#vtools [data-vt='over']")
     assert "on" in page.get_attribute("#vtools [data-vt='over']", "class")
     if (site["lib"] / "essai.gcode").exists():
@@ -331,6 +386,26 @@ def test_viewer_tools(page, site):
         page.click("#lplay")                                              # pause
         page.check("#show-single")
         assert "on" in page.get_attribute("#vtools [data-cam='top']", "class")
+    assert page.errors == []
+
+
+def test_measure_between_two_picked_points(page, site):
+    page.click("#files .file[data-n='cube.stl']")
+    page.wait_for_selector("#vtools [data-vt='mesure']:not([hidden])", timeout=30000)
+    page.click("#vtools [data-vt='mesure']")
+    box = page.locator("#stage canvas").bounding_box()
+    cx, cy = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+    page.mouse.move(cx - 35, cy); page.mouse.down(); page.mouse.up()   # first point on the piece
+    page.wait_for_selector("#vmeas:not([hidden])")
+    assert "2e point" in page.inner_text("#vmeas")
+    page.mouse.move(cx + 35, cy); page.mouse.down(); page.mouse.up()   # second point: the distance shows up
+    page.wait_for_function("document.getElementById('vmeas').textContent.includes('mm')", timeout=10000)
+    mm = float(page.inner_text("#vmeas").replace(" mm", "").replace(",", "."))
+    assert 0.1 < mm < 35                                               # something sane across a 20 mm cube
+    page.mouse.move(cx, cy + 20); page.mouse.down(); page.mouse.up()   # another click starts a new measure
+    page.wait_for_function("document.getElementById('vmeas').textContent.includes('2e')")
+    page.click("#vtools [data-vt='mesure']")                           # leaving the mode clears everything
+    assert page.is_hidden("#vmeas")
     assert page.errors == []
 
 
@@ -358,7 +433,10 @@ def test_brush_repaints_a_coloured_model(page, site):
     page.wait_for_selector("#vtools [data-vt='paint']:not([hidden])", timeout=30000)
     page.click("#vtools [data-vt='paint']")
     page.wait_for_selector("#paintbar:not([hidden])")
-    assert page.locator("#pb-sw button").count() == 2
+    # the brush offers the model's colours plus every spool colour loaded in the CANVAS, deduplicated by hex
+    page.wait_for_selector("#pb-sw button[data-key='#E9E9E7']", timeout=15000)   # the CANVAS answer lands after the bar opens
+    for hex in ("#E9E9E7", "#F2A900", "#D22630", "#008755"):        # the simulator's four trays
+        assert page.locator(f"#pb-sw button[data-key='{hex}']").count() == 1
     page.fill("#pb-size", "20")
     box = page.locator("#stage canvas").bounding_box()
     cx, cy = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
@@ -380,9 +458,17 @@ def test_brush_repaints_a_coloured_model(page, site):
 
 
 def test_supports_and_seam_brush_on_any_model(page, site):
-    page.click("#files .file[data-n='cube.stl']")                        # a plain STL: no colour brush, but this one
+    page.click("#files .file[data-n='cube.stl']")                        # a plain STL: one model colour, plus the CANVAS spools
     page.wait_for_selector("#vtools [data-vt='marks']:not([hidden])", timeout=30000)
-    assert page.is_hidden("#vtools [data-vt='paint']")
+    assert not page.is_hidden("#vtools [data-vt='paint']")
+    page.click("#vtools [data-vt='paint']")                              # the colour brush offers the CANVAS colours too
+    page.wait_for_selector("#paintbar:not([hidden])")
+    page.wait_for_selector("#pb-sw button[data-key='#E9E9E7']", timeout=15000)
+    for hex in ("#E9E9E7", "#F2A900", "#D22630", "#008755"):
+        assert page.locator(f"#pb-sw button[data-key='{hex}']").count() == 1
+    assert page.locator("#pb-sw button[data-key='#C0C0C0']").count() == 1   # the STL's own grey
+    page.click("#vtools [data-vt='paint']")                              # close it
+    page.wait_for_selector("#paintbar", state="hidden")
     page.click("#vtools [data-vt='marks']")
     page.wait_for_selector("#paintbar:not([hidden])")
     assert page.locator("#pb-sw button").count() == 4                   # support, never, seam, eraser
@@ -467,7 +553,7 @@ def test_assemble_search_and_preview(page):
     page.wait_for_function("document.querySelectorAll('#asm-list .asm-row').length === 1")
     page.click("#asm-list .asm-row [data-s='1']")
     page.wait_for_selector("#asm-go:has-text('Assembler 1 pièce')")
-    page.wait_for_selector("#asm-size:has-text('× 20 mm')")
+    page.wait_for_selector("#asm-size:has-text('hauteur 20 mm')")
     assert page.input_value("#asm-name") == "cube"
     assert not page.errors
 
@@ -480,9 +566,12 @@ def test_review_from_the_phone_link(page, site):
                                                  "fin": 1794351000, "duree_s": 1000, "issue": "terminee", "alertes": []}))
     page.goto(site["base"] + "/lab/#bilan=" + entry.name)
     page.wait_for_selector("#bilan[open] #bl-tips li")
-    page.click("#bl-issues [data-is='fils']")
+    page.click("#bl-rate [data-q='details'][data-n='1']")      # a low mark ticks its defect
+    page.wait_for_selector("#bl-issues [data-is='fils'].on")
+    page.click("#bl-rate [data-q='global'][data-n='4']")
     page.wait_for_selector("#bl-why:has-text('Fils fins')")
     page.click("#bl-go")
     page.wait_for_selector("#gal-list :text('Bilan : fils fins')")
-    assert json.loads((entry / "meta.json").read_text())["bilan"]["issues"] == ["fils"]
+    bilan = json.loads((entry / "meta.json").read_text())["bilan"]
+    assert bilan["issues"] == ["fils"] and bilan["notes"] == {"details": 1, "global": 4}
     assert not page.errors

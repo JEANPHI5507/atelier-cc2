@@ -27,12 +27,14 @@
 "), la plus proche chargée.": "), the closest loaded.",
 "), souvent une bobine vide. Regarde l'écran, recharge, puis reprends.": "), often an empty spool. Look at the screen, reload, then resume.",
 "). Charge une bobine de cette couleur pour être fidèle.": "). Load a spool of that colour to stay faithful.",
+"+ Pièce": "+ Piece",
 ", bonnes bobines dans le CANVAS.": ", the right spools in the CANVAS.",
 ", choisis": ", choose",
 ", et": ", and",
 ", garde l'écran allumé quand la tablette est en charge ; si ta version le propose, active « lancer à la connexion » dans les réglages de l'appli.": ", keep the screen on while the tablet is charging; if your version offers it, turn on “launch at login” in the app's settings.",
 ", ou directement": ", or directly",
 ", ouvre l'adresse du tableau (plus bas) puis l'icône d'installation dans la barre d'adresse, ou menu": ", open the dashboard's address (below) then the install icon in the address bar, or menu",
+", sur un nouveau plateau (le modèle d'origine ne change pas). Chaque pièce garde ses couleurs ; 4 couleurs au plus en tout.": ", on a new plate (the original model does not change). Each piece keeps its colours; 4 colours at most in all.",
 ". Active": ". Enable",
 ". Dans": ". In",
 ". Défaut connu du firmware : elle revient après un arrêt complet de l'imprimante (à faire après cette impression). Surveillance IA et timelapse en pause d'ici là.": ". Known firmware defect: it comes back after a full power-off of the printer (do it after this print). AI monitoring and timelapse paused until then.",
@@ -79,8 +81,10 @@
 "Ajouter un fichier": "Add a file",
 "Ajouter un prénom ou un texte": "Add a name or a text",
 "Ajouter un texte": "Add a text",
+"Ajouter une autre pièce de la bibliothèque sur ce plateau": "Add another piece from the library to this plate",
 "Ajouter une bordure et chercher la meilleure face": "Add a brim and find the best face",
 "Ajouter une bordure large": "Add a wide brim",
+"Ajouter une pièce sur ce plateau": "Add a piece to this plate",
 "Ajouter à la file d'attente": "Add to the queue",
 "Ajouté :": "Added:",
 "Ajustement des chevilles": "Dowel fit",
@@ -112,6 +116,7 @@
 "Arbre fin — le plus léger": "Thin tree — the lightest",
 "Arbre solide — pièces lourdes ou hautes": "Strong tree — heavy or tall parts",
 "Ardoise": "Slate",
+"Arrière": "Back",
 "Arrêt demandé": "Stop requested",
 "Arrêter": "Stop",
 "Arrêter : garde le doigt appuyé 2 secondes.": "Stop: keep your finger pressed for 2 seconds.",
@@ -142,11 +147,13 @@
 "Aucune impression enregistrée.": "No print recorded.",
 "Aucune impression pour l'instant.": "No print yet.",
 "Aucune impression pour l'instant. Chaque impression lancée apparaîtra ici avec sa vidéo en accéléré, sa photo et son coût.": "No print yet. Every print you start will show up here with its timelapse, photo and cost.",
+"Aucune pièce ne correspond.": "No piece matches.",
 "Aucune purge ni tour : le changement de couleur est juste le changement de bobine. Le plus économe et le plus rapide, mais un court mélange des deux couleurs apparaît après chaque changement. Essai à surveiller.": "No purge and no tower: the colour change is just the spool change. The most economical and fastest, but a short blend of the two colours shows after each change. Experimental, keep an eye on it.",
 "Automatique": "Automatic",
 "Autoriser": "Allow",
 "Autour de la pièce": "Around the part",
 "Autres options": "Other options",
+"Avant": "Front",
 "Avant d'en lancer une autre : plateau vide et propre (l'atelier le vérifie à la caméra).": "Before starting another: empty, clean plate (the workshop checks it with the camera).",
 "Avant de lancer :": "Before starting:",
 "Avec l'appli": "With the",
@@ -220,6 +227,7 @@
 "Choisis un modèle à gauche ou dépose un fichier : ses couleurs sont détectées automatiquement.": "Pick a model on the left or drop a file: its colours are detected automatically.",
 "Choisis une bobine pour au moins une pièce": "Pick a spool for at least one part",
 "Choisis une image de départ": "Pick a starting image",
+"Choisis une pièce de la bibliothèque : elle se met à côté de": "Pick a piece from the library: it goes next to",
 "Clic gauche : peindre · clic droit : tourner · molette : zoom": "Left click: paint · right click: rotate · wheel: zoom",
 "Coche ce que tu vois : l'atelier explique pourquoi et garde la correction pour la prochaine impression de ce modèle.": "Tick what you see: the workshop explains why and keeps the fix for the next print of this model.",
 "Code accepté, numéro de série": "Code accepted, serial number",
@@ -254,6 +262,7 @@
 "Couche affichée": "Displayed layer",
 "Couche en cours, vue du dessus": "Current layer, seen from above",
 "Couche par couche": "Layer by layer",
+"Couche par couche (toutes les pièces avancent ensemble)": "Layer by layer (all the pieces advance together)",
 "Couche précédente": "Previous layer",
 "Couche seule": "Single layer",
 "Couche suivante": "Next layer",
@@ -273,6 +282,7 @@
 "Couleurs": "Colours",
 "Couleurs conservées": "Colours kept",
 "Couleurs d'origine rétablies": "Original colours restored",
+"Couleurs propres": "Clean colours",
 "Couleurs qui bavent les unes sur les autres": "Colours bleeding into each other",
 "Couleurs reportées depuis l'original": "Colours carried over from the original",
 "Coupe": "Cross-section",
@@ -297,6 +307,7 @@
 "D'un seul trait, comme le dessin": "A single stroke, like the drawing",
 "Damier à 4 couleurs sur le dessus, sans traînées d'une couleur dans l'autre.": "A 4-colour checkerboard on top, with no colour streaking into another.",
 "Dans l'appli": "In the",
+"Dans l'ensemble": "Overall",
 "Dans l'ordre : chaque test valide quelque chose dont le suivant a besoin. Coche ce que tu constates, l'atelier s'en souvient.": "In order: each test checks something the next one needs. Tick what you see, the workshop remembers it.",
 "De côté": "Side",
 "De dessus": "Top",
@@ -322,6 +333,7 @@
 "Disponible": "Available",
 "Disposition du plateau": "Plate layout",
 "Droit": "Straight",
+"Droite": "Right",
 "Durée": "Duration",
 "Durée totale": "Total time",
 "Débit (tour de calibration, 1 = 100 %)": "Flow (calibration tower, 1 = 100 %)",
@@ -350,6 +362,7 @@
 "Déposer des fichiers": "Drop files",
 "Désactiver": "Turn off",
 "Détaillé": "Detailed",
+"Détails fins nets": "Sharp fine details",
 "Détails firmware": "Firmware details",
 "Détails plus fins qu'environ 1 % de la taille lissés ou retirés : vérifie l'aperçu": "Details finer than about 1 % of the size smoothed or removed: check the preview",
 "Détection des couleurs…": "Detecting colours…",
@@ -362,6 +375,7 @@
 "En couleur ce qui est imprimé, en gris ce qui reste ; le cône orange, c'est la buse (position envoyée chaque seconde par l'imprimante, en mm). Tourne avec un doigt, zoome en pinçant.": "In colour what is printed, in grey what is left; the orange cone is the nozzle (position sent every second by the printer, in mm). Turn with one finger, pinch to zoom.",
 "En couleur ce qui est imprimé, en gris ce qui reste. Tourne avec un doigt, zoome en pinçant.": "Printed in colour, what's left in grey. Rotate with a finger, pinch to zoom.",
 "En cours": "In progress",
+"En orange : les supports à retirer. En clair : la pièce. Tourne avec un doigt, zoome en pinçant.": "In orange: the supports to remove. Pale: the part. Turn with one finger, zoom by pinching.",
 "En pause": "Paused",
 "En rouge : les zones penchées à plus de 50° qui auront besoin de supports (vue basse).": "In red: areas tilted more than 50° that will need supports (low view).",
 "En réseau local, la CC2 n'accepte pas ces commandes (le SDK officiel d'Elegoo les désactive) : fais-les sur l'écran tactile.": "Over the local network, the CC2 refuses these commands (Elegoo's official SDK disables them): do them on the touch screen.",
@@ -430,6 +444,8 @@
 "Garder la taille d'origine": "Keep the original size",
 "Garder pour la prochaine fois": "Keep for next time",
 "Garder seulement le commun": "Keep only what both share",
+"Gauche": "Left",
+"Glisse un cutter ou la pince sous un coin du bloc et soulève-le d'un seul morceau, sans tirer sur la pièce.": "Slide a craft knife or the cutters under a corner of the block and lift it off in one piece, without pulling on the part.",
 "Glisse une pièce pour la déplacer sur le plateau.": "Drag a piece to move it on the plate.",
 "Glisse une pièce pour la déplacer sur le plateau. Les autres restent en place.": "Drag a piece to move it on the plate. The others stay put.",
 "Glisser chaque pièce sur le plateau pour la déplacer": "Drag each piece across the plate to move it",
@@ -460,9 +476,11 @@
 "IA : repérer les ratés (spaghetti, pièce décollée)": "AI: spot failures (spaghetti, part come loose)",
 "IA désactivée": "AI off",
 "Ignorer": "Ignore",
+"Il reste de petits points là où les supports touchaient : passe le cutter à plat, sans appuyer.": "Small dots remain where the supports touched: run the knife flat over them, without pressing.",
 "Il semble rester quelque chose sur le plateau.": "Something seems to be left on the plate.",
 "Il sert seulement à prouver au téléphone que c'est bien ton atelier.": "It only proves to the phone that it really is your workshop.",
 "Ils se décollent d'une pièce, sans se déchirer.": "They peel off in one piece, without tearing.",
+"Ils se retirent du haut vers le bas : coupe d'abord les branches fines près de la pièce, au ras, puis le tronc.": "They come off from the top down: cut the thin branches near the part first, flush, then the trunk.",
 "Image de départ": "Starting image",
 "Image → 3D en couleurs (TRELLIS.2, ≈ 8 min)": "Image → coloured 3D (TRELLIS.2, ≈ 8 min)",
 "Image → 3D, forme seule (Hunyuan3D : licence non valable dans l'UE)": "Image → 3D, shape only (Hunyuan3D: licence not valid in the EU)",
@@ -619,6 +637,7 @@
 "Miroir (gauche ↔ droite)": "Mirror (left ↔ right)",
 "Mise en origine": "Homing",
 "Mise en origine, déplacer la tête": "Homing, moving the head",
+"Mise en place des deux pièces sur un plateau…": "Putting both pieces on one plate…",
 "Mise à jour chaque seconde par l'imprimante, en mm. En rouge, la goulotte où la buse purge à chaque changement de couleur.": "Updated every second by the printer, in mm. In red, the chute where the nozzle purges at each colour change.",
 "Mise à jour du firmware": "Firmware update",
 "Mode LAN seulement": "LAN-only mode",
@@ -634,6 +653,7 @@
 "Motif de remplissage": "Infill pattern",
 "Multicolore": "Multicolour",
 "Ne remets pas la tour : reprends, quelques fils tomberont à sa place. L'atelier imprime déjà la tour avec une bordure de 8 mm et lève la buse de 0,8 mm ; nettoie le plateau à cet endroit. Pour une petite pièce, le mode Économie n'a pas de tour.": "Don't put the tower back: resume, a few strings will fall in its place. The workshop already prints the tower with an 8 mm brim and lifts the nozzle 0.8 mm; clean the plate at that spot. For a small part, Economy mode has no tower.",
+"Ne tire jamais sur une branche : tiens la pièce dans la main et coupe de l'autre.": "Never pull on a branch: hold the part in one hand and cut with the other.",
 "Nettoie le plateau au liquide vaisselle et rince (pas de doigts dessus) ; la prochaine fois : bordure et plateau plus chaud.": "Clean the plate with dish soap and rinse (no fingers on it); next time: brim and a hotter plate.",
 "Nettoyer et graisser les tiges X/Y, vérifier les courroies": "Clean and grease the X/Y rods, check the belts",
 "Nettoyer l'essuyeur et la goulotte de purge": "Clean the wiper and the purge chute",
@@ -665,6 +685,7 @@
 "Options par défaut au lancement d'une impression": "Default options when starting a print",
 "Opération": "Operation",
 "OrcaSlicer a échoué (code": "OrcaSlicer failed (code",
+"Ordre d'impression": "Print order",
 "Oreilles aux angles": "Mouse ears at corners",
 "Organiseur à compartiments": "Compartment organiser",
 "Orientation automatique (OrcaSlicer choisit la meilleure face)": "Automatic orientation (OrcaSlicer picks the best face)",
@@ -717,7 +738,15 @@
 "Pièce créée :": "Part created:",
 "Pièce haute et fine": "Tall, thin part",
 "Pièce non tranchée —": "Part not sliced —",
+"Pièce par pièce (les mêmes couleurs ensemble, bien moins de changements ; pièces espacées et basses)": "One piece at a time (same colours together, far fewer changes; pieces spaced apart and low)",
+"Pièce par pièce : chaque couleur imprime toutes ses pièces à la suite, d'où bien moins de changements et de purge. Pas de tour d'essuyage dans cet ordre : le premier millimètre après chaque changement fond les deux couleurs.": "One piece at a time: each colour prints all its pieces in a row, so far fewer changes and much less flush. No wipe tower in this order: the first millimetre after each change blends the two colours.",
+"Pièce par pièce ignoré : ce modèle ne fait qu'une seule pièce.": "One piece at a time skipped: this model is a single piece.",
+"Pièce par pièce ignoré : ce plateau ne fait qu'une seule pièce.": "One piece at a time skipped: this plate holds a single piece.",
+"Pièce par pièce ignoré : chaque exemplaire reprendrait toutes les couleurs ; couche par couche, ils se partagent chaque changement.": "One piece at a time skipped: every copy would go through all the colours again; layer by layer, they share each change.",
+"Pièce par pièce ignoré : la pièce est découpée, chacun de ses morceaux est déjà imprimé l'un après l'autre.": "One piece at a time skipped: the part is cut, each of its pieces already prints one after the other.",
+"Pièce par pièce ignoré : toutes les pièces de ce plateau portent les mêmes couleurs, et couche par couche elles partagent déjà chaque changement.": "One piece at a time skipped: every piece on this plate wears the same colours, and layer by layer they already share each change.",
 "Place 4 bobines de": "Put 4 spools of",
+"Plan vu de dessus : la pièce en gris, les supports en orange": "Top view: the part in grey, the supports in orange",
 "Plaque Gridfinity": "Gridfinity baseplate",
 "Plateau": "Plate",
 "Plateau froid (SuperTack)": "Cool plate (SuperTack)",
@@ -789,6 +818,7 @@
 "Relief du texte": "Text relief",
 "Remet les couleurs d'origine du modèle": "Restore the model's original colours",
 "Remet les pièces à leur place d'origine": "Puts the pieces back where they were",
+"Remet les pièces à leur place et à leur taille d'origine": "Puts the pieces back in their original place and size",
 "Remets-le en place et vérifie ses 3 aimants. Signalé : des déchets de purge qui s'accumulent sous la tête peuvent le déloger : vide le bac de purge et nettoie la goulotte et l'essuyeur.": "Put it back and check its 3 magnets. Reported: purge waste piling up under the head can knock it off: empty the purge bin and clean the chute and wiper.",
 "Remettre": "Reset",
 "Remplace la cartouche puis valide « Remplacé » sur l'écran de l'imprimante.": "Replace the cartridge then confirm “Replaced” on the printer's screen.",
@@ -873,6 +903,7 @@
 "Slicer indisponible": "Slicer unavailable",
 "Slicer introuvable. Lance: make slicer (ou renseigne [slicer] path dans config.toml)": "Slicer not found. Run: make slicer (or set [slicer] path in config.toml)",
 "Solide": "Strong",
+"Solidité": "Strength",
 "Son et vibration": "Sound and vibration",
 "Spirale étoilée": "Star spiral",
 "Sport": "Sport",
@@ -890,6 +921,7 @@
 "Supports durs à enlever ou marques": "Supports hard to remove or marks",
 "Supports en arbre ajoutés : OrcaSlicer a trouvé des parties qui flotteraient sans support.": "Tree supports added: OrcaSlicer found parts that would float without support.",
 "Supports et couture au pinceau": "Supports and seam brush",
+"Supports faciles à enlever": "Supports easy to remove",
 "Supports trop solides ou trop collés à la pièce.": "Supports too strong or too stuck to the part.",
 "Supprimer": "Delete",
 "Supprimer cette impression de la galerie (vidéo et photos) ?": "Delete this print from the gallery (video and photos)?",
@@ -898,11 +930,13 @@
 "Sur le côté droit": "On the right side",
 "Sur le côté gauche": "On the left side",
 "Surface reconstruite à partir du volume : l'original était trop abîmé pour une simple réparation": "Surface rebuilt from the volume: the original was too damaged for a simple repair",
+"Surfaces lisses (dessus, côtés)": "Smooth surfaces (top, sides)",
 "Surplombs": "Overhangs",
 "Surplombs sans support": "Overhangs without support",
 "Surveillance par caméra": "Camera monitoring",
 "Sélectionner plusieurs fichiers": "Select several files",
 "TPU : il ne passe pas par le CANVAS. Utilise le canal 1 avec l'adaptateur TPU, ou alimente la tête directement. Décoche le nivellement : il chauffe le plateau à 60 °C, le TPU en veut 35.": "TPU: it doesn't go through the CANVAS. Use channel 1 with the TPU adapter, or feed the head directly. Untick levelling: it heats the plate to 60 °C, TPU wants 35.",
+"Ta note, de 0 à 5": "Your mark, from 0 to 5",
 "Ta photo en relief : elle apparaît devant une lampe. Impression debout, remplissage 100 %.": "Your photo in relief: it appears in front of a lamp. Printed upright, 100 % infill.",
 "Tableau": "Dashboard",
 "Tableau de bord CC2": "CC2 dashboard",
@@ -911,7 +945,9 @@
 "Tablette en tableau de bord": "Tablet as a dashboard",
 "Taille": "Size",
 "Taille d'origine sans unité : 60 mm de haut proposés": "Original size has no unit: 60 mm high suggested",
+"Taille de cette pièce": "Size of this piece",
 "Taille du pinceau": "Brush size",
+"Taille en %": "Size in %",
 "Taille et réglages": "Size and settings",
 "Taille réelle :": "Real size:",
 "Telle quelle": "As is",
@@ -942,6 +978,7 @@
 "Timelapse de l'imprimante": "Printer's timelapse",
 "Ton choix": "Your choice",
 "Touche pour démarrer : plein écran, écran qui reste allumé, son des alertes.": "Tap to start: full screen, screen kept on, alert sounds.",
+"Touche une pièce pour la choisir (sa taille se règle à côté), glisse-la pour la déplacer.": "Touch a piece to pick it (its size is set beside the view), drag it to move it.",
 "Tour": "Tower",
 "Tour d'essuyage et purge dosée : le plus net quand le modèle change souvent de couleur (gouttes et bavures essuyées sur la tour).": "Wipe tower and sized purge: the cleanest when the model changes colour often (drops and smears wiped on the tower).",
 "Tour d'essuyage et purge maximale à chaque changement, quelles que soient les couleurs : le plus sûr, le plus de filament.": "Wipe tower and maximum purge at each change, whatever the colours: the safest, the most filament.",
@@ -1008,6 +1045,7 @@
 "Voir le tranchage couche par couche": "See the slicing layer by layer",
 "Voir les défauts": "Show the defects",
 "Volume fermé et vérifié, prêt à trancher": "Closed, checked volume, ready to slice",
+"Vu de dessus, devant l'imprimante. Gris : la pièce. Orange : là où étaient les supports.": "Seen from above, standing in front of the printer. Grey: the part. Orange: where the supports were.",
 "Vue 3D": "3D view",
 "Vérification du plateau à la caméra…": "Checking the plate with the camera…",
 "Vérifications de l'imprimante avant de démarrer": "Printer checks before starting",
@@ -1053,6 +1091,8 @@
 "arête partagée à tort corrigée": "wrongly shared edge fixed",
 "arêtes partagées à tort": "wrongly shared edges",
 "arêtes partagées à tort corrigées": "wrongly shared edges fixed",
+"au centre": "in the centre",
+"au milieu": "in the middle",
 "au moins une pièce est nécessaire": "at least one part is needed",
 "au total": "in total",
 "aucune bobine chargée dans le CANVAS": "no spool loaded in the CANVAS",
@@ -1193,6 +1233,7 @@
 "pièce impossible à construire avec ces cotes": "part can't be built with these dimensions",
 "pièce inconnue «": "unknown part “",
 "pièces": "pieces",
+"pièces les unes après les autres": "pieces one after the other",
 "plateau inconnu «": "unknown plate “",
 "plateau vide et propre": "empty, clean plate",
 "plateau à": "plate at",
@@ -1232,6 +1273,7 @@
 "supports inconnus «": "unknown supports “",
 "sur la CC2": "on the CC2",
 "tableau de bord": "dashboard",
+"taille d'une pièce : de 10 % à 500 %": "size of a piece: from 10 % to 500 %",
 "taille et position : trois nombres (mm)": "size and position: three numbers (mm)",
 "taille inconnue «": "unknown size “",
 "telle quelle": "as is",
@@ -1246,6 +1288,7 @@
 "trou rebouché": "hole filled",
 "trous rebouchés": "holes filled",
 "tâche inconnue": "unknown task",
+"un G-code est déjà tranché : choisis des modèles": "a G-code is already sliced: pick models",
 "une comparaison est déjà en cours": "a comparison is already running",
 "une impression en pause : si le bouton de l'atelier ne répond pas, reprends depuis l'écran.": "a paused print: if the workshop's button doesn't respond, resume from the screen.",
 "une partie flotterait sans support": "a part would float without support",
@@ -1313,7 +1356,11 @@
 "Éteins puis rallume. Signalé : parfois déclenchée par une commande de chauffe, corrigée en partie par le firmware 02.00.02.00.": "Switch off and on again. Reported: sometimes triggered by a heating command, partly fixed by firmware 02.00.02.00.",
 "Étiquette en relief (2 couleurs)": "Raised label (2 colours)",
 "Étoile": "Star",
+"à droite": "on the right",
+"à gauche": "on the left",
 "à jour": "up to date",
+"à l'arrière": "at the back",
+"à l'avant": "at the front",
 "échec ComfyUI:": "ComfyUI failure:",
 "éclat isolé retiré": "stray fragment removed",
 "éclats isolés retirés": "stray fragments removed",
@@ -1332,8 +1379,16 @@
 },
 "patterns": [
 [
+"Pièce par pièce : « {} » et « {} » ne sont qu'à {} mm l'une de l'autre, et il en faut {} : en imprimant l'une la tête passe sur l'autre, déjà finie. Écarte les pièces en mode Déplacer, ou reviens en couche par couche.",
+"One piece at a time: “{}” and “{}” stand only {} mm apart, and {} are needed: while printing one, the head sweeps over the other, already finished. Move the pieces apart in Move mode, or go back to layer by layer."
+],
+[
 "Bobine {} : {} reconnue, il reste environ {} g comme à son retrait. Si c'est une bobine neuve, appuie sur « Je viens de mettre une bobine neuve » dans l'onglet Imprimante.",
 "Spool {}: {} recognised, about {} g left as when it was taken out. If it is a new spool, press “I just put on a new spool” in the Printer tab."
+],
+[
+"Pièce par pièce : « {} » fait {} mm de haut, plus que les {} mm que la tête peut survoler en allant à la pièce suivante : imprime-la à part, ou en couche par couche.",
+"One piece at a time: “{}” is {} mm tall, more than the {} mm the print head can fly over on its way to the next piece: print it on its own, or layer by layer."
 ],
 [
 "Attends que le plateau redescende sous 35 °C (il était à {} °C) : la pièce se décolle alors presque seule. Sinon, retire la plaque et plie-la doucement.",
@@ -1360,8 +1415,16 @@
 "Spool {}: {} recognised, about {} g left as when it was taken out. The same spool or a new one? Answer in the Printer tab."
 ],
 [
+"{} exemplaires de largeur {} × profondeur {} mm ne tiennent pas sur le plateau (maximum {}) : réduis la taille ou le nombre",
+"{} copies of width {} × depth {} mm don't fit on the plate (maximum {}): reduce the size or the number"
+],
+[
 "La couleur {} ({} % du modèle) n'a pas de bobine proche : elle sera imprimée en {} (bobine {}), la plus proche chargée.",
 "Colour {} ({} % of the model) has no close spool: it will be printed in {} (spool {}), the closest loaded."
+],
+[
+"trop grand pour le plateau ({}, maximum {} mm de chaque côté) : réduis la hauteur ou active « Découper en pièces »",
+"too large for the plate ({}, at most {} mm on each side): lower the height or turn on « Découper en pièces » (cut into pieces)"
 ],
 [
 "{} : l'IA voit un raté (spaghetti ou pièce décollée). Regarde la photo : reprends si tout va bien, sinon arrête.",
@@ -1396,20 +1459,20 @@
 "more stable: {} mm² on the plate instead of {}, {} mm high instead of {} (overhangs will get supports)"
 ],
 [
-"{} exemplaires de {} × {} mm ne tiennent pas sur le plateau (maximum {}) : réduis la taille ou le nombre",
-"{} copies of {} × {} mm don't fit on the plate (maximum {}): reduce the size or the number"
+"Plateau prêt : {} pièces. Avec « Déplacer », touche une pièce pour la placer ou changer sa taille.",
+"Plate ready: {} pieces. With « Déplacer » (move), touch a piece to place it or change its size."
 ],
 [
 "Bobine {} : comptée comme une bobine pleine. Corrige le poids dans l'onglet Imprimante si besoin.",
 "Spool {}: counted as a full spool. Correct the weight in the Printer tab if needed."
 ],
 [
-"trop grand pour le plateau ({} mm, maximum {}) : réduis la hauteur ou active « Découper en pièces »",
-"too large for the plate ({} mm, maximum {}): reduce the height or enable “Cut into pieces”"
-],
-[
 "{}plateau à {} °C, la pièce se décolle presque seule. Sinon, retire la plaque et plie-la doucement.",
 "{}plate at {} °C, the part comes off almost by itself. Otherwise, remove the plate and flex it gently."
+],
+[
+"côte à côte, ces modèles font {} mm de large : trop pour le plateau, réduis-en un d'abord",
+"side by side, these models are {} mm wide: too much for the plate, shrink one first"
 ],
 [
 "Seulement {} mm² posés à plat : la pièce risque de se décoller en cours d'impression.",
@@ -1464,6 +1527,10 @@
 "⚠ {} colours have no close spool: the closest is used."
 ],
 [
+"ces modèles ont {} couleurs en tout : la CC2 n'a que 4 bobines",
+"these models have {} colours in all: the CC2 only has 4 spools"
+],
+[
 "mode inconnu « {} » (qualite, equilibre, economie, sans_purge)",
 "unknown mode “{}” (qualite, equilibre, economie, sans_purge)"
 ],
@@ -1512,12 +1579,20 @@
 "In the queue ({}): find it in the Printer tab"
 ],
 [
+"Supports : {} zones à retirer, en orange sur la vue 3D.",
+"Supports: {} zones to remove, in orange in the 3D view."
+],
+[
 "le workflow '{}' n'a pas d'entrée '{}' dans son .map.json",
 "workflow '{}' has no input '{}' in its .map.json"
 ],
 [
 "Plateau non vérifié ({}) : regarde-le avant de lancer.",
 "Plate not checked ({}): look at it before starting."
+],
+[
+"Supports : {} zone à retirer, en orange sur la vue 3D.",
+"Supports: {} zone to remove, in orange in the 3D view."
 ],
 [
 "⚠ {} sans bobine proche : la plus proche est utilisée.",
@@ -1544,10 +1619,6 @@
 "Real size: {} mm high as modelled"
 ],
 [
-"l'assemblage ({} mm) dépasse le plateau de {} mm",
-"the assembly ({} mm) is larger than the {} mm plate"
-],
-[
 "({} petite(s) imprimée(s) avec les chevilles)",
 "({} small one(s) printed with the dowels)"
 ],
@@ -1564,10 +1635,6 @@
 "Added as {} (the name already existed)"
 ],
 [
-"la pièce ({} mm) ne tient pas sur le plateau",
-"the part ({} mm) doesn't fit on the plate"
-],
-[
 "{} % du modèle fait moins de {} mm d'épaisseur",
 "{} % of the model is thinner than {} mm"
 ],
@@ -1576,16 +1643,24 @@
 "Then start the next one in the queue: {}."
 ],
 [
+"l'assemblage ({}) dépasse le plateau de {} mm",
+"the assembly ({}) is larger than the {} mm plate"
+],
+[
 "'{}' n'a pas produit d'image à passer à '{}'",
 "'{}' produced no image to pass to '{}'"
 ],
 [
-"le modèle ({} mm) dépasse le volume de {} mm",
-"the model ({} mm) exceeds the {} mm build volume"
+"la pièce ({}) ne tient pas sur le plateau",
+"the part ({}) doesn't fit on the plate"
 ],
 [
 "{} images analysées, une toutes les 10 s.",
 "{} images analysed, one every 10 s."
+],
+[
+"le modèle ({}) dépasse le volume de {} mm",
+"the model ({}) exceeds the {} mm build volume"
 ],
 [
 "{} changements de couleur restants sur {}",
@@ -1594,6 +1669,14 @@
 [
 "Coupes aux endroits les plus fins : {}",
 "Cuts at the thinnest places: {}"
+],
+[
+"Impossible de les mettre ensemble : {}",
+"Could not put them together: {}"
+],
+[
+"largeur {} × profondeur {} × hauteur {} mm",
+"width {} × depth {} × height {} mm"
 ],
 [
 "Bobine {} : {}, nouvelle pour l'atelier",
@@ -1652,10 +1735,6 @@
 "Elegoo profiles not found in {}"
 ],
 [
-"{} mm : plus grand que le plateau →",
-"{} mm: larger than the plate →"
-],
-[
 "« {} » choisi : clique sur Trancher",
 "“{}” chosen: click Slice"
 ],
@@ -1700,6 +1779,14 @@
 "Advisor: {} point to check"
 ],
 [
+"du plateau jusqu'à {} mm de haut",
+"from the plate up to {} mm high"
+],
+[
+"{} : plus grand que le plateau →",
+"{}: larger than the plate →"
+],
+[
 "{} changement de couleur restant",
 "{} colour change left"
 ],
@@ -1716,8 +1803,8 @@
 "face {} outside the model ({} faces)"
 ],
 [
-"{} × {} × {} mm (unités du fichier)",
-"{} × {} × {} mm (file units)"
+"touche la pièce entre {} et {} mm",
+"touches the part between {} and {} mm"
 ],
 [
 "· tournée de {}° sur le plateau",
@@ -1768,10 +1855,6 @@
 "New ({}) or already started?"
 ],
 [
-"Sur le plateau : {} × {} × {} mm",
-"On the plate: {} × {} × {} mm"
-],
-[
 "opération inconnue « {} » ({})",
 "unknown operation “{}” ({})"
 ],
@@ -1792,12 +1875,12 @@
 "Layer {} / {} · {} mm of {} mm"
 ],
 [
-"Nouveau fichier : {} ({} mm)",
-"New file: {} ({} mm)"
-],
-[
 "Rien ne répond sur {}:{} ({}).",
 "Nothing answers on {}:{} ({})."
+],
+[
+"touche la pièce vers {} mm",
+"touches the part at about {} mm"
 ],
 [
 "{} mm pour {} mm de plateau.",
@@ -1806,6 +1889,10 @@
 [
 "Jeu des chevilles : {} mm",
 "Dowel clearance: {} mm"
+],
+[
+"choisis de 2 à {} modèles",
+"pick 2 to {} models"
 ],
 [
 "plateau inconnu « {} » ({})",
@@ -1830,6 +1917,10 @@
 [
 "forme inconnue « {} » ({})",
 "unknown shape “{}” ({})"
+],
+[
+"Nouveau fichier : {} ({})",
+"New file: {} ({})"
 ],
 [
 "Pièce non tranchée — {}",
@@ -1884,6 +1975,10 @@
 "workflow refused ({}): {}"
 ],
 [
+"{} (unités du fichier)",
+"{} (file units)"
+],
+[
 "{} : terminée en {} min.",
 "{}: finished in {} min."
 ],
@@ -1926,6 +2021,14 @@
 [
 "⚠ {} alertes de l'IA",
 "⚠ {} AI alerts"
+],
+[
+"Sur le plateau : {}",
+"On the plate: {}"
+],
+[
+"de {} à {} mm de haut",
+"from {} to {} mm high"
 ],
 [
 "terminée en {} min.",
@@ -1984,6 +2087,10 @@
 "timeout after {}s"
 ],
 [
+"{} % des supports",
+"{} % of the supports"
+],
+[
 "{} : arrêtée à {} %",
 "{}: stopped at {} %"
 ],
@@ -2006,10 +2113,6 @@
 [
 "Bobine pour {}",
 "Spool for {}"
-],
-[
-"Pièce {} : {} mm",
-"Piece {}: {} mm"
 ],
 [
 "Une neuve ({})",
@@ -2084,6 +2187,10 @@
 "Cuts: {}"
 ],
 [
+"Pièce {} : {}",
+"Piece {}: {}"
+],
+[
 "Profil ({})",
 "Profile ({})"
 ],
@@ -2120,12 +2227,20 @@
 "{} pieces"
 ],
 [
+"Pièce {}",
+"Piece {}"
+],
+[
 "Posée {}",
 "Laid {}"
 ],
 [
 "IA : {}",
 "AI: {}"
+],
+[
+"Zone {}",
+"Zone {}"
 ],
 [
 "{} prêt{}",

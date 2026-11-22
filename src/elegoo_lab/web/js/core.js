@@ -22,6 +22,8 @@ const spools = {};
 
 const durSec = t => { if (!t) return 0; let s = 0; for (const [, n, u] of t.matchAll(/(\d+)([dhms])/g)) s += +n * { d: 86400, h: 3600, m: 60, s: 1 }[u]; return s; };
 const fmtG = g => g >= 1000 ? (g / 1000).toFixed(2).replace('.', ',') + ' kg' : Math.round(g) + ' g';
+// a size always names its sides, in this order: across the plate (left to right), front to back, up
+const sizeTxt = (s, dec = 0) => { const f = v => (+v).toFixed(dec).replace('.', ','); return `largeur ${f(s[0])} × profondeur ${f(s[1])} × hauteur ${f(s[2])} mm`; };
 const euro = e => (e ?? 0).toFixed(2).replace('.', ',') + ' €';
 const STATE = { 0: 'Prête', 1: 'Mise en origine', 5: 'Pause…', 6: 'En pause', 7: 'Arrêt…', 8: 'Arrêtée', 9: 'Terminée', 12: 'Reprise', 13: 'Impression', 14: 'Erreur', 15: 'Nivellement', 16: 'Préchauffe', 27: 'Changement de filament' };
 const BUSY = new Set([1, 5, 6, 7, 12, 13, 15, 16, 27, 28, 29]);
@@ -40,4 +42,4 @@ const act = async (btn, path, body, okMsg) => {
 const dur = s => { if (s == null || s <= 0) return '–'; s = Math.round(s); const h = Math.floor(s / 3600), m = Math.round((s % 3600) / 60); return h ? `${h} h ${String(m).padStart(2, '0')}` : `${m} min`; };
 const evTime = t => { const d = new Date(t * 1000), now = new Date(); return d.toDateString() === now.toDateString() ? d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) + ' ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }); };
 
-export { hooks, nice, $, BUSY, MESH, SCREEN_ONLY, SLOT, STATE, act, api, cfg, ctl, ctx, dur, durSec, esc, euro, evTime, fmtG, shortTime, size, spools, toast };
+export { hooks, nice, $, BUSY, MESH, SCREEN_ONLY, SLOT, STATE, act, api, cfg, ctl, ctx, dur, durSec, esc, euro, evTime, fmtG, shortTime, size, sizeTxt, spools, toast };

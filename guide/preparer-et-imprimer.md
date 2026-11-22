@@ -10,8 +10,9 @@ réglages**, **3. Trancher**, puis **Imprimer**. Les mêmes opérations existent
 
 À gauche : tes modèles et les fichiers prêts à imprimer.
 
-- **Ajouter** : glisser-déposer (ou cliquer) des STL, 3MF, OBJ, GLB, GLTF, PLY ou G-code, ou **Importer depuis un
-  lien**. Le lien peut viser un fichier, un zip de modèles, ou une page publique qui propose un fichier à télécharger.
+- **Ajouter** : glisser-déposer (ou cliquer) des STL, 3MF, STEP, OBJ, GLB, GLTF, PLY, OFF, DAE, des zip de modèles ou
+  du G-code, ou **Importer depuis un lien**. Un STEP (fichier CAD) devient un GLB à l'import ; un zip déplie tous les
+  modèles qu'il contient. Le lien peut viser un fichier, un zip de modèles, ou une page publique qui propose un fichier à télécharger.
   Les sites qui ne donnent leurs fichiers qu'à un compte connecté (MakerWorld par exemple) ne marchent pas par lien :
   télécharge le fichier, puis dépose-le. Un fichier ajouté ne remplace jamais un fichier existant (« modèle (2).stl »).
 - **Vues** : Tout, Modèles, **Prêts** (les G-code, rangés sous le modèle dont ils viennent). Tri et recherche dans le
@@ -34,6 +35,16 @@ couleur de la bobine qui l'imprimera.
 - Vues **3D**, **Face**, **Dessus**, **Côté**, **Plateau** (tout le plateau), recentrer, plein écran.
 - **Surplombs** : colore en rouge, en direct, les zones qui auront besoin de supports.
 - **Cotes** : dimensions à la taille d'impression.
+- **+ Pièce** : ajoute une autre pièce de la bibliothèque sur le même plateau. L'atelier crée un nouveau modèle (« cube +
+  pion ») avec les deux côte à côte, chacune avec ses couleurs (4 au plus en tout, une couleur commune partage la
+  bobine) ; le modèle d'origine ne change pas. Recommence pour en mettre une troisième.
+- **Déplacer** : touche une pièce pour la choisir (cadre orange) et glisse-la pour la déplacer ; elle s'arrête au bord
+  du plateau. Le cadre en bas à gauche règle **sa taille** (10 à 500 %, raccourcis 50, 75, 100, 150 %) : elle grandit
+  ou rétrécit sur place, posée sur le plateau. Le tranchage reprend les mêmes places et tailles. **Regrouper** remet
+  tout comme au départ.
+- **Supprimer cette pièce** (dans le cadre de la pièce choisie) : elle quitte le plateau dans un nouveau modèle ; les
+  autres gardent leurs places et leurs tailles, et le modèle d'origine reste dans la bibliothèque.
+- Tourner ou coucher la pièce la garde à sa place sur le plateau.
 - Le **coin interdit** de la CC2 (avant droit, 10 × 20 mm) est en rouge : l'atelier n'y pose jamais rien.
 - Après le tranchage, l'onglet **Tranchage** montre les vrais trajets couche par couche (curseur, lecture, couche seule,
   supports en orange, tour d'essuyage), chacun masquable.
@@ -48,9 +59,18 @@ modifiable : couleur par couleur, ou **Modifier**.
 - Plus de 4 couleurs : les teintes proches sont regroupées.
 - Un modèle **sans couleur** s'imprime avec la bobine déjà engagée dans le CANVAS (pas de changement inutile).
 - Une couleur trop éloignée de toutes les bobines, ou un mélange PLA + PETG, est signalé.
+- **Tes choix sont retenus** : la bobine que tu donnes à une couleur est réappliquée à la prochaine préparation du
+  même modèle, même si les bobines ont changé de place dans le CANVAS (tant qu'elle est encore chargée là ou ailleurs).
+- Sous chaque bobine chargée : **le filament qu'il reste** (~ g), en alerte quand elle est presque vide — plus besoin
+  d'attendre la vérification du lancement pour le découvrir.
+- **Le besoin de chaque couleur est estimé** avant même de trancher (à partir du volume du modèle et de l'usage
+  choisi) : une bobine qui n'en aura pas assez apparaît en rouge immédiatement. L'estimation **se corrige toute
+  seule** à chaque vraie impression : plus tu imprimes, plus elle est juste.
 - **Assembler** (en haut de la bibliothèque) : un modèle livré en plusieurs fichiers, un par couleur, devient un seul
   modèle multicolore.
-- **Pinceau** (vue 3D, modèles GLB, OBJ, PLY) : retoucher les couleurs à la main.
+- **Pinceau** (vue 3D, tous les modèles) : retoucher les couleurs à la main, dans les couleurs du modèle (un STL
+  sans couleur restera d'une seule teinte).
+- **Mesurer** (vue 3D, tous les modèles) : deux points touchés sur la pièce, la distance entre eux s'affiche en mm.
 - **Supports** (vue 3D, tous les modèles) : peindre « Support ici » (vert), « Jamais de support ici » (rouge) et
   « Couture ici » (bleu, l'endroit où commence chaque couche), la gomme efface. Des supports peints sans avoir demandé de
   supports : il n'y en a que là. Les zones sont gardées à côté du modèle, le fichier lui-même ne change pas.
@@ -69,7 +89,7 @@ l'optimisation** remet tout comme avant.
 | Choix | Ce que ça change |
 |---|---|
 | **Décoratif** (par défaut) | même aspect, intérieur allégé (remplissage « éclair » 8 %) : jusqu'à −55 % de filament |
-| **Solide** | 4 parois, remplissage gyroïde ; proposé d'office pour les boîtes, crochets, organiseurs |
+| **Solide** | 4 parois, remplissage gyroïde, paroi extérieure précise (cotes justes) ; proposé d'office pour les boîtes, crochets, organiseurs |
 | **Détaillé** | couches de 0,12 mm |
 | **Rapide** | couches de 0,24 mm |
 | **Profil Elegoo** | le profil d'origine, sans rien changer |
@@ -95,23 +115,24 @@ Exemple mesuré : une figurine de 95 mm passe de 62 g / 3 h 35 (profil Elegoo) �
 - **Exemplaires** sur le plateau (jusqu'à 50, en grille). Chaque pièce est marquée dans le G-code : si l'une rate, on
   peut l'abandonner et finir les autres.
 - **Réglages avancés** (vide = valeur du profil CC2) : parois, couches pleines, motif de remplissage, motif du dessus,
-  une seule paroi sur le dessus (déjà active dans le profil CC2), hauteur de couche variable (couches plus fines là où
-  la surface est en pente douce, pour des dômes et arrondis plus lisses), paroi extérieure précise (cotes justes pour
-  les pièces qui s'emboîtent), couture, lissage, bordure, radeau, angle des supports, températures, avance de
+  une seule paroi sur le dessus (déjà active dans le profil CC2), hauteur de couche variable (automatique par défaut, sauf en usage « Profil Elegoo » : couches plus fines là où
+  la surface est en pente douce, pour des dômes et arrondis plus lisses ; sans effet sur une pièce droite), paroi extérieure précise (cotes justes pour
+  les pièces qui s'emboîtent), couture, lissage, bordure, radeau, angle des supports, ordre d'impression (couche par couche, ou pièce par pièce — voir Multicolore), températures, avance de
   pression, débit… Chaque valeur est vérifiée avant d'aller au slicer.
 
 ### Multicolore
 
 | Mode | Principe | Quand |
 |---|---|---|
-| **Économie** (par défaut) | pas de tour d'essuyage, purge dosée selon les couleurs | la plupart des pièces |
-| **Équilibré** | tour d'essuyage + purge dosée | si des gouttes ou des bavures apparaissent aux changements |
+| **Équilibré** (par défaut) | tour d'essuyage + purge dosée selon les couleurs | couleurs nettes, même sur un modèle qui change souvent |
+| **Économie** | pas de tour d'essuyage, purge dosée selon les couleurs | le moins de filament ; bien pour peu de changements et des couleurs proches |
 | **Qualité** | tour + purge d'origine d'OrcaSlicer | couleurs très contrastées, maximum de propreté |
 | **Sans purge** | changement de bobine seul | essais ; mélange visible entre couleurs |
 
 La purge se fait dans la goulotte du CANVAS. Elle est dosée **en volume réel** selon le passage de couleur (du rouge au
 blanc il en faut plus que du blanc au rouge), ce qui évite le marbrage. Mesuré sur un perroquet de 60 mm en 4
-couleurs : 13 h 13 et ≈ 200 g en Qualité, 8 h 26 et ≈ 38 g en Économie.
+couleurs : 13 h 13 et ≈ 200 g en Qualité, 8 h 26 et ≈ 38 g en Économie. Si un bilan a signalé des couleurs qui bavent
+ou des gouttes sur cette pièce, le tranchage suivant purge le pire cas à chaque changement, quel que soit le mode.
 
 En Équilibré et Qualité, la tour a une bordure de 8 mm et la buse se lève de 0,8 mm en passant dessus : avec du PLA
 Silk, le fil qui coule après chaque purge fait des boucles sur la tour, et la buse les accrochait jusqu'à la renverser.
@@ -124,10 +145,21 @@ Les leviers qui comptent vraiment : **moins de changements** (couches plus épai
 **plusieurs pièces par plateau**, car les changements se font couche par couche pour toutes les pièces à la fois.
 Le résultat prévient au-delà de 150 changements.
 
+**Ordre d'impression : pièce par pièce** (Réglages avancés) : le plateau est tranché une pièce entière après
+l'autre, les pièces regroupées par couleur, au lieu que toutes avancent couche par couche. Une couleur imprime
+tout ce qui la porte avant de céder la place : sur deux pièces de couleurs différentes bien espacées, mesuré à
+l'atelier, 2 changements et 28 min au lieu de 101 et 2 h 21. Sans tour d'essuyage dans cet ordre, le premier
+millimètre après chaque changement fond les deux couleurs ; une pause à une hauteur tombe dans chaque pièce.
+La CC2 impose sa géométrie : 65 mm d'écart entre pièces (la tête balaie tout autour de la buse en imprimant la
+suivante) et 36 mm de haut au plus (la traverse passe au-dessus) — sinon le tranchage le dit, et on les écarte
+en mode Déplacer. Ignoré pour plusieurs exemplaires d'un même modèle (couche par couche, ils partagent chaque
+changement) et si toutes les pièces portent les mêmes couleurs.
+
 ## 3. Trancher
 
 **Trancher** lance OrcaSlicer avec les profils Elegoo de la CC2. Le résultat donne la durée, les grammes et le coût
-(purge comprise) par bobine, le nombre de changements de couleur, et les points à surveiller.
+(purge comprise) par bobine, le nombre de changements de couleur, les températures de buse et de plateau du profil
+(optimales pour le filament choisi), et les points à surveiller.
 
 - Le **conseiller** regarde la pièce telle qu'elle sera imprimée et prévient avant de perdre une bobine : parois trop
   fines, peu de contact avec le plateau, surplombs sans support, morceau en l'air, pièce haute et fine, maillage
@@ -135,6 +167,35 @@ Le résultat prévient au-delà de 150 changements.
 - **Comparer les options** tranche plusieurs variantes en arrière-plan (qualité, usage) et montre l'écart de filament,
   de coût et de temps ; « Choisir » applique la variante.
 - Si OrcaSlicer refuse une pièce qui flotterait sans support, l'atelier recommence avec des supports en arbre et le dit.
+
+## Assistant (étape 4)
+
+L'**Assistant** vit maintenant **dans la vue 3D** : un panneau repliable en haut à droite, juste sous les boutons
+de la vue — la pièce reste visible derrière lui (sur téléphone il est replié, une pique sur le titre le déplie).
+Tu demandes avec tes mots, il agit lui-même sur le modèle
+dans la bibliothèque — réparer, changer la hauteur ou l'échelle (miroir compris), faire pivoter, proposer la
+meilleure pose, percer un trou d'aimant ou ajouter un socle, et même trancher pour annoncer la durée réelle.
+Le cerveau est le CLI agent installé sur la machine (par défaut `vibe`, lancé hors écran à chaque message — aucune
+clé API, il est déjà connecté à ton compte) : chaque action passe par le même code que les boutons de la page et
+crée un nouveau fichier (l'original reste intact). Ses serveurs **MCP** restent accessibles : si Blender tourne
+avec le pont « blender » (add-on *MCP for Blender*, voir [Blender](blender.md)), l'Assistant peut construire la
+pièce en vraie CAO et l'exporter dans la bibliothèque. Repli possible sur l'API Mistral
+(`[assistant] moteur = "api"` + `api_key`, voir [Configuration](configuration.md)).
+La conversation suit le modèle ; un tour peut prendre quelques dizaines de secondes. Pendant qu'il travaille,
+le journal s'affiche en direct dans la bulle grise sous le message : l'atelier sur la pièce (fiche,
+redimensionner…), puis les appels de l'agent CLI hors écran (Blender : import, code, capture `look` du regard).
+
+**Viser un endroit précis** : le bouton **Cibler** de la vue 3D transforme la souris en viseur — clique la
+surface de la pièce pour poser un marqueur orange, règle son rayon dans la bulle qui apparaît sous la conversation,
+puis écris ton message : l'agent reçoit les coordonnées exactes du point (repère du fichier, Z = hauteur) et le
+rayon, et y porte son travail. Retirer le marqueur : le ✕ de la bulle, ou choisir un autre modèle.
+
+**Mesurer sur la pièce** : le bouton **Mesurer** de la vue 3D pose deux points — touche un premier point de la
+surface, un deuxième : la ligne tirée entre eux affiche la vraie distance en mm (diamètre d'un trou, entraxe de
+deux trous…), même si tu tournes la vue. Un nouveau clic part d'un nouveau point ; resors du mode pour tout effacer.
+
+Tout mesh que l'agent écrit lui-même dans la bibliothèque (export Blender…) est affiché tout seul dans la vue 3D :
+la page la recharge dès qu'il annonce son travail, même si le fichier garde le même nom.
 
 ## Imprimer
 

@@ -88,3 +88,13 @@ def apply(model: Path, layer_mm: float, level: str) -> int:
         z.writestr("Metadata/layer_config_ranges.xml", '<?xml version="1.0" encoding="utf-8"?>\n<objects>\n'
                    + "".join(objects) + "</objects>\n")
     return round(extra)
+
+
+def remove(model: Path) -> None:
+    """Drop the height ranges again (OrcaSlicer refuses variable layers once organic supports come in)."""
+    tmp = model.with_suffix(".tmp")
+    with zipfile.ZipFile(model) as zin, zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED, compresslevel=1) as zout:
+        for item in zin.infolist():
+            if item.filename != "Metadata/layer_config_ranges.xml":
+                zout.writestr(item, zin.read(item.filename))
+    tmp.replace(model)
