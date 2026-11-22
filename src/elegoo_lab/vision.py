@@ -111,12 +111,12 @@ def annotate(jpeg: bytes, dets: list[tuple[float, tuple[float, float, float, flo
     """The frame with the suspicious areas framed, for the alert."""
     img = Image.open(io.BytesIO(jpeg)).convert("RGB")
     d = ImageDraw.Draw(img)
-    W, H = img.size
+    w, h = img.size
     for c, (x1, y1, x2, y2) in dets:
         if c < 0.2:
             continue
-        d.rectangle([x1 * W, y1 * H, x2 * W, y2 * H], outline=(255, 80, 60), width=3)
-        d.text((x1 * W + 4, y1 * H + 2), f"{c:.0%}", fill=(255, 80, 60))
+        d.rectangle([x1 * w, y1 * h, x2 * w, y2 * h], outline=(255, 80, 60), width=3)
+        d.text((x1 * w + 4, y1 * h + 2), f"{c:.0%}", fill=(255, 80, 60))
     buf = io.BytesIO()
     img.save(buf, format="JPEG", quality=85)
     return buf.getvalue()
