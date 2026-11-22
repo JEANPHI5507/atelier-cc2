@@ -255,9 +255,12 @@ class Sim:
                     i += 2 + int.from_bytes(body[i:i + 2], "big")  # client id
                     user = pw = ""
                     if flags & 0x80:
-                        n = int.from_bytes(body[i:i + 2], "big"); user = body[i + 2:i + 2 + n].decode(); i += 2 + n
+                        n = int.from_bytes(body[i:i + 2], "big")
+                        user = body[i + 2:i + 2 + n].decode()
+                        i += 2 + n
                     if flags & 0x40:
-                        n = int.from_bytes(body[i:i + 2], "big"); pw = body[i + 2:i + 2 + n].decode()
+                        n = int.from_bytes(body[i:i + 2], "big")
+                        pw = body[i + 2:i + 2 + n].decode()
                     good = user == "elegoo" and pw == self.code
                     w.write(_pkt(0x20, bytes([0, 0 if good else 5])))
                     if not good:
