@@ -34,7 +34,7 @@ def manifold(v: np.ndarray, f: np.ndarray) -> mf.Manifold | None:
             solid = mf.Manifold(mf.Mesh(vert_properties=np.asarray(m.vertices, np.float32), tri_verts=np.asarray(m.faces, np.uint32)))
         if solid.status() != mf.Error.NoError or solid.is_empty():
             return None
-    except Exception:
+    except Exception:  # noqa: BLE001 - any mesh processing error should not crash the advisor
         return None
     return solid
 

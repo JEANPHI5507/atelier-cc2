@@ -39,7 +39,8 @@ async def test_sim_print_cycle(printer):
         if (await printer.status()).print_info.filename == "":
             break
     hist = (await printer.print_history())["history_task_list"]
-    assert hist and hist[0]["task_status"] == 1
+    assert hist
+    assert hist[0]["task_status"] == 1
 
 
 async def test_wrong_access_code():
@@ -64,7 +65,8 @@ def test_mesh_prepare_scales_and_grounds(tmp_path):
     trimesh.creation.icosphere(radius=0.5).export(src)  # unit-less AI-style output
     out = tmp_path / "ball.stl"
     info = mesh.prepare(src, out, height_mm=60)
-    assert info["watertight"] and info["fits_bed"]
+    assert info["watertight"]
+    assert info["fits_bed"]
     assert max(info["size_mm"]) == pytest.approx(60, abs=0.5)
     assert trimesh.load(out).bounds[0][2] == pytest.approx(0, abs=1e-6)
 
@@ -92,7 +94,8 @@ def test_comfy_generate_roundtrip(tmp_path, monkeypatch):
     c.http = httpx.Client(base_url="http://x", transport=httpx.MockTransport(handler))
     img = tmp_path / "in.png"; img.write_bytes(b"png")
     files = comfy.generate(c, "t", tmp_path, image=img)
-    assert files[0].read_bytes() == b"glbdata" and files[0].suffix == ".glb"
+    assert files[0].read_bytes() == b"glbdata"
+    assert files[0].suffix == ".glb"
     assert sent["prompt"]["1"]["inputs"]["image"] == "up.png"
     with pytest.raises(comfy.ComfyError):
         comfy.load_workflow("nope")
@@ -106,7 +109,9 @@ def test_slice_cylinder_and_overrides(tmp_path):
     src = tmp_path / "cyl.stl"
     trimesh.creation.cylinder(radius=10, height=20, sections=48).export(src)
     r = slicer.slice_model(src, tmp_path / "out", infill=5, supports=False)
-    assert r.layers == 100 and r.gcode[0].exists() and "Centauri Carbon 2" in r.gcode[0].read_text(errors="ignore")
+    assert r.layers == 100
+    assert r.gcode[0].exists()
+    assert "Centauri Carbon 2" in r.gcode[0].read_text(errors="ignore")
     dense = slicer.slice_model(src, tmp_path / "out2", infill=60)
     assert dense.filament_m > r.filament_m  # overrides really reach the slicer
     with pytest.raises(slicer.SliceError):
@@ -126,7 +131,8 @@ def test_multicolor_parts_change_tool_at_junction(tmp_path):
     assert info["filaments"] == 2
     r = slicer.slice_model(tmp_path / "duo.3mf", tmp_path / "o", filament=["PLA", "PLA Matte"])
     g = r.gcode[0].read_text(errors="ignore")
-    assert "\nT1\n" in g and g.count("\nT0\n") >= 1
+    assert "\nT1\n" in g
+    assert g.count("\nT0\n") >= 1
     # wrong filament count for the 3MF, bad slot, and incompatible temperatures are all refused
     with pytest.raises(slicer.SliceError):
         slicer.slice_model(tmp_path / "duo.3mf", tmp_path / "o2", filament=["PLA"])
@@ -162,10 +168,13 @@ def test_coloured_mesh_to_canvas_and_slice(tmp_path):
     src = tmp_path / "bicolore.ply"
     m.export(src)
     a = colors.analyze(src)
-    assert len(a["colours"]) == 2 and a["multicolour"]
+    assert len(a["colours"]) == 2
+    assert a["multicolour"]
     res = printprep.prepare_and_slice(src, filaments=["PLA", "PLA Matte"], out_dir=tmp_path)
     g = (tmp_path / res["gcode"][0]).read_text(errors="ignore")
-    assert "\nT1\n" in g and len(res["slots"]) == 2 and all(s["metres"] > 0 for s in res["slots"])
+    assert "\nT1\n" in g
+    assert len(res["slots"]) == 2
+    assert all(s["metres"] > 0 for s in res["slots"])
     # swapping slots swaps the filament usage
     swapped = printprep.prepare_and_slice(src, mapping={c["index"]: 3 - c["slot"] for c in a["colours"]},
                                           filaments=["PLA", "PLA Matte"], out_dir=tmp_path)
@@ -207,11 +216,15 @@ def test_standard_3mf_colours_and_roundtrip(tmp_path):
     out = tmp_path / "canvas.3mf"
     colors.to_canvas(src, out, {c["index"]: c["slot"] for c in a["colours"]})
     pr = threemf.read(out)
-    assert len(pr.objects) == 1 and pr.objects[0].parts[0].paint and pr.colours[:2] == [c["hex"] for c in a["colours"]][:2]
+    assert len(pr.objects) == 1
+    assert pr.objects[0].parts[0].paint
+    assert pr.colours[:2] == [c["hex"] for c in a["colours"]][:2]
     if not (slicer.TOOLS / "squashfs-root" / "AppRun").exists():
         pytest.skip("slicer non installé")
     r = printprep.prepare_and_slice(src, out_dir=tmp_path)
-    assert len(r["slots"]) == 2 and all(s["metres"] > 0 for s in r["slots"]) and r["colour_changes"] >= 1
+    assert len(r["slots"]) == 2
+    assert all(s["metres"] > 0 for s in r["slots"])
+    assert r["colour_changes"] >= 1
 
 
 def test_3mf_reader_unusual_shapes_and_cache(tmp_path):
@@ -255,7 +268,8 @@ def test_variable_layer_height_follows_the_slopes(tmp_path):
     ball.apply_translation([0, 0, 15])
     b = couches.bands(np.asarray(ball.vertices), np.asarray(ball.faces), 0.2, "pentes")
     h = lambda z: next(x for z0, z1, x in b if z0 <= z <= z1)                         # noqa: E731
-    assert h(29.5) < h(15) == 0.2 and min(x for *_, x in b) >= couches.MIN_MM       # thin at the pole, as is at the equator
+    assert h(29.5) < h(15) == 0.2
+    assert min(x for *_, x in b) >= couches.MIN_MM
     tube = trimesh.creation.cylinder(radius=10, height=30, sections=64)
     tube.apply_translation([0, 0, 15])
     assert couches.bands(np.asarray(tube.vertices), np.asarray(tube.faces), 0.2, "rapide") == [(0.0, 30.0, 0.28)]   # walls only
@@ -268,7 +282,8 @@ def test_variable_layer_height_follows_the_slopes(tmp_path):
     flat = printprep.prepare_and_slice(src, out_dir=tmp_path / "a", advanced={"couches": "non"})
     var = printprep.prepare_and_slice(src, out_dir=tmp_path / "b", advanced={"couches": "pentes"})
     assert zipfile.ZipFile(tmp_path / "b" / "boule_canvas.3mf").read("Metadata/layer_config_ranges.xml").count(b"<range") > 2
-    assert var["layers"] > flat["layers"] and any("couches de plus" in w for w in var["warnings"])
+    assert var["layers"] > flat["layers"]
+    assert any("couches de plus" in w for w in var["warnings"])
     g = (tmp_path / "b" / var["gcode"][0]).read_text(errors="ignore")
     zs = [float(z) for z in re.findall(r"^;Z:([\d.]+)", g, re.M)]
     assert min(round(b - a, 2) for a, b in zip(zs, zs[1:])) < 0.2
@@ -299,7 +314,8 @@ def test_painted_supports_and_seam_reach_the_slicer():
     support = lambda r, d: (d / r["gcode"][0]).read_text(errors="ignore").count(";TYPE:Support")   # noqa: E731
     d = config.MODELS_DIR / "a"
     r = printprep.prepare_and_slice(src, out_dir=d)
-    assert support(r, d) > 0 and any("peints" in w for w in r["warnings"])         # painted, none asked: only there
+    assert support(r, d) > 0
+    assert any("peints" in w for w in r["warnings"])
     colors.save_marks(src, {"sans_support": list(range(len(pv.faces)))}, clear=False)
     d = config.MODELS_DIR / "b"
     assert support(printprep.prepare_and_slice(src, out_dir=d, supports=True), d) == 0   # never here, everywhere
@@ -311,10 +327,12 @@ def test_drill_add_or_keep_a_shape():
     trimesh.creation.box((30, 30, 10)).export(lib / "plaque.stl")
     vol = lambda n: sum(trimesh.Trimesh(p.vertices, p.faces).volume for o in threemf.read(lib / n).objects for p in o.parts)  # noqa: E731
     hole = forme.apply(lib / "plaque.stl", shape="cylindre", op="percer", size=(8, 8, 20), at=(0, 0, 0))
-    assert hole["name"] == "plaque_perce.3mf" and abs(vol(hole["name"]) - (9000 - 3.1416 * 16 * 10)) < 60
+    assert hole["name"] == "plaque_perce.3mf"
+    assert abs(vol(hole["name"]) - (9000 - 3.1416 * 16 * 10)) < 60
     peg = forme.apply(lib / "plaque.stl", shape="cylindre", op="ajouter", size=(8, 8, 20), at=(0, 0, 5), colour=2)
     parts = [p for o in threemf.read(lib / peg["name"]).objects for p in o.parts]
-    assert [p.extruder for p in parts] == [1, 2] and abs(vol(peg["name"]) - (9000 + 3.1416 * 16 * 10)) < 60   # no overlap: the 10 mm above
+    assert [p.extruder for p in parts] == [1, 2]
+    assert abs(vol(peg["name"]) - (9000 + 3.1416 * 16 * 10)) < 60
     assert forme.apply(lib / "plaque.stl", shape="sphere", op="garder", size=(10, 10, 10), at=(0, 0, 0))["size_mm"] == [10.0, 10.0, 10.0]
     with pytest.raises(ValueError):
         forme.apply(lib / "plaque.stl", shape="cylindre", op="percer", size=(8, 8, 20), at=(100, 0, 0))   # misses: nothing changes
@@ -347,16 +365,20 @@ def test_two_models_on_one_plate_then_one_piece_resized(web):
     trimesh.creation.box((20, 20, 20)).export(lib / "bloc.stl")
     trimesh.creation.cylinder(radius=8, height=30).export(lib / "tube.stl")
     r = client.post("/lab/api/composer", json={"names": ["bloc.stl", "tube.stl"]}).json()
-    assert r["name"] == "bloc + tube.3mf" and r["pieces"] == 2 and len(r["colours"]) == 1    # same default colour: one spool
+    assert r["name"] == "bloc + tube.3mf"
+    assert r["pieces"] == 2
+    assert len(r["colours"]) == 1
     pr = threemf.read(lib / r["name"])
     a, b = (np.vstack([p.vertices for p in o.parts]) for o in pr.objects)
     assert [o.name for o in pr.objects] == ["bloc", "tube"]
-    assert b[:, 0].min() - a[:, 0].max() >= compose.GAP_MM - .01 and a[:, 2].min() == 0 == b[:, 2].min()
+    assert b[:, 0].min() - a[:, 0].max() >= compose.GAP_MM - .01
+    assert a[:, 2].min() == 0 == b[:, 2].min()
     assert client.post("/lab/api/composer", json={"names": ["bloc.stl"]}).status_code == 422
     out = lib / "bloc_plateau.3mf"
     colors.to_canvas(lib / r["name"], out, {1: 1}, scales={1: 2.0})
     a2, b2 = (np.vstack([p.vertices for p in o.parts]) for o in threemf.read(out).objects)
-    assert np.ptp(b2[:, 2]) == pytest.approx(60, abs=.01) and np.ptp(a2[:, 2]) == pytest.approx(20, abs=.01)
+    assert np.ptp(b2[:, 2]) == pytest.approx(60, abs=.01)
+    assert np.ptp(a2[:, 2]) == pytest.approx(20, abs=.01)
     assert b2[:, 2].min() == pytest.approx(0, abs=.01)                        # resized about its foot: still on the plate
     assert (b2[:, 0].min() + b2[:, 0].max()) / 2 - (a2[:, 0].min() + a2[:, 0].max()) / 2 == pytest.approx(
         (b[:, 0].min() + b[:, 0].max()) / 2 - (a[:, 0].min() + a[:, 0].max()) / 2, abs=.01)   # and in the same place
@@ -374,20 +396,24 @@ def test_composed_plate_loses_one_piece(web):
     trimesh.creation.cylinder(radius=8, height=30).export(lib / "tube.stl")
     r = client.post("/lab/api/composer", json={"names": ["bloc.stl", "tube.stl"]}).json()
     out = client.post(f"/lab/api/models/{r['name']}/retirer", json={"index": 0, "moves": {}, "scales": {}}).json()
-    assert out["pieces"] == 1 and out["piece"] == "bloc" and out["name"] == "bloc + tube sans bloc.3mf"
+    assert out["pieces"] == 1
+    assert out["piece"] == "bloc"
+    assert out["name"] == "bloc + tube sans bloc.3mf"
     pr = threemf.read(lib / out["name"])
     assert [o.name for o in pr.objects] == ["tube"]
     assert (lib / r["name"]).exists()                        # the original plate stays in the library
     before = np.vstack([p.vertices for p in threemf.read(lib / r["name"]).objects[1].parts])
     after = np.vstack([p.vertices for p in pr.objects[0].parts])
-    assert np.allclose(before.max(0), after.max(0), atol=.01) and np.allclose(before.min(0), after.min(0), atol=.01)
+    assert np.allclose(before.max(0), after.max(0), atol=.01)
+    assert np.allclose(before.min(0), after.min(0), atol=.01)
     # the viewer's placements follow the surviving pieces (indexes shift past the removed one)
     out2 = client.post(f"/lab/api/models/{r['name']}/retirer",
                        json={"index": 1, "moves": {"0": [15.0, 2.0, 0.0]}, "scales": {"0": 2.0}}).json()
     assert out2["piece"] == "tube"
     base = np.vstack([p.vertices for p in threemf.read(lib / r["name"]).objects[0].parts])   # the bloc as composed
     kept = np.vstack([p.vertices for p in threemf.read(lib / out2["name"]).objects[0].parts])
-    assert np.ptp(kept[:, 2]) == pytest.approx(40, abs=.01) and kept[:, 2].min() == pytest.approx(0, abs=.01)
+    assert np.ptp(kept[:, 2]) == pytest.approx(40, abs=.01)
+    assert kept[:, 2].min() == pytest.approx(0, abs=.01)
     assert kept[:, 0].max() == pytest.approx(base[:, 0].max() + (base[:, 0].max() - base[:, 0].min()) / 2 + 15, abs=.05)
     assert kept[:, 0].min() == pytest.approx(base[:, 0].min() - (base[:, 0].max() - base[:, 0].min()) / 2 + 15, abs=.05)
     assert client.post(f"/lab/api/models/{out['name']}/retirer", json={"index": 0}).status_code == 422
@@ -406,9 +432,12 @@ def test_compact_preview_glb_is_face_for_face():
     n, kind = struct.unpack("<I4s", glb[12:20])
     gltf = json.loads(glb[20:20 + n])
     prim = gltf["meshes"][0]["primitives"][0]
-    assert glb[:4] == b"glTF" and struct.unpack("<I", glb[8:12])[0] == len(glb) and "indices" not in prim
+    assert glb[:4] == b"glTF"
+    assert struct.unpack("<I", glb[8:12])[0] == len(glb)
+    assert "indices" not in prim
     acc = {k: gltf["accessors"][i] for k, i in prim["attributes"].items()}
-    assert acc["POSITION"]["count"] == 3 * 320 and acc["NORMAL"]["componentType"] == 5120   # one corner per face corner
+    assert acc["POSITION"]["count"] == 3 * 320
+    assert acc["NORMAL"]["componentType"] == 5120
     assert gltf["extensionsRequired"] == ["KHR_mesh_quantization"]
     ref = colors.preview_glb(src)
     start = 20 + n + 8
@@ -423,7 +452,8 @@ def test_economy_mode_purge_and_tower(tmp_path):
 
     from elegoo_lab import colors, printprep, slicer
     fm = colors.flush_matrix(["#FFFF00", "#101010"])  # yellow, black
-    assert fm[0] == 0 and fm[1] < fm[2]  # yellow->black needs less purge than black->yellow
+    assert fm[0] == 0
+    assert fm[1] < fm[2]
     assert colors.flush_matrix(["#FFFF00", "#101010"], smart=False)[1] == colors.FLUSH_MAX
     if not (slicer.TOOLS / "squashfs-root" / "AppRun").exists():
         pytest.skip("slicer non installé")
@@ -433,8 +463,10 @@ def test_economy_mode_purge_and_tower(tmp_path):
     eco = printprep.prepare_and_slice(src, out_dir=tmp_path / "e", mode="economie")
     qual = printprep.prepare_and_slice(src, out_dir=tmp_path / "q", mode="qualite")
     g_eco = (tmp_path / "e" / eco["gcode"][0]).read_text(errors="ignore")
-    assert ";TYPE:Prime tower" not in g_eco and "\nT1\n" in g_eco
-    assert eco["total_m"] < qual["total_m"] and sum(eco["purge_m"]) > 0
+    assert ";TYPE:Prime tower" not in g_eco
+    assert "\nT1\n" in g_eco
+    assert eco["total_m"] < qual["total_m"]
+    assert sum(eco["purge_m"]) > 0
 
 
 @pytest.mark.slicing
@@ -469,13 +501,17 @@ def test_cut_oversized_into_pieces_with_dowels():
     m = m.subdivide().subdivide()
     slots = np.where(m.triangles_center[:, 2] > 150, 2, 1)
     res = cut.cut(np.asarray(m.vertices), np.asarray(m.faces), slots, name="pave")
-    assert [a for a, _ in res.planes] == [2] and len(res.pieces) == 2 and res.pin_count >= 1
+    assert [a for a, _ in res.planes] == [2]
+    assert len(res.pieces) == 2
+    assert res.pin_count >= 1
     for p in res.pieces:
         piece = trimesh.Trimesh(p.vertices, p.faces, process=False)
-        assert piece.is_watertight and np.ptp(p.vertices[:, 2]) <= 256 - cut.MARGIN_MM
+        assert piece.is_watertight
+        assert np.ptp(p.vertices[:, 2]) <= 256 - cut.MARGIN_MM
         assert piece.volume < 60 * 60 * 150  # the dowel holes were drilled
     assert {int(s) for p in res.pieces for s in np.unique(p.slots)} == {1, 2}
-    assert res.pins is not None and len(res.pins.split()) == res.pin_count
+    assert res.pins is not None
+    assert len(res.pins.split()) == res.pin_count
 
 
 def test_config_save_keeps_other_settings(tmp_path, monkeypatch):
@@ -507,10 +543,12 @@ async def test_connection_check_on_simulator():
     await asyncio.sleep(0.3)
     try:
         ok = await connexion.check(sim.SIM_HOST, sim.SIM_CODE, mqtt_port=port, http_port=http_port)
-        assert ok["ok"] and [st["ok"] for st in ok["steps"]] == [True, True, True]
+        assert ok["ok"]
+        assert [st["ok"] for st in ok["steps"]] == [True, True, True]
         assert ok["serial"] == sim.SIM_SERIAL
         empty = await connexion.check("", "x")
-        assert not empty["ok"] and empty["steps"][0]["fix"]
+        assert not empty["ok"]
+        assert empty["steps"][0]["fix"]
     finally:
         task.cancel()
 
@@ -569,7 +607,8 @@ def test_comfy_chained_workflow_frees_vram_between_stages(tmp_path, monkeypatch)
     img = tmp_path / "photo.png"; img.write_bytes(b"png")
     files = comfy.generate(c, "a", tmp_path, image=img)
     names = [f.name for f in files]
-    assert any(n.endswith("figurine.png") for n in names) and any(n.endswith("m.glb") for n in names)
+    assert any(n.endswith("figurine.png") for n in names)
+    assert any(n.endswith("m.glb") for n in names)
     assert not any("tmp_preview" in n for n in names)            # temp previews are not kept
     assert calls.index("/free") < calls.index("/history/pb")      # VRAM freed before stage 2 runs
     assert len(uploads) == 2                                      # stage 2 received stage 1's image
@@ -586,9 +625,11 @@ def test_spool_matching_follows_loaded_canvas():
     model = [{"index": 1, "hex": "#D02020", "share": 70.0}, {"index": 2, "hex": "#F4F4F4", "share": 30.0}]
     r = spools.match(model, trays)
     assert r["mapping"] == {1: 2, 2: 1}                           # red -> T1, white -> T0
-    assert r["filaments"] == ["PLA Matte", "PLA"] and not r["warnings"]
+    assert r["filaments"] == ["PLA Matte", "PLA"]
+    assert not r["warnings"]
     green = spools.match([{"index": 1, "hex": "#20C040", "share": 50.0}], trays)
-    assert green["warnings"] and "pas de bobine proche" in green["warnings"][0]
+    assert green["warnings"]
+    assert "pas de bobine proche" in green["warnings"][0]
     mixed = spools.match([{"index": 1, "hex": "#FFFFFF", "share": 50.0}, {"index": 2, "hex": "#101010", "share": 50.0}], trays)
     assert any("incompatibles" in w for w in mixed["warnings"])   # PLA + PETG
 
@@ -605,7 +646,9 @@ def test_a_colour_needs_grams_before_any_slicing(web):
     model = [{"index": 1, "share": 50.0}, {"index": 2, "share": 50.0}]
     dec = spools.needs(160.0, model, usage="decoratif")
     fun = spools.needs(160.0, model, usage="fonctionnel")
-    assert 20 <= dec[1] <= 40 and fun[1] > 3 * dec[1] and spools.needs(None, model) == {}
+    assert 20 <= dec[1] <= 40
+    assert fun[1] > 3 * dec[1]
+    assert spools.needs(None, model) == {}
 
     client, lib = web
     m = trimesh.creation.box((100, 40, 40)).subdivide().subdivide()
@@ -619,7 +662,9 @@ def test_a_colour_needs_grams_before_any_slicing(web):
 
     client.app.state.manager = NS(printer=NS(canvas_status=canvas))
     r = client.get("/lab/api/models/bi.ply/match-spools?usage=decoratif").json()
-    assert set(r["needs"]) == {"1", "2"} and 20 <= int(r["needs"]["1"]) <= 40 and not r["warnings"]
+    assert set(r["needs"]) == {"1", "2"}
+    assert 20 <= int(r["needs"]["1"]) <= 40
+    assert not r["warnings"]
     strong = client.get("/lab/api/models/bi.ply/match-spools?usage=fonctionnel").json()
     assert int(strong["needs"]["1"]) > 3 * int(r["needs"]["1"])
 
@@ -637,8 +682,11 @@ def test_one_colour_model_takes_a_loaded_spool(tmp_path):
         {"tray_id": 2, "filament_color": "#FFFFFF", "filament_type": "PLA", "filament_name": "PLA Blanc", "status": 2},
         {"tray_id": 3, "filament_color": "#1E88E5", "filament_type": "PETG", "filament_name": "PETG Bleu", "status": 2}]}]}})
     blue = spools.single({"index": 1, "hex": "#2080E0", "share": 100.0}, trays, coloured=True)
-    assert blue["mapping"] == {1: 1} and blue["single"]["pos"] == 2      # sliced as T0, fed by the third spool
-    assert blue["filaments"] == ["PETG"] and blue["slot_colours"] == {1: "#1E88E5"} and not blue["warnings"]
+    assert blue["mapping"] == {1: 1}
+    assert blue["single"]["pos"] == 2
+    assert blue["filaments"] == ["PETG"]
+    assert blue["slot_colours"] == {1: "#1E88E5"}
+    assert not blue["warnings"]
     grey = {"index": 1, "hex": "#C0C0C0", "share": 100.0}
     assert spools.single(grey, trays, coloured=False, active=2)["single"]["pos"] == 1   # the spool in the head
     assert spools.single(grey, trays, coloured=False)["single"]["pos"] == 0
@@ -668,10 +716,16 @@ def test_advanced_settings_reach_the_gcode(tmp_path):
                                     advanced={"parois": 4, "motif": "gyroide", "temp_buse": 215, "motif_dessus": "concentrique",
                                               "paroi_dessus": "non", "paroi_precise": "oui"})
     g = (tmp_path / "a" / r["gcode"][0]).read_text(errors="ignore")
-    val = lambda k: re.search(rf"^; {k} = (.*)$", g, re.M).group(1)
-    assert val("curr_bed_type") == "Textured PEI Plate" and re.search(r"^M140 S60", g, re.M)   # PEI plate, 60 °C
-    assert val("wall_loops") == "4" and val("sparse_infill_pattern") == "gyroid" and re.search(r"^M10[49] S215", g, re.M)
-    assert val("top_surface_pattern") == "concentric" and val("only_one_wall_top") == "0" and val("precise_outer_wall") == "1"
+    def val(k):
+        return re.search(rf"^; {k} = (.*)$", g, re.M).group(1)
+    assert val("curr_bed_type") == "Textured PEI Plate"
+    assert re.search(r"^M140 S60", g, re.M)
+    assert val("wall_loops") == "4"
+    assert val("sparse_infill_pattern") == "gyroid"
+    assert re.search(r"^M10[49] S215", g, re.M)
+    assert val("top_surface_pattern") == "concentric"
+    assert val("only_one_wall_top") == "0"
+    assert val("precise_outer_wall") == "1"
     assert abs(float(re.search(r"^; max_z_height: ([\d.]+)", g, re.M).group(1)) - 20) < 0.5   # lying down: 20 mm tall
     with pytest.raises(ValueError):
         printprep.prepare_and_slice(src, out_dir=tmp_path / "b", copies=50, height_mm=60)       # does not fit
@@ -690,7 +744,8 @@ def test_off_dae_slice_and_the_temps_of_the_profile(tmp_path):
         res = printprep.prepare_and_slice(src, out_dir=tmp_path / ext[1:])
         assert res["gcode"]
     res = printprep.prepare_and_slice(tmp_path / "boite.off", out_dir=tmp_path)
-    assert res["temps"]["nozzle"] and res["temps"]["bed"] > 0   # the profile's temperatures, shown in the result
+    assert res["temps"]["nozzle"]
+    assert res["temps"]["bed"] > 0
 
 
 def test_zip_upload_and_broken_step_rejected(web):
@@ -704,9 +759,11 @@ def test_zip_upload_and_broken_step_rejected(web):
         z.writestr("deux.stl", stl)
         z.writestr(".cache.txt", b"junk")   # hidden files stay out
     r = client.post("/lab/api/models", files={"file": ("deux_pieces.zip", zz.getvalue())}).json()
-    assert len(r["names"]) == 2 and (lib / r["names"][0]).exists()
+    assert len(r["names"]) == 2
+    assert (lib / r["names"][0]).exists()
     bad = client.post("/lab/api/models", files={"file": ("oxe.step", b"pas un STEP")})
-    assert bad.status_code == 422 and not (lib / "oxe.step").exists()
+    assert bad.status_code == 422
+    assert not (lib / "oxe.step").exists()
 
 
 @pytest.fixture
@@ -732,7 +789,8 @@ def test_web_refuses_other_sites(web):
     assert evil.status_code == 403
     assert client.post("/print/pause", headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403
     ok = client.post("/lab/api/models", files={"file": ("a.stl", stl)}, headers={"Origin": "http://testserver"})
-    assert ok.status_code == 200 and ok.json()["name"] == "a.stl"
+    assert ok.status_code == 200
+    assert ok.json()["name"] == "a.stl"
     again = client.post("/lab/api/models", files={"file": ("a.stl", stl)})          # CLI/scripts: no Origin
     assert again.json()["name"] == "a (2).stl"                                       # no silent overwrite
     assert client.get("/lab/api/models/..%2F..%2Fconfig.toml").status_code == 404     # stays in the library
@@ -759,8 +817,10 @@ def test_the_assistant_acts_through_the_workshop_tools(web, monkeypatch):
     monkeypatch.setattr(assistant.httpx, "post", lambda url, **kw: Fake())
     r = client.post("/lab/api/models/cube.stl/assistant", json={"message": "mets-le à 40 mm de haut"})
     d = r.json()
-    assert r.status_code == 200 and d["outils"] == ["fiche", "redimensionner"]
-    assert d["file"] == "cube_h40mm.ply" and (lib / "cube_h40mm.ply").exists()
+    assert r.status_code == 200
+    assert d["outils"] == ["fiche", "redimensionner"]
+    assert d["file"] == "cube_h40mm.ply"
+    assert (lib / "cube_h40mm.ply").exists()
     assert abs(mesh.info(lib / "cube_h40mm.ply")["size_mm"][2] - 40) < 0.5
     monkeypatch.setattr(assistant, "api_key", lambda: None)
     assert client.post("/lab/api/models/cube.stl/assistant", json={"message": "coucou"}).status_code == 422
@@ -798,17 +858,23 @@ def test_the_assistant_runs_on_the_local_cli(web, monkeypatch):
     monkeypatch.setattr(assistant.subprocess, "run", fake_run)
     r = client.post("/lab/api/models/cube.stl/assistant", json={"message": "mets-le à 40 mm de haut"})
     d = r.json()
-    assert r.status_code == 200 and d["outils"] == ["fiche", "redimensionner"]
-    assert d["file"] == "cube_h40mm.ply" and (lib / "cube_h40mm.ply").exists()
+    assert r.status_code == 200
+    assert d["outils"] == ["fiche", "redimensionner"]
+    assert d["file"] == "cube_h40mm.ply"
+    assert (lib / "cube_h40mm.ply").exists()
     prompt = calls[0][calls[0].index("-p") + 1]
-    assert "cube.stl" in prompt and "PROTOCOLE" in fake_system
+    assert "cube.stl" in prompt
+    assert "PROTOCOLE" in fake_system
     assert "--resume" not in calls[0]
     # round 2 resumes the CLI session instead of resending the whole fiche and history
-    assert calls[1][calls[1].index("--resume") + 1] == "S1" and "--system-prompt-file" not in calls[1]
+    assert calls[1][calls[1].index("--resume") + 1] == "S1"
+    assert "--system-prompt-file" not in calls[1]
     # headless mode: the native tools are off (the workshop does the files itself), MCP (Blender…) stays approved
     off = {t: i for i, t in enumerate(calls[0])}
-    assert "bash" in calls[0] and calls[0][off["bash"] - 1] == "--disabled-tools"
-    assert "--auto-approve" not in calls[0] and calls[0][off["--approval-policy"] + 1] == "auto-approve"
+    assert "bash" in calls[0]
+    assert calls[0][off["bash"] - 1] == "--disabled-tools"
+    assert "--auto-approve" not in calls[0]
+    assert calls[0][off["--approval-policy"] + 1] == "auto-approve"
     # a CLI that goes away gives a clear error, not a crash
     monkeypatch.setattr(assistant, "cli_bin", lambda: None)
     assert client.post("/lab/api/models/cube.stl/assistant", json={"message": "x"}).status_code == 422
@@ -855,8 +921,10 @@ def test_the_api_engine_guards(web, monkeypatch):
     monkeypatch.setattr(assistant.httpx, "post", fake_post)
     r = client.post("/lab/api/models/cube.stl/assistant", json={"message": "dis-moi tout du cube"})
     d = r.json()
-    assert r.status_code == 200 and d["reply"].startswith("La fiche est là")
-    assert d["outils"] == ["fiche"] and runs["n"] == 1     # the duplicate fiche was replayed, not rerun
+    assert r.status_code == 200
+    assert d["reply"].startswith("La fiche est là")
+    assert d["outils"] == ["fiche"]
+    assert runs["n"] == 1
     assert d["file"] == "cube.stl"
     assert choices == ["auto", "auto", "none"]       # the all-duplicate round forces a plain answer
 
@@ -868,8 +936,10 @@ def test_the_api_engine_guards(web, monkeypatch):
               msg(content="Voilà le cube à 40 puis 50 mm de haut.")]
     r = client.post("/lab/api/models/cube.stl/assistant", json={"message": "mets-le à 40 puis 50 mm de haut"})
     d = r.json()
-    assert d["outils"] == ["redimensionner", "redimensionner"] and runs["n"] == 3
-    assert d["file"] == "cube_h40mm_h50mm.ply" and (lib / "cube_h40mm_h50mm.ply").exists()
+    assert d["outils"] == ["redimensionner", "redimensionner"]
+    assert runs["n"] == 3
+    assert d["file"] == "cube_h40mm_h50mm.ply"
+    assert (lib / "cube_h40mm_h50mm.ply").exists()
     assert abs(mesh.info(lib / "cube_h40mm_h50mm.ply")["size_mm"][2] - 50) < 0.5
 
     # guard 3: a silent model after its tools gets one nudge, then it speaks
@@ -880,7 +950,8 @@ def test_the_api_engine_guards(web, monkeypatch):
     r = client.post("/lab/api/models/cube_h40mm_h50mm.ply/assistant", json={"message": "sa taille ?"})
     d = r.json()
     assert r.status_code == 200
-    assert d["reply"].startswith("La pièce fait 20 mm") and choices[-1] == "none"
+    assert d["reply"].startswith("La pièce fait 20 mm")
+    assert choices[-1] == "none"
 
 
 def test_the_aI_picks_the_slice_settings(web, monkeypatch):
@@ -911,11 +982,15 @@ def test_the_aI_picks_the_slice_settings(web, monkeypatch):
     r = client.post("/lab/api/models/cube.stl/slice-brain", json={"quality": "0.20mm Standard", "infill": 15})
     assert r.status_code == 200
     d = r.json()
-    assert d["qualite"] == "0.16mm Optimal" and d["remplissage"] == 25 and d["supports"] == "aucun"
+    assert d["qualite"] == "0.16mm Optimal"
+    assert d["remplissage"] == 25
+    assert d["supports"] == "aucun"
     assert d["reglages"] == {"couture": "arriere"}            # unknown key and out-of-range number dropped
-    assert d["usage"] == "fonctionnel" and "explication" in d
+    assert d["usage"] == "fonctionnel"
+    assert "explication" in d
     assert '"taille_mm"' in captured["prompt"]                # the brain sees the part's sheet
-    assert "TRANCHEUR" in captured["system"] and "--resume" not in captured["prompt"]
+    assert "TRANCHEUR" in captured["system"]
+    assert "--resume" not in captured["prompt"]
 
     # no CLI configured: a clear error, not a crash
     monkeypatch.setattr(assistant, "cli_bin", lambda: None)
@@ -938,11 +1013,14 @@ def test_the_assistant_journals_live_events(web, monkeypatch):
 
     monkeypatch.setattr(assistant, "chat", fake_chat)
     r = client.post("/lab/api/models/b.stl/assistant/stream", json={"message": "décris-la"})
-    assert r.status_code == 200 and "text/event-stream" in r.headers["content-type"]
+    assert r.status_code == 200
+    assert "text/event-stream" in r.headers["content-type"]
     events = [json.loads(L[6:]) for L in r.text.splitlines() if L.startswith("data: ")]
     assert [e["type"] for e in events] == ["outil", "cli", "final"]
-    assert events[0]["outil"] == "fiche" and events[1]["cible"] == "mcp_blender.get_scene_info"
-    assert events[-1]["reply"] == "Voilà." and events[-1]["outils"] == ["fiche"]
+    assert events[0]["outil"] == "fiche"
+    assert events[1]["cible"] == "mcp_blender.get_scene_info"
+    assert events[-1]["reply"] == "Voilà."
+    assert events[-1]["outils"] == ["fiche"]
 
 
 @pytest.mark.slicing
@@ -952,16 +1030,20 @@ def test_web_preview_slice_and_jobs(web):
     trimesh.creation.box((20, 20, 20)).export(lib / "c.stl")
     assert client.get("/lab/api/models/c.stl/colors").json()["colours"]
     glb = client.get("/lab/api/models/c.stl/preview.glb")
-    assert glb.status_code == 200 and glb.content[:4] == b"glTF"
+    assert glb.status_code == 200
+    assert glb.content[:4] == b"glTF"
     assert client.get("/lab/api/jobs").json()[0]["state"] == "error"                 # interrupted job reported
     assert client.get("/lab/api/setup").json()["tests"]
     if not (slicer.TOOLS / "squashfs-root" / "AppRun").exists():
         pytest.skip("slicer non installé")
     r = client.post("/lab/api/models/c.stl/prepare-print", json={"advanced": {"parois": 3}}).json()
     g = (lib / r["gcode"][0]).read_text(errors="ignore")
-    assert "; thumbnail begin 144x144" in g and "; curr_bed_type = Textured PEI Plate" in g and "; wall_loops = 3" in g
+    assert "; thumbnail begin 144x144" in g
+    assert "; curr_bed_type = Textured PEI Plate" in g
+    assert "; wall_loops = 3" in g
     bad = client.post("/lab/api/models/c.stl/prepare-print", json={"advanced": {"parois": 99}})
-    assert bad.status_code == 422 and "parois" in bad.json()["detail"].lower()
+    assert bad.status_code == 422
+    assert "parois" in bad.json()["detail"].lower()
 
 
 def test_parametric_parts_are_closed_and_validated(tmp_path, monkeypatch):
@@ -990,19 +1072,25 @@ def test_phone_access_needs_the_code(web, monkeypatch):
     from elegoo_lab import app as app_mod
     client, lib = web
     code = access.ensure_code()
-    assert code and access.ensure_code() is None and "code_hash" in config.CONFIG_FILE.read_text()
+    assert code
+    assert access.ensure_code() is None
+    assert "code_hash" in config.CONFIG_FILE.read_text()
     assert code not in config.CONFIG_FILE.read_text()                                  # only the hash is stored
     phone = TestClient(app_mod.create_app(lan=True, port=8787), client=("192.168.1.42", 5000))
     page = phone.get("/lab/", follow_redirects=False)
-    assert page.status_code == 303 and page.headers["location"] == "/lab/login.html"
+    assert page.status_code == 303
+    assert page.headers["location"] == "/lab/login.html"
     assert phone.get("/lab/login.html").status_code == 200
-    assert phone.get("/lab/api/models").status_code == 401 and phone.post("/print/pause").status_code == 401
+    assert phone.get("/lab/api/models").status_code == 401
+    assert phone.post("/print/pause").status_code == 401
     for _ in range(access.MAX_FAILS):
         assert phone.post("/lab/api/login", json={"code": "nope"}).status_code == 403
     assert phone.post("/lab/api/login", json={"code": code}).status_code == 429        # guessing is throttled
     other = TestClient(app_mod.create_app(lan=True, port=8787), client=("192.168.1.43", 5000))
     ok = other.post("/lab/api/login", json={"code": code})
-    assert ok.status_code == 200 and "HttpOnly" in ok.headers["set-cookie"] and "SameSite=Strict" in ok.headers["set-cookie"]
+    assert ok.status_code == 200
+    assert "HttpOnly" in ok.headers["set-cookie"]
+    assert "SameSite=Strict" in ok.headers["set-cookie"]
     assert other.get("/lab/api/models").status_code == 200                              # session cookie kept
     assert other.get("/lab/api/phone").json()["qr"].lstrip().startswith("<?xml")
     access.set_code("4321")                                                             # new code ends old sessions
@@ -1026,10 +1114,12 @@ async def test_alerts_follow_a_print(tmp_path, monkeypatch):
     await asyncio.sleep(0.05)                                                           # photo task
     seen = [e["kind"] for e in w.events]
     assert seen == ["debut", "filament", "reprise", "fin"]
-    assert w.events[-1].get("photo") and (alerts.photos_dir() / w.events[-1]["photo"]).read_bytes().startswith(b"\xff\xd8")
+    assert w.events[-1].get("photo")
+    assert (alerts.photos_dir() / w.events[-1]["photo"]).read_bytes().startswith(b"\xff\xd8")
     w.observe(13, 0, "b.gcode", {}); w.observe(13, 30, "b.gcode", {}); w.observe(8, 30, "b.gcode", {})
     w.observe(13, 0, "c.gcode", {}); w.observe(14, 10, "c.gcode", {"exception_status": [501]})
-    assert [e["kind"] for e in w.events[-4:]] == ["debut", "arret", "debut", "erreur"] and "501" in w.events[-1]["detail"]
+    assert [e["kind"] for e in w.events[-4:]] == ["debut", "arret", "debut", "erreur"]
+    assert "501" in w.events[-1]["detail"]
     assert [e["kind"] for e in alerts.Watcher(lambda: None).events] == [e["kind"] for e in w.events]   # kept on disk
 
 
@@ -1041,11 +1131,13 @@ def test_alert_when_the_plate_is_cold(tmp_path, monkeypatch):
     w = alerts.Watcher(lambda: None)
     for ps, prog in [(0, 0), (13, 0), (13, 99), (0, 0)]:
         w.observe(ps, prog, "chat.gcode", {})
-    assert w.events[-1]["kind"] == "fin" and "35" in w.events[-1]["detail"]
+    assert w.events[-1]["kind"] == "fin"
+    assert "35" in w.events[-1]["detail"]
     w.cool(None); w.cool(52.0)
     assert w.events[-1]["kind"] == "fin"                       # still hot, or no reading: wait
     w.cool(33.6)
-    assert w.events[-1]["kind"] == "froid" and "34 °C" in w.events[-1]["detail"]
+    assert w.events[-1]["kind"] == "froid"
+    assert "34 °C" in w.events[-1]["detail"]
     w.cool(30.0)
     assert sum(e["kind"] == "froid" for e in w.events) == 1    # said once
     w2 = alerts.Watcher(lambda: None)
@@ -1088,9 +1180,13 @@ def test_section_for_the_tablet(tmp_path):
     f = tmp_path / "carre.gcode"
     f.write_text("\n".join(g) + "\n; filament_colour = #FF0000;#00FF00\n")
     d = coupe.coupe(f, 2)
-    assert d["layer"] == 2 and d["layers"] == [0.2, 0.4, 0.6] and d["box"] == [0, 0, 10, 10]
-    assert len(d["section"]) == 16 and d["tools"] == [0, 0, 0, 0]          # layer 2 from above: 4 sides
-    assert [r[2] for r in d["front"][2]] == [1] and d["front"][0][0][:2] == [0, 9]   # front: whole width, colour per layer
+    assert d["layer"] == 2
+    assert d["layers"] == [0.2, 0.4, 0.6]
+    assert d["box"] == [0, 0, 10, 10]
+    assert len(d["section"]) == 16
+    assert d["tools"] == [0, 0, 0, 0]
+    assert [r[2] for r in d["front"][2]] == [1]
+    assert d["front"][0][0][:2] == [0, 9]
     assert "front" not in coupe.coupe(f, 3, front=False)
 
 
@@ -1106,7 +1202,10 @@ def test_colours_now_and_next(web):
     f = lib / "noel_0.20mm_PLA.gcode"
     f.write_text("\n".join(g) + "\n; filament_colour = #008755;#E9E9E7;#D22630\n")
     p = suivi_couleurs.plan(f, 2, active=1)                      # white engaged: red comes next, in this layer
-    assert p["tool"] == 1 and [n["tool"] for n in p["next"]] == [2, 0] and p["left"] == 2 and p["total"] == 3
+    assert p["tool"] == 1
+    assert [n["tool"] for n in p["next"]] == [2, 0]
+    assert p["left"] == 2
+    assert p["total"] == 3
     assert [n["tool"] for n in suivi_couleurs.plan(f, 2)["next"]] == [0]   # no CANVAS: the layer's changes are done
     # purge still to come per tool, as the firmware counts it (L under 23 mm rounded up, +6 mm): white is done
     assert [(x["tool"], x["left"], x["count"], x["left_m"], x["total_m"]) for x in p["purge"]] == [
@@ -1124,7 +1223,9 @@ def test_colours_now_and_next(web):
     data = stock.load(); data["prints"][f.name] = {"per_m": [1, 1, 1], "route": {"0": 1, "1": 2, "2": 0}}; stock.save(data)
     d = client.get("/lab/api/couleurs").json()
     # tray 2 engaged = tool 1 by the launch route; tool 2 is in tray 0, tool 0 in tray 1
-    assert d["maintenant"]["tool"] == 1 and d["maintenant"]["bobine"] == 3 and d["maintenant"]["hex"] == "#F72221"
+    assert d["maintenant"]["tool"] == 1
+    assert d["maintenant"]["bobine"] == 3
+    assert d["maintenant"]["hex"] == "#F72221"
     assert [(n["tool"], n["bobine"], n["couche"]) for n in d["suivants"]] == [(2, 1, 2), (0, 2, 3)]
     assert [(x["bobine"], x["reste"], x["total"]) for x in d["purge"]] == [(2, 1, 2), (3, 0, 1), (1, 1, 1)]
 
@@ -1136,7 +1237,8 @@ def test_english_dictionary_and_server_translation():
 
     from elegoo_lab import i18n
     d = json.loads(i18n.DICT.read_text())
-    assert len(d["exact"]) > 1000 and len(d["patterns"]) > 100
+    assert len(d["exact"]) > 1000
+    assert len(d["patterns"]) > 100
     for fr, en in d["patterns"]:
         re.compile("^" + re.escape(fr).replace(r"\{\}", "(.*?)") + "$")                # every pattern is valid
         n = fr.count("{}")
@@ -1168,13 +1270,17 @@ def test_pwa_and_https_for_the_phone(web, monkeypatch, tmp_path):
     assert "192.168.1.42" in {str(a) for a in san.get_values_for_type(x509.IPAddress)}
     ssl.create_default_context(cadata=certs.ca_pem().decode()).load_cert_chain(crt, key)   # chain is coherent
     before = crt.read_bytes()
-    assert certs.ensure(["192.168.1.42"]) == (crt, key) and crt.read_bytes() == before          # reused, not reissued
+    assert certs.ensure(["192.168.1.42"]) == (crt, key)
+    assert crt.read_bytes() == before
     web_app = app_mod.create_app(lan=True, port=8443, https=True, http_port=8787)
     plain = TestClient(web_app, base_url="http://192.168.1.42:8787", client=("192.168.1.50", 5000))
     r = plain.get("/lab/", follow_redirects=False)
-    assert r.status_code == 307 and r.headers["location"] == "https://192.168.1.42:8443/lab/"   # HTTP: only a signpost
+    assert r.status_code == 307
+    assert r.headers["location"] == "https://192.168.1.42:8443/lab/"
     ca = plain.get("/lab/ca.crt")
-    assert ca.status_code == 200 and b"BEGIN CERTIFICATE" in ca.content and b"PRIVATE" not in ca.content
+    assert ca.status_code == 200
+    assert b"BEGIN CERTIFICATE" in ca.content
+    assert b"PRIVATE" not in ca.content
     phone = TestClient(web_app, base_url="https://192.168.1.42:8443", client=("192.168.1.50", 5000))
     for path in ("/lab/manifest.webmanifest", "/lab/sw.js", "/lab/offline.html", "/lab/icons/icon-192.png"):
         assert phone.get(path).status_code == 200, path                                 # installable before login
@@ -1182,7 +1288,8 @@ def test_pwa_and_https_for_the_phone(web, monkeypatch, tmp_path):
     ok = phone.post("/lab/api/login", json={"code": code})
     assert "Secure" in ok.headers["set-cookie"]
     info = TestClient(web_app, client=("127.0.0.1", 5000)).get("/lab/api/phone").json()
-    assert info["url"].startswith("https://") and info["ca_url"].endswith(":8787/lab/ca.crt")
+    assert info["url"].startswith("https://")
+    assert info["ca_url"].endswith(":8787/lab/ca.crt")
 
 
 def test_advisor_spots_what_ruins_prints(tmp_path):
@@ -1190,7 +1297,8 @@ def test_advisor_spots_what_ruins_prints(tmp_path):
     def save(m, name):
         m.export(tmp_path / name)
         return tmp_path / name
-    keys = lambda p, **kw: {w["key"] for w in advisor.analyze(p, **kw)["warnings"]}
+    def keys(p, **kw):
+        return {w["key"] for w in advisor.analyze(p, **kw)["warnings"]}
     assert keys(save(trimesh.creation.box((20, 20, 20)), "cube.stl")) == set()
     base = trimesh.creation.box((30, 30, 3)); base.apply_translation((0, 0, 1.5))
     fin = trimesh.creation.box((30, 0.5, 20)); fin.apply_translation((0, 0, 13))
@@ -1198,11 +1306,13 @@ def test_advisor_spots_what_ruins_prints(tmp_path):
     stem = trimesh.creation.box((10, 10, 20)); stem.apply_translation((0, 0, 10))
     top = trimesh.creation.box((40, 40, 4)); top.apply_translation((0, 0, 22))
     tee = save(trimesh.util.concatenate([stem, top]), "champignon.stl")
-    assert "surplombs" in keys(tee) and "surplombs" not in keys(tee, supports=True)
+    assert "surplombs" in keys(tee)
+    assert "surplombs" not in keys(tee, supports=True)
     w = next(w for w in advisor.analyze(tee)["warnings"] if w["key"] == "surplombs")
     assert w["fix"] == {"supports": "arbre"}
     ball = save(trimesh.creation.icosphere(subdivisions=3, radius=15), "boule.stl")
-    assert "adherence" in keys(ball) and "adherence" not in keys(ball, brim=True)
+    assert "adherence" in keys(ball)
+    assert "adherence" not in keys(ball, brim=True)
 
 
 def test_spool_stock_and_costs(tmp_path, monkeypatch):
@@ -1215,14 +1325,16 @@ def test_spool_stock_and_costs(tmp_path, monkeypatch):
     assert stock.sync(trays) == []                                                   # first sight: no alert
     stock.set_tray(1, restant_g=150, prix_kg=25)
     u = stock.record_slice("chat.gcode", [10.0, 30.0], [0.5, 0.5])
-    assert u["trays"][1]["manque"] is False and abs(u["eur"] - (u["trays"][0]["eur"] + u["trays"][1]["eur"])) < 0.02
+    assert u["trays"][1]["manque"] is False
+    assert abs(u["eur"] - (u["trays"][0]["eur"] + u["trays"][1]["eur"])) < 0.02
     stock.record_slice("gros.gcode", [0.0, 80.0])
     assert stock.check("gros.gcode")["manques"][0]["tray"] == 1                       # 238 g needed, 150 g left
     w = alerts.Watcher(lambda: None)
     for ps, prog in [(0, 0), (13, 0), (13, 99), (0, 0)]:
         w.observe(ps, prog, "/local/chat.gcode", {})
     s = stock.summary()
-    assert s["trays"][1]["restant_g"] < 60 and s["history"][0]["fichier"] == "chat.gcode"
+    assert s["trays"][1]["restant_g"] < 60
+    assert s["history"][0]["fichier"] == "chat.gcode"
     assert any(e["kind"] == "stock" and "Bobine 2" in e["detail"] for e in w.events)       # nearly empty warning
     before = s["trays"][0]["restant_g"]
     assert stock.consume("chat.gcode", 1.0, s["history"][0]["ref"]) == []            # counted once only
@@ -1238,7 +1350,8 @@ def test_spool_stock_and_costs(tmp_path, monkeypatch):
     assert stock.summary()["trays"][1]["question"]["remise"] is True                 # "the same one, or a new one?"
     stock.set_tray(1, nouvelle=True)                                                 # the user says: a new one
     t1 = stock.summary()["trays"][1]
-    assert t1["restant_g"] == t1["poids_g"] and "question" not in t1
+    assert t1["restant_g"] == t1["poids_g"]
+    assert "question" not in t1
     stock.set_tray(1, restant_g=left)
     stock.set_tray(0, restant_g=300)
     trays[0]["color"], trays[1]["color"] = trays[1]["color"], trays[0]["color"]   # two spools swap trays
@@ -1287,17 +1400,22 @@ async def test_ai_watch_pauses_a_failed_print_and_gallery_keeps_it(tmp_path, mon
     for layer in range(1, 41):                       # 40 healthy layers: nothing to say
         w.observe(13, layer * 2, "dragon.gcode", {})
         await w._camera(layer)
-    assert not paused and not [e for e in w.events if e["kind"] in ("suspect", "rate")]
+    assert not paused
+    assert not [e for e in w.events if e["kind"] in ("suspect", "rate")]
     failing["on"] = True                             # spaghetti appears
     for layer in range(41, 60):
         await w._camera(layer)
         if paused:
             break
-    assert paused and w.events[-1]["kind"] == "rate" and (alerts.photos_dir() / w.events[-1]["photo"]).exists()
-    assert w.rec.meta["alertes"] and w.rec.frames >= 40
+    assert paused
+    assert w.events[-1]["kind"] == "rate"
+    assert (alerts.photos_dir() / w.events[-1]["photo"]).exists()
+    assert w.rec.meta["alertes"]
+    assert w.rec.frames >= 40
     w.observe(6, 90, "dragon.gcode", {})
     w.observe(13, 90, "dragon.gcode", {})            # the user resumed: judged afresh
-    assert not w.ai_paused and w.pred.frames == 0
+    assert not w.ai_paused
+    assert w.pred.frames == 0
     w.observe(0, 0, "", {})                          # stopped before the end
     await asyncio.sleep(0.5)
     for _ in range(50):
@@ -1305,9 +1423,12 @@ async def test_ai_watch_pauses_a_failed_print_and_gallery_keeps_it(tmp_path, mon
             break
         await asyncio.sleep(0.2)
     e = gallery.entries()[0]
-    assert e["issue"] == "arretee" and e["photo"] and e["alertes"]
+    assert e["issue"] == "arretee"
+    assert e["photo"]
+    assert e["alertes"]
     if shutil.which("ffmpeg"):
-        assert e["video"] == "timelapse.mp4" and gallery.file(e["id"], "timelapse.mp4").stat().st_size > 1000
+        assert e["video"] == "timelapse.mp4"
+        assert gallery.file(e["id"], "timelapse.mp4").stat().st_size > 1000
     assert not (gallery.root() / e["id"] / "frames").exists()
     with pytest.raises(FileNotFoundError):
         gallery.file(e["id"], "../meta.json")
@@ -1325,13 +1446,18 @@ def test_failure_model_on_simulator_frame():
 def test_web_forms_reach_the_server(web):
     client, lib = web
     r = client.post("/lab/api/bobines/1", json={"restant_g": 420, "prix_kg": 24.5})
-    assert r.status_code == 200 and r.json()["restant_g"] == 420 and r.json()["prix_kg"] == 24.5
+    assert r.status_code == 200
+    assert r.json()["restant_g"] == 420
+    assert r.json()["prix_kg"] == 24.5
     assert client.post("/lab/api/bobines/1", json={"restant_g": 99999}).status_code == 422
     r = client.post("/lab/api/surveillance", json={"pause_auto": True, "sensibilite": 1.5})
-    assert r.status_code == 200 and r.json()["pause_auto"] is True and r.json()["sensibilite"] == 1.5
+    assert r.status_code == 200
+    assert r.json()["pause_auto"] is True
+    assert r.json()["sensibilite"] == 1.5
     assert client.post("/lab/api/surveillance", json={"sensibilite": 9}).status_code == 422
     r = client.post("/lab/api/lancement", json={"bedlevel_force": True, "print_layout": "B"})
-    assert r.status_code == 200 and r.json() == {**r.json(), "bedlevel_force": True, "print_layout": "B"}
+    assert r.status_code == 200
+    assert r.json() == {**r.json(), "bedlevel_force": True, "print_layout": "B"}
     assert client.post("/lab/api/lancement", json={"print_layout": "Z"}).status_code == 422
     assert client.get("/lab/api/lancement").json()["print_layout"] == "B"
 
@@ -1343,15 +1469,18 @@ async def test_start_sends_the_spool_map(printer, tmp_path, monkeypatch):
     g.write_text("; HEADER_BLOCK_START\n; filament used [mm] = 1200.00, 0.00, 340.50\n; HEADER_BLOCK_END\nG1 X1\n"
                  "; filament_colour = #008755;#E9E9E7;#F2A900\n; filament_type = PLA;PLA;PETG\n")
     tools = launch.gcode_colours(g)
-    assert [t["t"] for t in tools] == [0, 2] and tools[1]["type"] == "PETG"          # unused colour left out
+    assert [t["t"] for t in tools] == [0, 2]
+    assert tools[1]["type"] == "PETG"
     canvas = (await printer.canvas_status()).raw
     plan = launch.plan(g, canvas)
     # green file colour is on the CANVAS's green spool, gold on the gold one, whatever their positions
     by_t = {m["t"]: m["tray_id"] for m in plan["slot_map"]}
     trays = {t["tray_id"]: t["colour"] for t in plan["trays"]}
-    assert trays[by_t[0]] == "#008755" and trays[by_t[2]] == "#F2A900"
+    assert trays[by_t[0]] == "#008755"
+    assert trays[by_t[2]] == "#F2A900"
     payload = launch.params(g.name, {"bedlevel_force": True}, plan["slot_map"])
-    assert payload["config"]["bedlevel_force"] is True and payload["config"]["slot_map"][0]["canvas_id"] == 0
+    assert payload["config"]["bedlevel_force"] is True
+    assert payload["config"]["slot_map"][0]["canvas_id"] == 0
     assert (await printer._cc2_request(1020, payload))["error_code"] == 0
     await printer.stop()
     await asyncio.sleep(0.3)
@@ -1367,7 +1496,9 @@ def test_printer_name_stays_ascii():
     from elegoo_lab import launch
     assert launch.printer_name("cube_0.20mm_PLA.gcode") == "cube_0.20mm_PLA.gcode"
     cine = launch.printer_name("洋葱头宝宝_canvas_0.20mm_PLA.gcode")
-    assert cine.isascii() and cine.endswith(".gcode") and len(cine) < 40
+    assert cine.isascii()
+    assert cine.endswith(".gcode")
+    assert len(cine) < 40
     assert launch.printer_name(cine) == cine                                # deterministic: upload and start agree
     assert launch.printer_name("洋葱头宝宝.3mf.json") != launch.printer_name("洋葱头宝宝.gcode")
     # the whole round trip: upload under the translated name, then start names the same file
@@ -1399,7 +1530,8 @@ def test_usage_puts_plastic_where_it_matters(tmp_path):
         assert "; enable_filament_ramming = 0" in g                     # ramming on -> error 1243
     assert grams["decoratif"] < 0.75 * grams["fonctionnel"]
     rows = printprep.compare(src, {"usage": "decoratif"})
-    assert rows[0]["current"] and {r["label"] for r in rows} >= {"Ton choix", "Rapide", "Solide", "Détaillé"}
+    assert rows[0]["current"]
+    assert {r["label"] for r in rows} >= {"Ton choix", "Rapide", "Solide", "Détaillé"}
     assert all("error" not in r and r["g"] > 0 for r in rows)
 
 
@@ -1409,7 +1541,8 @@ def test_cc2_knowledge_errors_materials_maintenance(tmp_path, monkeypatch):
     from elegoo_lab import alerts, errors, gallery, launch, maintenance
     monkeypatch.setattr(config, "MODELS_DIR", tmp_path)
     monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "config.toml")
-    assert "capot" in errors.sentence([707]) and "code 707" in errors.sentence([707, 1231])   # cover fan detached, not "purge missed"
+    assert "capot" in errors.sentence([707])
+    assert "code 707" in errors.sentence([707, 1231])
     assert "écran" in errors.sentence([4242])                                   # unknown code: look at the screen
     w = alerts.Watcher(lambda: None)
     w.observe(0, 0, "", {}); w.observe(13, 0, "a.gcode", {})
@@ -1417,13 +1550,15 @@ def test_cc2_knowledge_errors_materials_maintenance(tmp_path, monkeypatch):
     w.observe(13, 11, "a.gcode", {"exception_status": [707]})                 # reported once
     assert [e["kind"] for e in w.events].count("anomalie") == 1
     w.observe(6, 12, "a.gcode", {"exception_status": [707, 1242]})
-    assert w.events[-1]["kind"] == "filament" and "1242" in w.events[-1]["detail"]
+    assert w.events[-1]["kind"] == "filament"
+    assert "1242" in w.events[-1]["detail"]
     for _ in range(10):                                                         # the same picture over and over
         w._camera_health(b"same")
     w._camera_health(b"same")
     assert w.events[-1]["kind"] == "camera"
     warn = " ".join(launch.material_warnings([{"t": 0, "type": "TPU"}, {"t": 1, "type": "PLA-CF"}], []))
-    assert "TPU" in warn and "abrasif" in warn
+    assert "TPU" in warn
+    assert "abrasif" in warn
     assert launch.material_warnings([{"t": 0, "type": "PLA"}], [{"type": "PLA", "filament_name": "PLA Rouge"}]) == []
     st = {t["id"]: t for t in maintenance.status()}
     assert not any(t["a_faire"] for t in st.values())
@@ -1433,7 +1568,8 @@ def test_cc2_knowledge_errors_materials_maintenance(tmp_path, monkeypatch):
     meta = gallery.entries()[0]
     gallery.update(meta["id"], duree_s=40 * 3600)
     due = {t["id"] for t in maintenance.newly_due()}
-    assert due == {"plateau"} and maintenance.newly_due() == []                 # announced once
+    assert due == {"plateau"}
+    assert maintenance.newly_due() == []
     time.sleep(1.1)
     assert not {t["id"]: t for t in maintenance.done("plateau")}["plateau"]["a_faire"]
 
@@ -1448,7 +1584,8 @@ def test_canvas_trays_in_both_formats():
     got = spools.loaded(sdk)
     assert [(t["pos"], t["tray_id"], t["type"], t["color"]) for t in got] == [(0, 1, "PETG", "#FF0000"), (2, 3, "PLA", "#00FF00")]
     old = {"canvas_list": [{"tray_list": [{"tray_id": 0, "type": "PLA", "color": "#123456", "status": 1}]}]}
-    assert spools.loaded(old)[0]["pos"] == 0 and spools.loaded(old)[0]["color"] == "#123456"
+    assert spools.loaded(old)[0]["pos"] == 0
+    assert spools.loaded(old)[0]["color"] == "#123456"
 
 
 def test_orientations_advise_the_obvious(tmp_path):
@@ -1458,7 +1595,8 @@ def test_orientations_advise_the_obvious(tmp_path):
     mast = trimesh.creation.box((4, 4, 50)); mast.apply_translation((0, 0, 28))
     trimesh.util.concatenate([plate, mast]).export(tmp_path / "panneau.stl")
     out = {o["id"]: o for o in orient.orientations(tmp_path / "panneau.stl")}
-    assert len(out) == 6 and all(o["image"].startswith("data:image/png;base64,") for o in out.values())
+    assert len(out) == 6
+    assert all(o["image"].startswith("data:image/png;base64,") for o in out.values())
     assert out["debout"]["recommandee"]                       # plate down, mast up: no support, big footing
     assert out["envers"]["contact"] < 30                      # upside down it stands on the mast tip
     assert out["avant"]["surplomb"] > out["debout"]["surplomb"]
@@ -1485,15 +1623,20 @@ def test_library_knows_each_file(tmp_path, monkeypatch):
     (tmp_path / "orphelin_0.20mm_PLA.gcode").write_text("G1 X1\n")
     library.record("orphelin_0.20mm_PLA.gcode", source="parti.stl")
     by = {e["name"]: e for e in library.listing()}
-    assert by["chat_canvas.3mf"]["kind"] == "technique" and by["chat.stl"]["prets"] == 1
+    assert by["chat_canvas.3mf"]["kind"] == "technique"
+    assert by["chat.stl"]["prets"] == 1
     c = by["chat_0.20mm_PLA.gcode"]
-    assert c["source"] == "chat.stl" and c["temps"] == "1h 2m 3s" and c["g"] == 3.2
-    assert c["couleurs"] == ["#E53935"] and c["qualite"] == "0.20mm Standard"   # unused colour left out
+    assert c["source"] == "chat.stl"
+    assert c["temps"] == "1h 2m 3s"
+    assert c["g"] == 3.2
+    assert c["couleurs"] == ["#E53935"]
+    assert c["qualite"] == "0.20mm Standard"
     assert library.thumbnail("chat_0.20mm_PLA.gcode") == buf.getvalue()          # the embedded picture
     assert library.thumbnail("chat.stl")[:4] == b"\x89PNG"                        # a model gets a render
     stock.record_slice("chat_0.20mm_PLA.gcode", [1.0])
     new = library.rename("chat_0.20mm_PLA.gcode", "chat rouge")
-    assert new == "chat rouge.gcode" and "chat rouge.gcode" in stock.load()["prints"]
+    assert new == "chat rouge.gcode"
+    assert "chat rouge.gcode" in stock.load()["prints"]
     assert library.rename("chat.stl", "minou") == "minou.stl"
     assert {e["name"]: e for e in library.listing()}["chat rouge.gcode"]["source"] == "minou.stl"   # link kept
     with pytest.raises(ValueError):
@@ -1502,9 +1645,12 @@ def test_library_knows_each_file(tmp_path, monkeypatch):
     with pytest.raises(ValueError, match="existe déjà"):
         library.rename("minou.stl", "autre")                                      # no silent overwrite
     clean = {c["name"]: c["raison"] for c in library.cleanup()}
-    assert "chat_canvas.3mf" in clean and "orphelin_0.20mm_PLA.gcode" in clean and "minou.stl" not in clean
+    assert "chat_canvas.3mf" in clean
+    assert "orphelin_0.20mm_PLA.gcode" in clean
+    assert "minou.stl" not in clean
     assert library.delete(list(clean)) == sorted(clean, key=list(clean).index)
-    assert not (tmp_path / "chat_canvas.3mf").exists() and (tmp_path / "minou.stl").exists()
+    assert not (tmp_path / "chat_canvas.3mf").exists()
+    assert (tmp_path / "minou.stl").exists()
     assert library.rename("minou.stl", "chaton.obj") == "chaton.obj.stl"         # the extension stays
 
 
@@ -1513,7 +1659,8 @@ def test_error_codes_follow_elegoos_own_list():
     official = {101, 102, 103, 104, 108, 304, 401, 701, 702, 703, 704, 705, 706, 707, 801, 802, 803, 902, 1101, 1103,
                 1210, 1211, 1220, 1231, 1232, 1241, 1242, 1243, 1251, 1252, 1260, 1262, 1263, 1264}
     assert set(errors.CODES) == official                      # exception_handler.h, ErrorCode namespace
-    assert "grille" in errors.sentence([1101]) and "grille" in errors.sentence([1103])   # exhaust grille, not a filter
+    assert "grille" in errors.sentence([1101])
+    assert "grille" in errors.sentence([1103])
     assert "Plus de filament" in errors.sentence([1211])
     for code in (605, 109, 1102, 1265):                       # codes an earlier guide listed, absent from the firmware
         assert "écran" in errors.sentence([code])
@@ -1560,11 +1707,17 @@ def test_repair_closes_an_open_coloured_mesh_and_keeps_the_original(tmp_path, mo
     assert fix == {"repair": True}
     before = src.read_bytes()
     d = repair.diagnose(src)                                       # where it is open, before repairing
-    assert d["holes"] == 1 and d["open_edges"] > 0 and len(d["open"]) == d["open_edges"] * 6
+    assert d["holes"] == 1
+    assert d["open_edges"] > 0
+    assert len(d["open"]) == d["open_edges"] * 6
     r = repair.repair(src)
-    assert r["closed"] and r["name"] == "boite_repare.glb" and r["coloured"] and r["holes_closed"] == 1
+    assert r["closed"]
+    assert r["name"] == "boite_repare.glb"
+    assert r["coloured"]
+    assert r["holes_closed"] == 1
     note = advisor.analyze(tmp_path / r["name"], height_mm=20)["notes"][0]   # the copy says what was done
-    assert note["from"] == "boite.glb" and "1 trou rebouché" in note["items"]
+    assert note["from"] == "boite.glb"
+    assert "1 trou rebouché" in note["items"]
     assert advisor.analyze(src, height_mm=20)["notes"] == []
     assert src.read_bytes() == before                              # the original is untouched
     assert mesh.info(tmp_path / r["name"])["watertight"]
@@ -1600,15 +1753,18 @@ def test_hand_retouch_repaints_faces_beside_the_model(tmp_path, monkeypatch):
     assert colors.save_retouch(src, {green: list(range(10))}) == 10          # every red face turns green
     assert len(colors.analyze(src)["colours"]) == 1                          # caches saw the change
     assert src.read_bytes() == before                                        # the model itself is untouched
-    assert colors.retouch_file(src).is_file() and n_red in (0, 1)
+    assert colors.retouch_file(src).is_file()
+    assert n_red in (0, 1)
     pv = colors.preview_glb(src)                                             # triangle i of the preview is face i
-    assert len(pv.faces) == 12 and len(pv.vertices) == 36
+    assert len(pv.faces) == 12
+    assert len(pv.vertices) == 36
     with pytest.raises(ValueError):
         colors.save_retouch(src, {green: [999]})
     with pytest.raises(ValueError):
         colors.save_retouch(src, {"rouge": [1]})
     new = library.rename("boite.glb", "cadeau.glb")                          # the retouch follows its model
-    assert colors.retouch_file(tmp_path / new).is_file() and not colors.retouch_file(src).exists()
+    assert colors.retouch_file(tmp_path / new).is_file()
+    assert not colors.retouch_file(src).exists()
     assert len(colors.analyze(tmp_path / new)["colours"]) == 1
     colors.save_retouch(tmp_path / new, {}, erase=list(range(10)))           # erasing brings the colours back
     assert len(colors.analyze(tmp_path / new)["colours"]) == 2
@@ -1688,12 +1844,16 @@ def test_rebuild_drops_a_flat_sheet_and_closes_a_broken_mesh(tmp_path, monkeypat
     src = tmp_path / "abime.stl"
     broken.export(src)
     r = repair.repair(src)
-    assert r["rebuilt"] and r["closed"] and r["sheets_removed"]
+    assert r["rebuilt"]
+    assert r["closed"]
+    assert r["sheets_removed"]
     out = trimesh.load(tmp_path / r["name"], force="mesh")
-    assert out.is_watertight and out.extents.max() < 25                      # the 60 mm plate is gone
+    assert out.is_watertight
+    assert out.extents.max() < 25
     assert abs(out.volume - body.volume) / body.volume < 0.15                 # the ball is whole again
     note = advisor.analyze(tmp_path / r["name"])["notes"][0]
-    assert note["title"] == "Maillage reconstruit" and any("Feuilles" in i for i in note["items"])
+    assert note["title"] == "Maillage reconstruit"
+    assert any("Feuilles" in i for i in note["items"])
 
 
 @pytest.mark.slicing
@@ -1711,15 +1871,18 @@ def test_own_spools_are_recognised_and_sliced(tmp_path, monkeypatch):
         {"tray_id": 2, "filament_color": "#1E88E5", "filament_type": "PLA", "status": 2},           # a blue: not ours
         {"tray_id": 3, "filament_color": "#E53935", "filament_type": "PLA", "filament_name": "PLA Matte", "status": 2},
         {"tray_id": 4, "filament_color": "#FFD700", "filament_type": "PETG", "status": 2}]}]})     # other material
-    assert trays[0]["color"] == "#D22630" and trays[0]["printer_color"] == "#FF0000"
-    assert spools.filament_for(trays[0]) == "PLA Silk Noël" and trays[0]["filament_name"] == "Silk Rouge Noël"
+    assert trays[0]["color"] == "#D22630"
+    assert trays[0]["printer_color"] == "#FF0000"
+    assert spools.filament_for(trays[0]) == "PLA Silk Noël"
+    assert trays[0]["filament_name"] == "Silk Rouge Noël"
     assert [t.get("profile") for t in trays[1:]] == [None, None, None]
     assert "PLA Silk Noël" in slicer.filaments()
     src = tmp_path / "cube.stl"
     trimesh.creation.box((20, 20, 20)).export(src)
     g = slicer.slice_model(src, tmp_path / "out", filament=["PLA Silk Noël"], colours=["#D22630"]).gcode[0]
     text = g.read_text(errors="ignore")
-    assert g.name.isascii() and "; filament_max_volumetric_speed = 12" in text
+    assert g.name.isascii()
+    assert "; filament_max_volumetric_speed = 12" in text
     assert '; filament_settings_id = "Elegoo PLA Silk @ECC2"' in text     # a name the CC2 knows
 
 
@@ -1749,10 +1912,12 @@ def test_model_repainted_with_the_loaded_spools(tmp_path):
     cube.export(src)
     palette = ("#D22630", "#F2A900", None, "#008755")                # slot 3 empty
     a = colors.analyze(src, palette)
-    assert a["palette"] and {c["index"] for c in a["colours"]} == {1, 4}     # dark red -> red spool, dull green -> green
+    assert a["palette"]
+    assert {c["index"] for c in a["colours"]} == {1, 4}
     assert all(c["slot"] == c["index"] and c["hex"] == palette[c["index"] - 1] for c in a["colours"])
     out = colors.to_canvas(src, tmp_path / "c.3mf", {1: 1, 4: 4}, palette=palette)
-    assert out["slot_colours"][0] == "#D22630" and out["slot_colours"][3] == "#008755"
+    assert out["slot_colours"][0] == "#D22630"
+    assert out["slot_colours"][3] == "#008755"
     trays = [{"color": "#D22630", "pos": 0, "type": "PLA", "filament_name": "Rouge"}]
     assert "pas de bobine proche" in spools.far_colours([{"hex": "#0A3CC8", "share": 50.0}], trays)[0]
     assert not colors.analyze(src)["palette"]                         # without spools: the model's own colours
@@ -1788,7 +1953,8 @@ def test_name_added_inside_a_line_drawing(tmp_path):
     trimesh.Trimesh(np.asarray(m.vert_properties)[:, :3], np.asarray(m.tri_verts)).export(src)
     for font, angle in (("manuscrite", 0), ("manuscrite", 30), ("trait", 0)):
         r = addtext.add(src, "Noël", font=font, angle=angle, out=tmp_path / f"c{font}{angle}.3mf")
-        assert r["pieces"] == 1 and 3 < r["capitales_mm"] < 40               # one piece: accents and bar tied
+        assert r["pieces"] == 1
+        assert 3 < r["capitales_mm"] < 40
         a = colors.analyze(tmp_path / r["name"])
         assert {c["index"] for c in a["colours"]} == {1, 2}                    # model and text, two colours
     with pytest.raises(ValueError):
@@ -1799,7 +1965,9 @@ def test_bed_mesh_can_be_commented_out_of_the_start_gcode():
     from elegoo_lab import slicer
     g = b"G90\nM190 S65 A\nBED_MESH_CALIBRATE mesh_min=10,74 mesh_max=203,233 FROM_SLICER=1\nG28\n"
     out = slicer.without_bed_mesh(g)
-    assert b"\nBED_MESH_CALIBRATE" not in out and b"G28\n" in out and out.count(b"\n") == g.count(b"\n")
+    assert b"\nBED_MESH_CALIBRATE" not in out
+    assert b"G28\n" in out
+    assert out.count(b"\n") == g.count(b"\n")
 
 
 async def test_end_of_print_is_read_from_the_printer_history(tmp_path, monkeypatch):
@@ -1834,10 +2002,13 @@ def test_restart_mid_print_carries_on_with_the_open_gallery_entry(tmp_path, monk
     rec.save()
     rec.add_frame(b"\xff\xd8x\xff\xd9")
     again = gallery.Recorder.resume("piece.gcode")
-    assert again.id == rec.id and again.frames == 1 and again.meta["debut"] == rec.meta["debut"]
+    assert again.id == rec.id
+    assert again.frames == 1
+    assert again.meta["debut"] == rec.meta["debut"]
     assert gallery.close_stale(gallery.stale(keep=again.id)) == 1
     issues = {e["fichier"]: e["issue"] for e in gallery.entries()}
-    assert issues == {"oublie.gcode": "interrompue", "piece.gcode": "en cours"} and old.id != rec.id
+    assert issues == {"oublie.gcode": "interrompue", "piece.gcode": "en cours"}
+    assert old.id != rec.id
 
 
 def test_unknown_printer_state_is_not_a_print(tmp_path, monkeypatch):
@@ -1847,7 +2018,9 @@ def test_unknown_printer_state_is_not_a_print(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "config.toml")
     w = alerts.Watcher(lambda: None)
     w.observe(99, 0, "", {}); w.observe(0, 0, "", {}); w.observe(99, 0, "", {}); w.observe(0, 0, "", {})
-    assert w.events == [] and w.rec is None and gallery.entries() == []
+    assert w.events == []
+    assert w.rec is None
+    assert gallery.entries() == []
 
 
 def test_filament_is_taken_off_the_spool_that_fed_it(tmp_path, monkeypatch):
@@ -1859,16 +2032,20 @@ def test_filament_is_taken_off_the_spool_that_fed_it(tmp_path, monkeypatch):
     stock.record_route("ange.gcode", {1: 3, 2: 2})
     stock.consume("ange.gcode", 1.0, "r1")
     left = {int(i): t["restant_g"] for i, t in stock.load()["trays"].items()}
-    assert left[1] == left[0] and left[3] < left[0] and left[2] < left[0]
+    assert left[1] == left[0]
+    assert left[3] < left[0]
+    assert left[2] < left[0]
 
 
 def test_model_preview_is_revalidated_not_downloaded_again(web):
     client, lib = web
     trimesh.creation.box((20, 20, 20)).export(lib / "cube.stl")
     r = client.get("/lab/api/models/cube.stl/preview.glb")
-    assert r.status_code == 200 and r.headers["etag"]
+    assert r.status_code == 200
+    assert r.headers["etag"]
     again = client.get("/lab/api/models/cube.stl/preview.glb", headers={"If-None-Match": r.headers["etag"]})
-    assert again.status_code == 304 and not again.content
+    assert again.status_code == 304
+    assert not again.content
     other = client.get("/lab/api/models/cube.stl/preview.glb?pal=%23FF0000", headers={"If-None-Match": r.headers["etag"]})
     assert other.status_code == 200
 
@@ -1883,7 +2060,8 @@ def test_model_renamed_while_read_is_not_found_not_an_error(web, monkeypatch):
         raise FileNotFoundError(path)
     monkeypatch.setattr(orient, "orientations", renamed)
     r = client.get("/lab/api/models/cube.stl/orientations")
-    assert r.status_code == 404 and "introuvable" in r.json()["detail"]
+    assert r.status_code == 404
+    assert "introuvable" in r.json()["detail"]
 
     def broken(path, *a):
         raise ValueError("maillage vide")
@@ -1936,7 +2114,8 @@ def test_a_failed_write_keeps_the_old_file(tmp_path, monkeypatch):
     monkeypatch.setattr(os, "fsync", lambda fd: (_ for _ in ()).throw(OSError("disque plein")))
     with pytest.raises(OSError):
         config.write_atomic(f, '{"a": 2}')
-    assert f.read_text() == '{"a": 1}' and [p.name for p in tmp_path.iterdir()] == ["stock.json"]   # no leftover temp file
+    assert f.read_text() == '{"a": 1}'
+    assert [p.name for p in tmp_path.iterdir()] == ["stock.json"]
 
 
 def test_backup_copies_the_library_and_keeps_old_versions(tmp_path, monkeypatch):
@@ -1957,8 +2136,10 @@ def test_backup_copies_the_library_and_keeps_old_versions(tmp_path, monkeypatch)
     assert sauvegarde.overdue().startswith("Aucune sauvegarde")
     sauvegarde.run("serveur")
     dest = far / sauvegarde.DEST
-    assert (dest / "models" / "coeur.stl").read_text() == "v1" and (dest / "config.toml").exists()
-    assert (dest / "elegoo.bundle").stat().st_size > 0 and sauvegarde.overdue() is None
+    assert (dest / "models" / "coeur.stl").read_text() == "v1"
+    assert (dest / "config.toml").exists()
+    assert (dest / "elegoo.bundle").stat().st_size > 0
+    assert sauvegarde.overdue() is None
     assert sauvegarde.run("serveur", if_needed=True) == "sauvegarde du jour déjà faite"
     (config.MODELS_DIR / "coeur.stl").write_text("v2")
     os.utime(config.MODELS_DIR / "coeur.stl", (time.time() + 5,) * 2)   # rsync compares size and time: an edit an hour later
@@ -1968,7 +2149,8 @@ def test_backup_copies_the_library_and_keeps_old_versions(tmp_path, monkeypatch)
     (bin_ / "ssh").write_text("#!/bin/sh\necho 'ssh: connect to host 192.168.1.48 port 22: No route to host' >&2\nexit 255\n")
     with pytest.raises(RuntimeError, match="No route to host"):
         sauvegarde.run("serveur")
-    assert sauvegarde.status()["erreur"].endswith("No route to host") and sauvegarde.overdue() is None   # yesterday's copy still counts
+    assert sauvegarde.status()["erreur"].endswith("No route to host")
+    assert sauvegarde.overdue() is None
 
 
 def test_backup_to_a_usb_disk_never_fills_the_pc_disk(tmp_path, monkeypatch):
@@ -2011,7 +2193,8 @@ def test_old_printed_gcodes_go_their_models_stay():
     # sapin: in the queue · etoile: printed yesterday · lutin: no model left · renne: never printed · boule: printing
     assert gone == ["coeur_0.20mm_PLA.gcode"]
     library.delete(gone)
-    assert not (lib / "coeur_0.20mm_PLA.gcode").exists() and (lib / "coeur.stl").exists()
+    assert not (lib / "coeur_0.20mm_PLA.gcode").exists()
+    assert (lib / "coeur.stl").exists()
 
 
 def test_terminal_tells_only_what_changed(tmp_path, monkeypatch):
@@ -2034,7 +2217,8 @@ def test_terminal_tells_only_what_changed(tmp_path, monkeypatch):
     assert texts == ["État : impression", "Couche 1 / 362 · Z 0,20 mm", "Buse : consigne 230 °C", "Vitesse : 160 %",
                      "Buse à 229 °C : consigne atteinte"]
     w.emit("pause", "x.gcode")
-    assert w.term[-1]["level"] == "warn" and w.term[-1]["text"].startswith("Impression en pause")
+    assert w.term[-1]["level"] == "warn"
+    assert w.term[-1]["text"].startswith("Impression en pause")
 
 
 def test_toolchange_reprime_no_longer_drops_a_blob():
@@ -2057,7 +2241,8 @@ def test_phone_alerts_topic(web):
     assert client.get("/lab/api/alertes/telephone").json() == {"ntfy": None}
     assert client.post("/lab/api/alertes/telephone", json={"action": "test"}).status_code == 409
     url = client.post("/lab/api/alertes/telephone", json={"action": "on"}).json()["ntfy"]
-    assert url.startswith("https://ntfy.sh/cc2-") and len(url.rsplit("/", 1)[1]) == 24
+    assert url.startswith("https://ntfy.sh/cc2-")
+    assert len(url.rsplit("/", 1)[1]) == 24
     assert client.post("/lab/api/alertes/telephone", json={"action": "on"}).json()["ntfy"] != url   # never reused
     assert client.post("/lab/api/alertes/telephone", json={"action": "off"}).json() == {"ntfy": None}
     assert client.post("/lab/api/alertes/telephone", json={"action": "x"}).status_code == 422
@@ -2071,7 +2256,8 @@ def test_add_pauses(tmp_path):
     placed = add_pauses(g, [0.5, 0.55, 0.1, 9])
     assert placed == [{"mm": 0.5, "z": 0.4, "layer": 3, "run": 1}]
     lines = g.read_text().splitlines()
-    assert lines.count("PAUSE") == 1 and lines[lines.index("PAUSE") + 2] == ";Z:0.6"
+    assert lines.count("PAUSE") == 1
+    assert lines[lines.index("PAUSE") + 2] == ";Z:0.6"
 
 
 def test_add_pauses_each_piece_of_a_piece_by_piece_print(tmp_path):
@@ -2081,7 +2267,8 @@ def test_add_pauses_each_piece_of_a_piece_by_piece_print(tmp_path):
     g.write_text("G28\n" + "".join(f";LAYER_CHANGE\n;Z:{z}\n;HEIGHT:0.2\nG1 X1 E1\n"
                                    for z in (0.2, 0.4, 0.6) + (0.2, 0.4, 0.6, 0.8)))
     placed = add_pauses(g, [0.5])
-    assert [p["run"] for p in placed] == [1, 2] and [p["layer"] for p in placed] == [3, 3]
+    assert [p["run"] for p in placed] == [1, 2]
+    assert [p["layer"] for p in placed] == [3, 3]
     assert g.read_text().count("PAUSE") == 2
 
 
@@ -2175,7 +2362,8 @@ def test_piece_by_piece_slices_the_plate_with_far_fewer_changes(tmp_path):
     couches = printprep.prepare_and_slice(out, filaments=["PLA", "PLA Matte"], out_dir=tmp_path / "c", screen_thumbnail=False)
     suite = printprep.prepare_and_slice(out, filaments=["PLA", "PLA Matte"], advanced={"ordre": "suite"},
                                         out_dir=tmp_path / "s", screen_thumbnail=False)
-    assert couches["ordre"] == "couche" and suite["ordre"] == "suite"
+    assert couches["ordre"] == "couche"
+    assert suite["ordre"] == "suite"
     assert suite["colour_changes"] * 4 < couches["colour_changes"]
     g = (tmp_path / "s" / Path(suite["gcode"][0]).name).read_text(errors="ignore")
     z = [float(l[3:]) for l in g.splitlines() if l.startswith(";Z:")]
@@ -2187,10 +2375,13 @@ def test_mirror_and_axis_scale(tmp_path):
     from elegoo_lab import colors
     src = tmp_path / "b.stl"
     trimesh.creation.box((10, 20, 30)).export(src)
-    assert colors.rotation((0, 0, 0)) is None and colors.rotation((0, 0, 0, 1, 1, 1)) is None
+    assert colors.rotation((0, 0, 0)) is None
+    assert colors.rotation((0, 0, 0, 1, 1, 1)) is None
     v, f, _, _ = colors.solid(src, {}, rotate=(0, 0, 90, -2, 1, 1))
     m = trimesh.Trimesh(v, f, process=False)
-    assert sorted(map(round, m.extents)) == [10, 30, 40] and round(m.extents[0]) == 40 and m.volume > 0
+    assert sorted(map(round, m.extents)) == [10, 30, 40]
+    assert round(m.extents[0]) == 40
+    assert m.volume > 0
     with pytest.raises(ValueError):
         colors.rotation((0, 0, 0, 0, 1, 1))
 
@@ -2239,10 +2430,12 @@ def test_calibration_tower_bands(tmp_path):
     bands = calibration.tune(g, calibration.BY_KEY["avance"])
     assert [b["value"] for b in bands] == [0.0, 0.005, 0.01]
     text = g.read_text()
-    assert "\nSET_PRESSURE_ADVANCE ADVANCE=0.04" not in text and text.count("ADVANCE=0.005 ;") == 1
+    assert "\nSET_PRESSURE_ADVANCE ADVANCE=0.04" not in text
+    assert text.count("ADVANCE=0.005 ;") == 1
     g.write_text("".join(f";LAYER_CHANGE\n;Z:{z}\n" for z in (0.2, 2.2, 6.2)))
     calibration.tune(g, calibration.BY_KEY["debit"])
-    assert g.read_text().splitlines()[-1].startswith("M221 S100") and "M221 S92 " in g.read_text()
+    assert g.read_text().splitlines()[-1].startswith("M221 S100")
+    assert "M221 S92 " in g.read_text()
     _, fil = settings.build({"avance_pression": 0.035, "debit": 0.97})
     assert fil == {"pressure_advance": ["0.035"], "enable_pressure_advance": ["1"], "filament_flow_ratio": ["0.97"]}
     with pytest.raises(ValueError):
@@ -2254,7 +2447,9 @@ def test_parametric_preview(web):
     client, lib = web
     before = set(lib.iterdir())
     r = client.post("/lab/api/parametric/boite/preview", json={"longueur": 100})
-    assert r.status_code == 200 and r.content[:4] == b"glTF" and r.headers["x-size"].startswith("100.0,")
+    assert r.status_code == 200
+    assert r.content[:4] == b"glTF"
+    assert r.headers["x-size"].startswith("100.0,")
     assert set(lib.iterdir()) == before
     assert client.post("/lab/api/parametric/boite/preview", json={"longueur": 999}).status_code == 422
     assert client.post("/lab/api/parametric/inconnu/preview", json={}).status_code == 422
@@ -2272,8 +2467,11 @@ def test_optimize_plan(web):
     trimesh.util.concatenate([stem, bar]).export(src)
     before = src.read_bytes()
     p = client.post("/lab/api/models/t.stl/optimize").json()
-    assert p["file"] == "t.stl" and p["rotate"] != [0, 0, 0] and p["steps"]
-    assert p["steps"][0]["title"].startswith("Posée") and all(s["why"] for s in p["steps"])
+    assert p["file"] == "t.stl"
+    assert p["rotate"] != [0, 0, 0]
+    assert p["steps"]
+    assert p["steps"][0]["title"].startswith("Posée")
+    assert all(s["why"] for s in p["steps"])
     assert src.read_bytes() == before
     assert client.post("/lab/api/models/x.gcode/optimize").status_code in (400, 404)
 
@@ -2283,7 +2481,8 @@ def test_alert_names_are_short():
     from elegoo_lab.alerts import _GCODE, nice
     t = "atelier_couleurs_00015_clean_canvas_0.24mm_PLA_Silk_Noel-PLA_Silk_Noel.gcode en 6 h 28."
     assert _GCODE.sub(lambda m: nice(m.group(0)), t) == "atelier couleurs 00015 clean · 0,24 mm en 6 h 28."
-    assert nice("stand_0.20mm_PLA.gcode") == "stand · 0,20 mm" and nice("essai.gcode") == "essai"
+    assert nice("stand_0.20mm_PLA.gcode") == "stand · 0,20 mm"
+    assert nice("essai.gcode") == "essai"
 
 
 def test_plate_check_sees_a_part(tmp_path, monkeypatch):
@@ -2325,12 +2524,17 @@ def test_print_review(web):
     rec.finish("terminee")
     d = client.get(f"/lab/api/bilan/{rec.id}").json()
     tips = " ".join(d["tips"])
-    assert "65 °C" in tips and "Supports" in tips and "Plusieurs couleurs" in tips and "Silk" in tips
+    assert "65 °C" in tips
+    assert "Supports" in tips
+    assert "Plusieurs couleurs" in tips
+    assert "Silk" in tips
     assert [q["key"] for q in d["questions"]] == ["global", "surface", "details", "supports", "couleurs", "solidite"]
     r = client.post(f"/lab/api/bilan/{rec.id}", json={"issues": ["fils", "decolle", "inconnu"], "note": "ok",
                                                       "notes": {"global": 9, "surface": 3, "supports": -2, "autre": 4}}).json()
     assert r["notes"] == {"global": 5, "surface": 3, "supports": 0}   # clamped to 0..5, unknown questions dropped
-    assert r["issues"] == ["fils", "decolle"] and r["fix"]["advanced"]["temp_buse"] == 220 and r["fix"]["advanced"]["temp_plateau"] == 70
+    assert r["issues"] == ["fils", "decolle"]
+    assert r["fix"]["advanced"]["temp_buse"] == 220
+    assert r["fix"]["advanced"]["temp_plateau"] == 70
     assert client.get("/lab/api/models/orque.stl/info").status_code in (200, 422)
     assert library.load_index()["orque.stl"]["retour"]["issues"] == ["fils", "decolle"]
 
@@ -2349,10 +2553,15 @@ def test_supports_plan_says_where_the_supports_are(tmp_path):
     g = tmp_path / "x.gcode"
     g.write_text("\n".join(lines) + "\n")
     plan = aftercare.supports_plan(g)
-    assert plan and "tronc" in plan["tips"][0]
+    assert plan
+    assert "tronc" in plan["tips"][0]
     zone = plan["tips"][1]
-    assert zone.startswith("Zone 1 · ") and "à gauche" in zone and "du plateau jusqu'à" in zone and "touche la pièce" in zone
-    assert plan["map"]["part"] and plan["map"]["supports"]
+    assert zone.startswith("Zone 1 · ")
+    assert "à gauche" in zone
+    assert "du plateau jusqu'à" in zone
+    assert "touche la pièce" in zone
+    assert plan["map"]["part"]
+    assert plan["map"]["supports"]
     assert aftercare.supports_plan(tmp_path / "absent.gcode") is None
 
 
@@ -2369,9 +2578,11 @@ def test_paths_overview_is_lighter_and_cached(tmp_path):
     g = tmp_path / "x.gcode"
     g.write_text("\n".join(lines) + "\n")
     full = gcode_preview.cached(g)
-    assert full["count"] == 100 and "pas" not in full
+    assert full["count"] == 100
+    assert "pas" not in full
     lite = gcode_preview.cached(g, 40)
-    assert lite["pas"] == 3 and lite["layers"] == full["layers"]
+    assert lite["pas"] == 3
+    assert lite["layers"] == full["layers"]
     lay = np.frombuffer(base64.b64decode(lite["layer"]), "<u2")
     assert sorted(set(lay.tolist())) == [0, 3, 6, 9]          # every third layer, and the last one
     assert gcode_preview.cached(g, 40) is lite                  # from memory
@@ -2413,7 +2624,8 @@ def test_more_parametric_parts():
     from elegoo_lab import parametric
     if not Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf").exists():
         pytest.skip("DejaVuSans-Bold font not available")
-    sz = lambda k, v=None: parametric.preview(k, v or {})[1]
+    def sz(k, v=None):
+        return parametric.preview(k, v or {})[1]
     assert sz("gridfinity", {"cases_x": 2, "cases_y": 1, "hauteur_u": 6, "empilable": False})[:3] == [83.5, 41.5, 42.0]   # 42 mm grid, 7 mm units
     for piece in ("vis", "ecrou", "rondelle", "entretoise"):
         assert sz("visserie", {"piece": piece, "taille": "M5"})
@@ -2424,7 +2636,9 @@ def test_more_parametric_parts():
     buf = io.BytesIO(); Image.new("L", (40, 20), 128).save(buf, "PNG")
     photo = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
     w, thick, h = sz("lithophanie", {"photo": photo, "largeur": 60, "cadre": 0})
-    assert abs(w - 60) < 1 and abs(h - 30) < 1 and thick <= 3.0                            # stands up, keeps the photo's shape
+    assert abs(w - 60) < 1
+    assert abs(h - 30) < 1
+    assert thick <= 3.0
     with pytest.raises(ValueError):
         parametric.preview("visserie", {"taille": "M7"})
 
@@ -2439,7 +2653,9 @@ def test_simplify_colour_specks():
     st = np.ones(len(box.faces), int)
     st[:2] = 2                                       # a speck of colour 2
     states = [st.copy()]
-    assert colors.simplify_layers([part], states, 2.5, 0.03) == 1 and (states[0] == 1).all()
+    assert colors.simplify_layers([part], states, 2.5, 0.03) == 1
+    assert (states[0] == 1).all()
     part.locked = np.zeros(len(box.faces), bool); part.locked[0] = True
     states = [st.copy()]
-    assert colors.simplify_layers([part], states, 2.5, 0.03) == 0 and states[0][0] == 2
+    assert colors.simplify_layers([part], states, 2.5, 0.03) == 0
+    assert states[0][0] == 2

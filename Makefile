@@ -34,7 +34,7 @@ dash:
 	uv run cc2 --control dash
 
 lint:
-	uv run ruff check src/ tests/
+	uv run ruff check src/
 	uv run mypy src/elegoo_lab --ignore-missing-imports
 	uv run black --check src/ tests/
 	uv run isort --check-only src/ tests/

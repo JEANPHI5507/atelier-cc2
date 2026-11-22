@@ -134,7 +134,8 @@ def test_from_model_to_print(page, site):
     page.click("#ln-go")
     page.wait_for_selector("#toasts :text('Impression lancée')", timeout=60000)
     st = api(site, "/status")
-    assert st["print_status"] not in (0, 8, 9) and st["filename"].startswith("cube")
+    assert st["print_status"] not in (0, 8, 9)
+    assert st["filename"].startswith("cube")
     assert page.errors == []
 
 
@@ -148,7 +149,8 @@ def test_printer_tab_forms_reach_the_server(page, site):
     page.click("#tray-save")
     page.wait_for_function("!document.getElementById('tray-dlg').open")
     tray = next(t for t in api(site, "/lab/api/bobines")["trays"] if t["tray"] == 1)
-    assert tray["restant_g"] == 333 and tray["prix_kg"] == 27
+    assert tray["restant_g"] == 333
+    assert tray["prix_kg"] == 27
     page.click("#sv-tl")                                   # timelapse off
     page.wait_for_timeout(800)
     assert api(site, "/lab/api/surveillance")["timelapse"] is False
@@ -168,7 +170,8 @@ def test_nozzle_position_is_shown(page):
     page.wait_for_selector("#pv-pos:not([hidden])", timeout=20000)
     page.wait_for_function("document.getElementById('pv-pos-x').textContent !== '–'")
     x = float(page.text_content("#pv-pos-x").replace(",", "."))
-    assert 0 <= x <= 256 and page.get_attribute("#pv-pos-dot", "cx") != "-50"       # the dot is on the plate
+    assert 0 <= x <= 256
+    assert page.get_attribute("#pv-pos-dot", "cx") != "-50"
     assert page.errors == []
 
 
@@ -260,7 +263,10 @@ def test_a_turned_part_stays_on_the_plate(page, site):
     where = """() => Promise.all([import('/lab/js/lab.js'), import('three')]).then(([m, T]) => {
                const b = new T.Box3().setFromObject(m.current), c = b.getCenter(new T.Vector3()); return [c.x, c.y, b.min.z, b.max.z - b.min.z]; })"""
     x0, y0, z0, h0 = page.evaluate(where)
-    assert abs(x0) < .5 and abs(y0) < .5 and abs(z0) < .1 and h0 > 70     # centred on the plate, as sliced
+    assert abs(x0) < .5
+    assert abs(y0) < .5
+    assert abs(z0) < .1
+    assert h0 > 70
     for k in range(page.locator("#orients [data-orient]").count()):   # every way to lay it, then turned on the plate
         page.click(f"#orients [data-orient='{k}']")
         page.click("#rot [data-rot='2']")
@@ -306,7 +312,8 @@ def test_add_a_piece_then_resize_it_on_the_plate(page, site):
 def test_pick_how_the_part_lies(page):
     page.click("#files .file[data-n='cube.stl']")
     page.wait_for_selector("#orients [data-orient]", timeout=30000)
-    assert page.locator("#orients .orient").count() == 6 and page.locator("#orients .best").count() == 1
+    assert page.locator("#orients .orient").count() == 6
+    assert page.locator("#orients .best").count() == 1
     page.click("#orients [data-orient='4']")
     assert page.inner_text("#rot-v") == "sur le côté droit"
     page.click("#rot [data-rot='2']")
@@ -362,7 +369,8 @@ def test_library_views_rename_and_bulk_delete(page, site):
     page.once("dialog", lambda d: d.accept())
     page.click("#bulk-del")
     page.wait_for_selector("#toasts :text('2 fichiers supprimés')")
-    assert not (lib / "a_renomme.stl").exists() and not (lib / "b_supprimer.stl").exists()
+    assert not (lib / "a_renomme.stl").exists()
+    assert not (lib / "b_supprimer.stl").exists()
     assert page.errors == []
 
 
@@ -485,7 +493,8 @@ def test_supports_and_seam_brush_on_any_model(page, site):
     page.click("#pb-save")
     page.wait_for_selector("#toasts :text('Faces enregistrées')", timeout=60000)
     marks = json.loads((Path(site["lib"]) / ".marques" / "cube.stl.json").read_text())
-    assert marks.get("support") and set(marks) <= {"support", "couture"}
+    assert marks.get("support")
+    assert set(marks) <= {"support", "couture"}
     page.click("#vtools [data-vt='marks']")                              # painted faces come back in their colour
     page.wait_for_selector("#paintbar:not([hidden])")
     page.on("dialog", lambda d: d.accept())
@@ -500,7 +509,8 @@ def test_drill_a_hole_through_a_model(page, site):
     page.wait_for_selector("#vtools [data-vt='marks']:not([hidden])", timeout=30000)   # the 3D view is up
     page.click("#add-shape")
     page.wait_for_selector("#shp[open]")
-    assert page.is_hidden("#shp-col-f") and page.is_hidden("#shp-d-f")               # a round hole: no colour, no depth
+    assert page.is_hidden("#shp-col-f")
+    assert page.is_hidden("#shp-d-f")
     page.fill("#shp-w", "6")
     page.select_option("#shp-kind", "cube")
     assert page.is_visible("#shp-d-f")
@@ -573,5 +583,6 @@ def test_review_from_the_phone_link(page, site):
     page.click("#bl-go")
     page.wait_for_selector("#gal-list :text('Bilan : fils fins')")
     bilan = json.loads((entry / "meta.json").read_text())["bilan"]
-    assert bilan["issues"] == ["fils"] and bilan["notes"] == {"details": 1, "global": 4}
+    assert bilan["issues"] == ["fils"]
+    assert bilan["notes"] == {"details": 1, "global": 4}
     assert not page.errors

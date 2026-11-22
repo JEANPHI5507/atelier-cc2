@@ -158,7 +158,7 @@ async def send_ntfy(ev: dict[str, Any]) -> bool:
                              headers={**extra, "Priority": "high" if ev["level"] == "bad" else "default",
                                       "Tags": {"ok": "white_check_mark", "warn": "warning", "bad": "rotating_light"}[ev["level"]]})
             return r.is_success
-    except Exception as e:  # never let a phone notification break the watcher
+    except Exception as e:  # noqa: BLE001 - never let a phone notification break the watcher
         log.warning("ntfy: %s", e)
         return False
 
@@ -336,7 +336,7 @@ class Watcher:
         try:
             names = await asyncio.to_thread(library.old_gcodes, queue | {self.filename})
             gone = await asyncio.to_thread(library.delete, names) if names else []
-        except Exception as e:   # housekeeping never stops the watcher
+        except Exception as e:   # noqa: BLE001 - housekeeping never stops the watcher
             log.warning("ménage des G-code : %s", e)
             return
         if gone:
@@ -488,7 +488,7 @@ class Watcher:
             tasks = [t for t in (h or {}).get("history_task_list", [])
                      if t.get("task_name") == Path(name).name and t.get("end_time", 0) >= started - 120]
             finished = bool(tasks) and max(tasks, key=lambda t: t["end_time"]).get("task_status") == 1
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - never break alerts for history errors
             log.warning("historique: %s", e)
         if finished:
             self._done(name, took, rec)
@@ -552,7 +552,7 @@ class Watcher:
         facts = {"g": used["g"], "eur": used["eur"]} if used else {}
         try:
             meta = await asyncio.to_thread(rec.finish, issue, progression=progress, **facts)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - never break alerts for gallery errors
             log.warning("galerie: %s", e)
             return
         from . import maintenance

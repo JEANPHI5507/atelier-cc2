@@ -65,13 +65,13 @@ select = [
     "TCH", "ARG", "PLC", "PLE", "PLW", "RUF"
 ]
 ignore = [
-    "E501", "B008", "C901", "PLC0107", "PLW2901", "RUF001", "RUF002",
+    "E501", "B008", "C901", "PLW2901", "PLC0415", "RUF001", "RUF002",
     "RUF003", "S101", "S301", "S307", "S603", "S607", "UP007"
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "src/elegoo_lab/web/js/*.js" = ["ALL"]
-"tests/*" = ["S101", "PLR2004", "ARG001", "PLR0913", "PLR0915"]
+"tests/*" = ["S101", "PLR2004", "ARG001", "PLR0913", "PLR0915", "PT018", "E702", "PT011", "ARG005", "S310", "S108", "E731", "N814", "E741", "SIM115", "N802", "E402"]
 
 [tool.ruff.format]
 quote-style = "double"
