@@ -1,7 +1,7 @@
 name: CI
 
-# 🚀 Atelier CC2 - Workflow CI/CD
-# Exécute les tests, le linting et la vérification du code à chaque push/PR.
+#  Atelier CC2 - Workflow CI/CD
+# Excute les tests, le linting et la vrification du code  chaque push/PR.
 
 on:
   push:
@@ -25,83 +25,81 @@ on:
       - 'LICENSE'
       - '.gitignore'
 
----
 
-# 📋 Variables globales
+#  Variables globales
 env:
   PYTHON_VERSION: "3.12"
   UV_VERSION: "0.1.0"
   PROJECT_NAME: "elegoo-lab"
 
----
 
 jobs:
-  # 🔍 Job 1: Vérification du code Python (linting, typage)
+  #  Job 1: Vrification du code Python (linting, typage)
   lint:
     name: Lint Python Code
     runs-on: ubuntu-latest
     steps:
-      - name: 📥 Checkout Repository
+      - name:  Checkout Repository
         uses: actions/checkout@v4
 
-      - name: 🐍 Set up Python ${{ env.PYTHON_VERSION }}
+      - name:  Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: 🔧 Install uv
+      - name:  Install uv
         uses: astral-sh/setup-uv@v1
         with:
           uv-version: ${{ env.UV_VERSION }}
 
-      - name: 📦 Install Dependencies
+      - name:  Install Dependencies
         run: |
           uv sync --all-extras
 
-      - name: ✅ Run Ruff (Linting)
+      - name:  Run Ruff (Linting)
         run: |
           uv run ruff check src/ tests/ || true
 
-      - name: ✅ Run Mypy (Type Checking)
+      - name:  Run Mypy (Type Checking)
         run: |
           uv run mypy src/elegoo_lab --ignore-missing-imports || true
 
-      - name: ✅ Check Python Formatting (Black)
+      - name:  Check Python Formatting (Black)
         run: |
           uv run black --check src/ tests/ || true
 
-      - name: ✅ Check Imports (isort)
+      - name:  Check Imports (isort)
         run: |
           uv run isort --check-only src/ tests/ || true
 
-  # 🧪 Job 2: Exécution des tests unitaires (sans slicing)
+  #  Job 2: Excution des tests unitaires (sans slicing)
   test-unit:
     name: Unit Tests (No Slicing)
     runs-on: ubuntu-latest
     needs: lint
     steps:
-      - name: 📥 Checkout Repository
+      - name:  Checkout Repository
         uses: actions/checkout@v4
 
-      - name: 🐍 Set up Python ${{ env.PYTHON_VERSION }}
+      - name:  Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: 🔧 Install uv
+      - name:  Install uv
         uses: astral-sh/setup-uv@v1
         with:
           uv-version: ${{ env.UV_VERSION }}
 
-      - name: 📦 Install Dependencies
+      - name:  Install Dependencies
         run: |
           uv sync --all-extras
 
-      - name: 🧪 Run Unit Tests with Coverage
+      - name:  Run Unit Tests with Coverage
         run: |
           uv run pytest tests/test_core.py -v --tb=short -m "not slicing" --cov=src/elegoo_lab --cov-report=xml --cov-report=html || true
 
-      - name: 🐍 Upload Coverage to Codecov
+      - name:  Upload Coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -110,150 +108,149 @@ jobs:
           name: codecov-umbrella
         continue-on-error: true
 
-  # 🧪 Job 3: Exécution des tests de slicing (avec OrcaSlicer et OpenGL)
+  #  Job 3: Excution des tests de slicing (avec OrcaSlicer et OpenGL)
   test-slicing:
     name: Slicing Tests (with OrcaSlicer)
     runs-on: ubuntu-latest
     needs: lint
     steps:
-      - name: 📥 Checkout Repository
+      - name:  Checkout Repository
         uses: actions/checkout@v4
 
-      - name: 🐍 Set up Python ${{ env.PYTHON_VERSION }}
+      - name:  Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: 🔧 Install uv
+      - name:  Install uv
         uses: astral-sh/setup-uv@v1
         with:
           uv-version: ${{ env.UV_VERSION }}
 
-      - name: 📦 Install Dependencies
+      - name:  Install Dependencies
         run: |
           uv sync --all-extras
 
-      - name: 🖨️ Install OrcaSlicer
+      - name:  Install OrcaSlicer
         run: |
           make slicer || echo "OrcaSlicer installation skipped"
 
-      - name: 🎨 Install OpenGL Libraries
+      - name:  Install OpenGL Libraries
         run: |
           sudo apt-get update
           sudo apt-get install -y libopengl0 libglu1-mesa
 
-      - name: 🧪 Run Slicing Tests
+      - name:  Run Slicing Tests
         run: |
           uv run pytest tests/test_core.py -v --tb=short -m "slicing" || true
 
-  # 🌐 Job 4: Vérification du JavaScript
+  #  Job 4: Vrification du JavaScript
   lint-js:
     name: Lint JavaScript
     runs-on: ubuntu-latest
     steps:
-      - name: 📥 Checkout Repository
+      - name:  Checkout Repository
         uses: actions/checkout@v4
 
-      - name: 🌍 Set up Node.js
+      - name:  Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
 
-      - name: ✅ Check JavaScript Syntax
+      - name:  Check JavaScript Syntax
         run: |
           find src/elegoo_lab/web/js -name "*.js" -exec node --input-type=module --check {} \; || true
 
-  # 🔄 Job 5: Build et Vérification du package
+  #  Job 5: Build et Vrification du package
   build:
     name: Build Package
     runs-on: ubuntu-latest
     needs: [lint, test-unit, test-slicing, lint-js]
     steps:
-      - name: 📥 Checkout Repository
+      - name:  Checkout Repository
         uses: actions/checkout@v4
 
-      - name: 🐍 Set up Python ${{ env.PYTHON_VERSION }}
+      - name:  Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: 🔧 Install uv
+      - name:  Install uv
         uses: astral-sh/setup-uv@v1
         with:
           uv-version: ${{ env.UV_VERSION }}
 
-      - name: 📦 Install Build Dependencies
+      - name:  Install Build Dependencies
         run: |
           uv sync --all-extras
 
-      - name: 🏗️ Build Package
+      - name:  Build Package
         run: |
           uv build || true
 
-  # 🐳 Job 6: Build et Push Docker (si sur main)
+  #  Job 6: Build et Push Docker (si sur main)
   docker:
     name: Build and Push Docker
     runs-on: ubuntu-latest
     needs: [lint, test-unit, test-slicing, lint-js, build]
     if: github.ref == 'refs/heads/main'
     steps:
-      - name: 📥 Checkout Repository
+      - name:  Checkout Repository
         uses: actions/checkout@v4
 
-      - name: 🐳 Set up Docker Buildx
+      - name:  Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: 🔐 Login to Docker Hub
+      - name:  Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_TOKEN }}
 
-      - name: 🏗️ Build Docker Image
+      - name:  Build Docker Image
         run: |
           docker build -t ${{ env.PROJECT_NAME }}:latest -t ${{ env.PROJECT_NAME }}:${{ github.sha }} .
 
-      - name: 📤 Push Docker Image
+      - name:  Push Docker Image
         run: |
           docker push ${{ env.PROJECT_NAME }}:latest
           docker push ${{ env.PROJECT_NAME }}:${{ github.sha }}
 
-  # 📚 Job 7: Déploiement de la documentation (si sur main)
+  #  Job 7: Dploiement de la documentation (si sur main)
   deploy-docs:
     name: Deploy Documentation
     runs-on: ubuntu-latest
     needs: [lint, test-unit, test-slicing, lint-js]
     if: github.ref == 'refs/heads/main'
     steps:
-      - name: 📥 Checkout Repository
+      - name:  Checkout Repository
         uses: actions/checkout@v4
 
-      - name: 🐍 Set up Python ${{ env.PYTHON_VERSION }}
+      - name:  Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: 🔧 Install uv
+      - name:  Install uv
         uses: astral-sh/setup-uv@v1
 
-      - name: 📦 Install Dependencies
+      - name:  Install Dependencies
         run: |
           uv sync
 
-      - name: 📖 Build Documentation
+      - name:  Build Documentation
         run: |
           echo "Documentation build skipped (no docs tool configured)"
 
-      - name: 📤 Deploy to GitHub Pages
+      - name:  Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./docs
         continue-on-error: true
 
----
 
-# 🎯 Workflow Dispatch (pour exécuter manuellement)
+#  Workflow Dispatch (pour excuter manuellement)
   workflow_dispatch:
     inputs:
       run-lint:
