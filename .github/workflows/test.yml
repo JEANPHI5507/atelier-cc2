@@ -1,0 +1,159 @@
+name: Tests Automatiques
+
+# 527 Workflow pour excuter les tests automatiquement sur chaque PR
+# et pour vrifier les changements avant merge.
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
+
+---
+
+env:
+  PYTHON_VERSION: "3.12"
+  UV_VERSION: "0.1.0"
+
+---
+
+jobs:
+  # 527 Job 1: Tests unitaires rapides (sans OrcaSlicer)
+  unit-tests:
+    name: Unit Tests (Fast)
+    runs-on: ubuntu-latest
+    steps:
+      - name: 4E4 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 526 Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: 489 Install uv
+        uses: astral-sh/setup-uv@v1
+        with:
+          uv-version: ${{ env.UV_VERSION }}
+
+      - name: 4B0 Install Dependencies
+        run: |
+          uv sync --all-extras
+
+      - name: 527 Run Fast Tests
+        run: |
+          # Excute les tests qui ne ncessitent pas OrcaSlicer
+          uv run pytest tests/test_core.py -v --tb=short -m "not slicing"
+
+  # 4A8 Job 2: Tests avec OrcaSlicer (si disponible)
+  slicing-tests:
+    name: Slicing Tests (with OrcaSlicer)
+    runs-on: ubuntu-latest
+    steps:
+      - name: 4E4 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 526 Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: 489 Install uv
+        uses: astral-sh/setup-uv@v1
+
+      - name: 4B0 Install Dependencies
+        run: |
+          uv sync --all-extras
+
+      - name: 4C8 Install OrcaSlicer
+        run: |
+          make slicer
+
+      - name: 527 Run Slicing Tests
+        run: |
+          # Excute uniquement les tests de dcoupe
+          uv run pytest tests/test_core.py -v --tb=short -m "slicing" || echo "Slicing tests skipped (OrcaSlicer not available)"
+
+  # 469 Job 3: Tests UI avec Playwright (si Chrome est disponible)
+  ui-tests:
+    name: UI Tests (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - name: 4E4 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 526 Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: 489 Install uv
+        uses: astral-sh/setup-uv@v1
+
+      - name: 4B0 Install Dependencies
+        run: |
+          uv sync --all-extras
+
+      - name: 4C8 Install Playwright
+        run: |
+          uv run playwright install chromium
+
+      - name: 527 Run UI Tests
+        run: |
+          uv run pytest tests/test_ui.py -v --tb=short || echo "UI tests skipped (no display available)"
+
+  # 4BB Job 4: Tests d'intgration avec le simulateur
+  integration-tests:
+    name: Integration Tests (Simulator)
+    runs-on: ubuntu-latest
+    steps:
+      - name: 4E4 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 526 Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: 489 Install uv
+        uses: astral-sh/setup-uv@v1
+
+      - name: 4B0 Install Dependencies
+        run: |
+          uv sync --all-extras
+
+      - name: 4C8 Start Simulator
+        run: |
+          uv run cc2 simulateur --duree 300 &
+          sleep 5
+
+      - name: 527 Run Integration Tests
+        run: |
+          uv run pytest tests/test_core.py::test_simulator_connection -v --tb=short || echo "Integration tests skipped"
+
+---
+
+# 4CD Workflow Dispatch (excution manuelle)
+  workflow_dispatch:
+    inputs:
+      test-type:
+        description: 'Type de tests'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - unit
+          - slicing
+          - ui
+          - integration

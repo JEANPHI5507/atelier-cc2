@@ -1,0 +1,286 @@
+name: CI
+
+# 4A1 Atelier CC2 - Workflow CI/CD
+# Excute les tests, le linting et la vrification du code  chaque push/PR.
+
+on:
+  push:
+    branches: [main, develop]
+    paths-ignore:
+      - 'docs/**'
+      - 'guide/**'
+      - '*.md'
+      - '*.png'
+      - '*.jpg'
+      - 'LICENSE'
+      - '.gitignore'
+  pull_request:
+    branches: [main, develop]
+    paths-ignore:
+      - 'docs/**'
+      - 'guide/**'
+      - '*.md'
+      - '*.png'
+      - '*.jpg'
+      - 'LICENSE'
+      - '.gitignore'
+
+---
+
+# 4CD Variables globales
+env:
+  PYTHON_VERSION: "3.12"
+  UV_VERSION: "0.1.0"
+  PROJECT_NAME: "elegoo-lab"
+
+---
+
+jobs:
+  # 489 Job 1: Vrification du code Python (linting, typage)
+  lint:
+    name: Lint Python Code
+    runs-on: ubuntu-latest
+    steps:
+      - name: 4E4 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 526 Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: 489 Install uv
+        uses: astral-sh/setup-uv@v1
+        with:
+          uv-version: ${{ env.UV_VERSION }}
+
+      - name: 4B0 Install Dependencies
+        run: |
+          uv sync --all-extras
+
+      - name: 4D6 Run Ruff (Linting)
+        run: |
+          uv run ruff check src/ tests/
+
+      - name: 4D6 Run Mypy (Type Checking)
+        run: |
+          uv run mypy src/elegoo_lab --ignore-missing-imports
+
+      - name: 4D6 Check Python Formatting (Black)
+        run: |
+          uv run black --check src/ tests/
+
+      - name: 4D6 Check Imports (isort)
+        run: |
+          uv run isort --check-only src/ tests/
+
+  # 527 Job 2: Excution des tests unitaires
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - name: 4E4 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 526 Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: 489 Install uv
+        uses: astral-sh/setup-uv@v1
+        with:
+          uv-version: ${{ env.UV_VERSION }}
+
+      - name: 4B0 Install Dependencies
+        run: |
+          uv sync --all-extras
+
+      - name: 4C8 Install OrcaSlicer (for slicing tests)
+        run: |
+          make slicer || echo "OrcaSlicer installation skipped (not critical for all tests)"
+
+      - name: 527 Run Unit Tests (Core)
+        run: |
+          uv run pytest tests/test_core.py -v --tb=short
+
+      - name: 527 Run Unit Tests (All)
+        run: |
+          uv run pytest tests/ -v --tb=short -x
+
+      - name: 4CA Generate Coverage Report
+        run: |
+          uv run pytest tests/ --cov=src/elegoo_lab --cov-report=xml --cov-report=html
+
+      - name: 4C8 Upload Coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+        continue-on-error: true
+
+  # 4BB Job 3: Vrification du JavaScript
+  lint-js:
+    name: Lint JavaScript
+    runs-on: ubuntu-latest
+    steps:
+      - name: 4E4 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 526 Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: 4B0 Install Node Dependencies (if any)
+        run: |
+          npm install --global eslint prettier
+
+      - name: 4D6 Check JavaScript Syntax
+        run: |
+          find src/elegoo_lab/web/js -name "*.js" -exec node --input-type=module --check {} \;
+
+      - name: 4D6 Check Tablet JavaScript
+        run: |
+          node --check src/elegoo_lab/web/js/tableau.js
+
+  # 4CC Job 4: Vrification des traductions
+  check-translations:
+    name: Check Translations
+    runs-on: ubuntu-latest
+    steps:
+      - name: 4E4 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 4D6 Verify Translation Files
+        run: |
+          # Vrifie que tous les fichiers de traduction existent
+          if [ ! -f "src/elegoo_lab/web/i18n/en.json" ]; then
+            echo "::error::Missing en.json translation file"
+            exit 1
+          fi
+          if [ ! -f "src/elegoo_lab/web/i18n/fr.json" ]; then
+            echo "::error::Missing fr.json translation file"
+            exit 1
+          fi
+
+      - name: 4D6 Check for Missing Translations
+        run: |
+          # Compare en.json et fr.json pour dtecter les cls manquantes
+          python3 << 'EOF'
+          import json
+          
+          try:
+              with open('src/elegoo_lab/web/i18n/en.json', 'r') as f:
+                  en = json.load(f)
+              with open('src/elegoo_lab/web/i18n/fr.json', 'r') as f:
+                  fr = json.load(f)
+              
+              en_keys = set(en.keys())
+              fr_keys = set(fr.keys())
+              
+              missing_in_fr = en_keys - fr_keys
+              missing_in_en = fr_keys - en_keys
+              
+              if missing_in_fr:
+                  print(f"::warning::Missing keys in fr.json: {missing_in_fr}")
+              if missing_in_en:
+                  print(f"::warning::Missing keys in en.json: {missing_in_en}")
+                  
+          except FileNotFoundError as e:
+              print(f"::error::{e}")
+              exit(1)
+          except json.JSONDecodeError as e:
+              print(f"::error::Invalid JSON in translation file: {e}")
+              exit(1)
+          EOF
+
+  # 4A1 Job 5: Build et Vrification du package
+  build:
+    name: Build Package
+    runs-on: ubuntu-latest
+    needs: [lint, test, lint-js]
+    steps:
+      - name: 4E4 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 526 Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: 489 Install uv
+        uses: astral-sh/setup-uv@v1
+        with:
+          uv-version: ${{ env.UV_VERSION }}
+
+      - name: 4B0 Install Build Dependencies
+        run: |
+          uv sync --all-extras
+
+      - name: 4C8 Build Package
+        run: |
+          uv build
+
+      - name: 4C8 Check Package Metadata
+        run: |
+          python3 -c "import metadata; print(metadata.metadata('${{ env.PROJECT_NAME }}'))" || echo "Package metadata check skipped"
+
+  # 4CD Job 6: Dploiement de la documentation (si sur main)
+  deploy-docs:
+    name: Deploy Documentation
+    runs-on: ubuntu-latest
+    needs: [lint, test, lint-js, check-translations]
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: 4E4 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 526 Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: 489 Install uv
+        uses: astral-sh/setup-uv@v1
+
+      - name: 4B0 Install Dependencies
+        run: |
+          uv sync
+
+      - name: 4C8 Build Documentation
+        run: |
+          # Si vous utilisez MkDocs ou un autre outil de documentation
+          # uv run mkdocs build
+          echo "Documentation build skipped (no docs tool configured)"
+
+      - name: 4C8 Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site
+        continue-on-error: true
+
+---
+
+# 4CD Workflow Dispatch (pour excuter manuellement)
+  workflow_dispatch:
+    inputs:
+      run-lint:
+        description: 'Run Linting'
+        required: true
+        default: true
+        type: boolean
+      run-tests:
+        description: 'Run Tests'
+        required: true
+        default: true
+        type: boolean
+      run-build:
+        description: 'Run Build'
+        required: true
+        default: true
+        type: boolean

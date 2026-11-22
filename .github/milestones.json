@@ -1,0 +1,83 @@
+{
+  "milestones": [
+    {
+      "title": "Phase 1: Stabilité & Portabilité",
+      "description": "Résoudre les problèmes critiques de compatibilité et de stabilité. Inclut : Docker, WSL2, Mode Safe, Diagnostic amélioré, gestion des erreurs caméra.",
+      "due_on": "2024-12-31",
+      "state": "open",
+      "labels": ["priorité:critique", "phase:1"],
+      "issues": [
+        {"number": 1, "title": "Dockerisation du projet"},
+        {"number": 2, "title": "Support WSL2 pour Windows"},
+        {"number": 3, "title": "Mode Safe pour firmware inconnu"},
+        {"number": 4, "title": "Outil cc2 doctor étendu"},
+        {"number": 5, "title": "Documentation des limites CC2 dans l'UI"},
+        {"number": 6, "title": "Gestion des erreurs caméra"}
+      ]
+    },
+    {
+      "title": "Phase 2: Expérience Utilisateur",
+      "description": "Rendre l'outil accessible et intuitif pour tous les utilisateurs. Inclut : Mode Débutant, CANVAS 3D, Notifications intelligentes, Backup automatique.",
+      "due_on": "2025-03-31",
+      "state": "open",
+      "labels": ["priorité:haute", "phase:2"],
+      "issues": [
+        {"number": 7, "title": "Mode Débutant"},
+        {"number": 8, "title": "Visualisation CANVAS 3D"},
+        {"number": 9, "title": "Notifications intelligentes"},
+        {"number": 10, "title": "Backup automatique"},
+        {"number": 11, "title": "Assistant guidé étendu"},
+        {"number": 12, "title": "Tutoriels intégrés"},
+        {"number": 13, "title": "Thème sombre pour tablette"},
+        {"number": 14, "title": "Accessibilité (raccourcis clavier, WCAG)"}
+      ]
+    },
+    {
+      "title": "Phase 3: Fonctionnalités Avancées",
+      "description": "Ajouter des fonctionnalités demandées par la communauté. Inclut : Multi-imprimantes, Planification, Thingiverse, Partage de profils.",
+      "due_on": "2025-06-30",
+      "state": "open",
+      "labels": ["priorité:moyenne", "phase:3"],
+      "issues": [
+        {"number": 15, "title": "Gestion multi-imprimantes"},
+        {"number": 16, "title": "Planification des impressions"},
+        {"number": 17, "title": "Intégration Thingiverse/Printables"},
+        {"number": 18, "title": "Partage de profils"},
+        {"number": 19, "title": "Support PrusaSlicer/Bambu Studio"},
+        {"number": 20, "title": "Journal des maintenance"},
+        {"number": 21, "title": "Vérification niveau filament"}
+      ]
+    },
+    {
+      "title": "Phase 4: Performance & Optimisation",
+      "description": "Améliorer les performances et réduire la consommation de ressources. Inclut : Découpe incrémentale, Mode léger, Cache, WebRTC.",
+      "due_on": "2025-08-31",
+      "state": "open",
+      "labels": ["priorité:moyenne", "phase:4"],
+      "issues": [
+        {"number": 22, "title": "Découpe incrémentale"},
+        {"number": 23, "title": "Mode léger pour Raspberry Pi"},
+        {"number": 24, "title": "Cache des modèles"},
+        {"number": 25, "title": "Optimisation mémoire"},
+        {"number": 26, "title": "Parallélisation de la découpe"},
+        {"number": 27, "title": "Flux vidéo WebRTC"}
+      ]
+    },
+    {
+      "title": "Phase 5: Intégrations & Écosystème",
+      "description": "Étendre l'écosystème et intégrer avec d'autres outils. Inclut : Home Assistant, OctoPrint, Let's Encrypt, Webhooks.",
+      "due_on": "2025-12-31",
+      "state": "open",
+      "labels": ["priorité:faible", "phase:5"],
+      "issues": [
+        {"number": 28, "title": "Intégration Home Assistant"},
+        {"number": 29, "title": "Plugin OctoPrint"},
+        {"number": 30, "title": "Let's Encrypt pour HTTPS"},
+        {"number": 31, "title": "Webhooks Discord/Slack"},
+        {"number": 32, "title": "Intégration Git"},
+        {"number": 33, "title": "Support Centauri Carbon 1"},
+        {"number": 34, "title": "Marketplace de modèles"}
+      ]
+    }
+  ]
+}
