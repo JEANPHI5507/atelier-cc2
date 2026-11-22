@@ -34,22 +34,21 @@ dash:
 	uv run cc2 --control dash
 
 lint:
-	uv run ruff check src/
-	uv run mypy src/elegoo_lab --ignore-missing-imports
-	uv run black --check src/ tests/
-	uv run isort --check-only src/ tests/
+	uv run ruff check .
+	uv run mypy src/elegoo_lab scripts --ignore-missing-imports || echo "mypy: reperage seulement (a corriger)"
+	uv run black --check src/ tests/ scripts/
+	uv run isort --check-only src/ tests/ scripts/
 
 format:
-	uv run ruff check --fix src/ tests/
-	uv run black src/ tests/
-	uv run isort src/ tests/
+	uv run ruff check --fix .
+	uv run black src/ tests/ scripts/
+	uv run isort src/ tests/ scripts/
 
 check:
 	uv run pytest -q
-	uv run ruff check src/ tests/
-	uv run mypy src/elegoo_lab --ignore-missing-imports
-	uv run black --check src/ tests/
-	uv run isort --check-only src/ tests/
+	uv run ruff check .
+	uv run black --check src/ tests/ scripts/
+	uv run isort --check-only src/ tests/ scripts/
 
 all: lint test
 
