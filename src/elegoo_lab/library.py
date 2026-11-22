@@ -150,7 +150,7 @@ def thumbnail(name: str) -> bytes | None:
         except ValueError:
             return None
     st = p.stat()
-    cache = _thumbs() / (hashlib.sha1(f"{p.name}:{st.st_mtime_ns}:{st.st_size}".encode()).hexdigest()[:20] + ".png")
+    cache = _thumbs() / (hashlib.sha256(f"{p.name}:{st.st_mtime_ns}:{st.st_size}".encode()).hexdigest()[:20] + ".png")
     if cache.exists():
         return cache.read_bytes()
     import numpy as np

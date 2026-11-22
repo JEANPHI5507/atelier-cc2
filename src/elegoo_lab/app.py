@@ -522,7 +522,7 @@ def lab_router(cfg: config.Config) -> APIRouter:
         palette = _pal(pal.split(",") if pal else None)
         key = (src.name, src.stat().st_mtime, map or "", palette)
         # an AI model's preview weighs several MB: the browser keeps it and only asks whether it changed
-        etag = '"' + hashlib.sha1(repr(key).encode()).hexdigest()[:20] + '"'
+        etag = '"' + hashlib.sha256(repr(key).encode()).hexdigest()[:20] + '"'
         cache = {"ETag": etag, "Cache-Control": "private, no-cache"}
         if request.headers.get("if-none-match") == etag:
             return Response(status_code=304, headers=cache)

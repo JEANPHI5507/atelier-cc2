@@ -138,7 +138,7 @@ def printer_name(name: str) -> str:
     stem = name[: -len(suffix)] if suffix else name
     slug = re.sub(r"[^A-Za-z0-9._-]+", "_", unicodedata.normalize("NFKD", stem)
                   .encode("ascii", "ignore").decode()).strip("._")
-    return f"{slug or 'piece'}_{hashlib.sha1(name.encode()).hexdigest()[:6]}{suffix}"
+    return f"{slug or 'piece'}_{hashlib.sha256(name.encode()).hexdigest()[:6]}{suffix}"
 
 
 def params(filename: str, opts: dict[str, Any], slot_map: list[dict[str, int]] | None, canvas_id: int = 0,
