@@ -337,10 +337,9 @@ def lab_router(cfg: config.Config) -> APIRouter:
                 names += _split_plates(dest)["plates"]
             if not names:
                 raise HTTPException(400, "l'archive ne contient aucun modèle")
-            elif len(names) == 1:
+            if len(names) == 1:
                 return {"name": dest.name, "names": names, "plates": []}
-            else:
-                return {"name": names[0], "names": names}
+            return {"name": names[0], "names": names}
         dest = _new_model_path(name)
         with dest.open("wb") as out:
             out.write(data)
@@ -1410,7 +1409,7 @@ def _add_alerts(app: FastAPI) -> None:
 
     app.router.lifespan_context = lifespan
 
-    def watcher(request: Request) -> "alerts.Watcher":
+    def watcher(request: Request) -> alerts.Watcher:
         w = getattr(request.app.state, "watcher", None)
         if w is None:
             raise HTTPException(503, "Suivi pas encore démarré")

@@ -12,14 +12,13 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 from pycentauri.cli import app as printer_app
 
-from . import colorize, colors
+from . import colorize, colors, config, mesh, printprep, slicer
 from . import comfy as comfy_mod
-from . import config, mesh, printprep, slicer
 
 app = typer.Typer(help=__doc__, no_args_is_help=True, add_completion=False)
 
@@ -46,7 +45,7 @@ app.registered_commands.extend(printer_app.registered_commands)
 def dash(
     ctx: typer.Context,
     bind: Annotated[str, typer.Option(help="Interface d'écoute (127.0.0.1 = local seulement).")] = "127.0.0.1",
-    port: Annotated[Optional[int], typer.Option()] = None,
+    port: Annotated[int | None, typer.Option()] = None,
     reseau: Annotated[bool, typer.Option("--reseau", help="Ouvre l'atelier au réseau de la maison (téléphone), protégé par un code d'accès.")] = False,
     port_https: Annotated[int, typer.Option(help="Port HTTPS pour le téléphone (avec --reseau).")] = 8443,
     sans_https: Annotated[bool, typer.Option("--sans-https", help="Téléphone en HTTP simple (pas d'installation en appli).")] = False,
@@ -145,7 +144,7 @@ def simulateur(
 
 @app.command("code-acces")
 def code_acces(
-    code: Annotated[Optional[str], typer.Argument(help="Nouveau code (4 à 12 chiffres) ; vide = en tirer un au hasard.")] = None,
+    code: Annotated[str | None, typer.Argument(help="Nouveau code (4 à 12 chiffres) ; vide = en tirer un au hasard.")] = None,
 ) -> None:
     """Change le code d'accès depuis le téléphone (les téléphones déjà connectés devront le ressaisir)."""
     import secrets
@@ -253,7 +252,7 @@ app.add_typer(backup, name="sauvegarde")
 
 @backup.command("faire")
 def backup_run(
-    vers: Annotated[Optional[str], typer.Option(help="Dossier d'un disque branché, ou machine ssh ; vide = le disque USB branché.")] = None,
+    vers: Annotated[str | None, typer.Option(help="Dossier d'un disque branché, ou machine ssh ; vide = le disque USB branché.")] = None,
     si_besoin: Annotated[bool, typer.Option("--si-besoin", help="Seulement si la dernière date de plus de 20 h.")] = False,
 ) -> None:
     """Copie models/, config.toml et l'historique git dans le dossier atelier-cc2 du disque USB branché."""
@@ -267,7 +266,7 @@ def backup_run(
 
 @backup.command("installer")
 def backup_install(
-    vers: Annotated[Optional[str], typer.Option(help="Dossier d'un disque branché, ou machine ssh ; vide = le disque USB branché.")] = None,
+    vers: Annotated[str | None, typer.Option(help="Dossier d'un disque branché, ou machine ssh ; vide = le disque USB branché.")] = None,
 ) -> None:
     """Sauvegarde automatique : essai toutes les heures, une copie par jour, rattrapée dès que le disque est branché."""
     exe = Path(sys.executable).parent / "cc2"
@@ -321,8 +320,8 @@ def models_info(file: Path) -> None:
 @models.command("prepare")
 def models_prepare(
     file: Path,
-    height: Annotated[Optional[float], typer.Option(help="Hauteur finale en mm.")] = None,
-    out: Annotated[Optional[Path], typer.Option(help="Sortie (.stl/.3mf).")] = None,
+    height: Annotated[float | None, typer.Option(help="Hauteur finale en mm.")] = None,
+    out: Annotated[Path | None, typer.Option(help="Sortie (.stl/.3mf).")] = None,
 ) -> None:
     """Convertit en STL imprimable: repose sur Z=0, centre, répare, met à l'échelle."""
     src = _resolve(file)
@@ -340,10 +339,10 @@ def slice_cmd(
     file: Path,
     nozzle: Annotated[str, typer.Option(help="Diamètre de buse (mm).")] = slicer.DEFAULT_NOZZLE,
     quality: Annotated[str, typer.Option(help="Profil de qualité, voir `cc2 slice-profiles`.")] = slicer.DEFAULT_QUALITY,
-    filament: Annotated[Optional[list[str]], typer.Option(help="Filament par bobine, dans l'ordre des bobines 1, 2… (répétable).")] = None,
-    slot: Annotated[Optional[list[str]], typer.Option(help="Couleur→bobine, ex. --slot 3:1 (voir `cc2 colors`).")] = None,
-    height: Annotated[Optional[float], typer.Option(help="Hauteur finale en mm.")] = None,
-    infill: Annotated[Optional[int], typer.Option(help="Remplissage en %.")] = None,
+    filament: Annotated[list[str] | None, typer.Option(help="Filament par bobine, dans l'ordre des bobines 1, 2… (répétable).")] = None,
+    slot: Annotated[list[str] | None, typer.Option(help="Couleur→bobine, ex. --slot 3:1 (voir `cc2 colors`).")] = None,
+    height: Annotated[float | None, typer.Option(help="Hauteur finale en mm.")] = None,
+    infill: Annotated[int | None, typer.Option(help="Remplissage en %.")] = None,
     supports: Annotated[str, typer.Option(help="Supports : aucun, arbre, arbre_fin, arbre_solide, colonnes.")] = "aucun",
     plate_only: Annotated[bool, typer.Option("--plateau-seul", help="Supports seulement depuis le plateau.")] = False,
     mode: Annotated[str, typer.Option(help="Multicolore : equilibre (tour d'essuyage, par défaut), qualite, economie (sans tour), sans_purge.")] = printprep.DEFAULT_MODE,
@@ -438,9 +437,9 @@ def _send(path: Path, start: bool) -> None:
 def multicolor(
     parts: Annotated[list[str], typer.Argument(help="Pièces au format fichier:emplacement, ex. base.stl:1 dessus.stl:2")],
     name: Annotated[str, typer.Option(help="Nom du modèle.")] = "multicolore",
-    filament: Annotated[Optional[list[str]], typer.Option(help="Filament par emplacement, dans l'ordre (répétable).")] = None,
+    filament: Annotated[list[str] | None, typer.Option(help="Filament par emplacement, dans l'ordre (répétable).")] = None,
     quality: Annotated[str, typer.Option()] = slicer.DEFAULT_QUALITY,
-    infill: Annotated[Optional[int], typer.Option()] = None,
+    infill: Annotated[int | None, typer.Option()] = None,
     upload: Annotated[bool, typer.Option(help="Envoyer à l'imprimante (exige --control).")] = False,
     start: Annotated[bool, typer.Option(help="Lancer l'impression (exige --upload).")] = False,
 ) -> None:
@@ -490,9 +489,9 @@ def slice_profiles(nozzle: str = slicer.DEFAULT_NOZZLE) -> None:
 @app.command("gen")
 def gen(
     workflow: str,
-    image: Annotated[Optional[Path], typer.Option(help="Image source (image→3D).")] = None,
-    prompt: Annotated[Optional[str], typer.Option(help="Texte (texte→3D).")] = None,
-    seed: Annotated[Optional[int], typer.Option()] = None,
+    image: Annotated[Path | None, typer.Option(help="Image source (image→3D).")] = None,
+    prompt: Annotated[str | None, typer.Option(help="Texte (texte→3D).")] = None,
+    seed: Annotated[int | None, typer.Option()] = None,
 ) -> None:
     """Génère un modèle 3D via un workflow ComfyUI (workflows/<nom>.json)."""
     cfg = config.load()
@@ -518,21 +517,21 @@ def doctor() -> None:
 
     cfg = config.load()
     ok = lambda b: typer.style("OK ", fg="green") if b else typer.style("KO ", fg="red")  # noqa: E731
-    
+
     # 1. Configuration
     typer.echo("\n=== Configuration ===")
     typer.echo(f"{ok(config.CONFIG_FILE.exists())}config.toml ({config.CONFIG_FILE})")
-    
+
     # 2. Python et dépendances
     typer.echo("\n=== Environnement Python ===")
     typer.echo(f"{ok(sys.version_info >= (3, 12))}Python {sys.version.split()[0]} (requis: >= 3.12)")
-    
+
     try:
         import uv
         typer.echo(f"{ok(True)}uv {uv.__version__} installé")
     except ImportError:
         typer.echo(f"{ok(False)}uv non installé (requis pour la gestion des dépendances)")
-    
+
     # 3. OrcaSlicer
     typer.echo("\n=== OrcaSlicer ===")
     orca_path = Path(config.TOOLS_DIR) / "orcaslicer" / "squashfs-root" / "AppRun"
@@ -540,7 +539,7 @@ def doctor() -> None:
     typer.echo(f"{ok(orca_ok)}OrcaSlicer {'installé' if orca_ok else 'NON installé'}")
     if not orca_ok:
         typer.echo("    → Exécute 'make slicer' pour l'installer")
-    
+
     # 4. Modèle IA (Obico)
     typer.echo("\n=== Modèle IA (détection de spaghetti) ===")
     try:
@@ -551,7 +550,7 @@ def doctor() -> None:
             typer.echo("    → Exécute 'make ia' pour l'installer")
     except Exception:
         typer.echo(f"{ok(False)}Modèle IA non disponible")
-    
+
     # 5. Imprimante
     typer.echo("\n=== Imprimante (CC2) ===")
     if cfg.printer.host:
@@ -566,7 +565,7 @@ def doctor() -> None:
             typer.echo("    → Vérifie : imprimante allumée ? même réseau ? mode « LAN Only » activé ?")
     else:
         typer.echo(f"{ok(False)}Imprimante non configurée (host vide dans config.toml)")
-    
+
     # 6. Caméra
     typer.echo("\n=== Caméra ===")
     try:
@@ -574,24 +573,24 @@ def doctor() -> None:
         typer.echo(f"{ok(True)}Module caméra disponible")
     except ImportError:
         typer.echo(f"{ok(False)}Module caméra non disponible")
-    
+
     # 7. Espace disque
     typer.echo("\n=== Espace disque ===")
     total, used, free = shutil.disk_usage("/")
     typer.echo(f"{ok(free > 10 * 1024**3)}Espace libre: {free / 1024**3:.1f} Go (recommandé: > 10 Go)")
-    
+
     # 8. ComfyUI
     typer.echo("\n=== ComfyUI (optionnel) ===")
     if cfg.comfyui_url:
         try:
             s = comfy_mod.Comfy(cfg.comfyui_url, timeout=3).stats()
-            devices = [d.get('name') for d in s.get('devices', [])]
+            devices = [d.get("name") for d in s.get("devices", [])]
             typer.echo(f"{ok(True)}ComfyUI {cfg.comfyui_url} — {devices}")
         except comfy_mod.ComfyError as err:
             typer.echo(f"{ok(False)}ComfyUI non accessible: {err}")
     else:
         typer.echo(f"{ok(True)}ComfyUI non configuré (optionnel)")
-    
+
     # Résumé
     typer.echo("\n=== Résumé ===")
     typer.echo("Toutes les vérifications sont terminées.")

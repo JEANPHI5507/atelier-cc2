@@ -7,9 +7,7 @@ dans les différents composants de l'application.
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
-from . import firmware
 from .firmware import firmware_manager
 
 logger = logging.getLogger(__name__)
@@ -27,23 +25,22 @@ def check_firmware_on_connection(attrs) -> dict:
     Returns:
         dict: Informations sur le firmware et le mode safe
     """
-    version_string = getattr(attrs, 'firmware_version', None)
-    
+    version_string = getattr(attrs, "firmware_version", None)
+
     if version_string:
         firmware_manager.set_detected_version(version_string)
-        
+
         info = firmware_manager.get_safe_mode_info()
-        
+
         if firmware_manager.safe_mode:
             logger.warning(
                 f"Firmware inconnu détecté: {version_string}. "
                 f"Mode safe activé. Certaines commandes seront bloquées."
             )
-        
+
         return info
-    else:
-        logger.warning("Impossible de récupérer la version du firmware")
-        return firmware_manager.get_safe_mode_info()
+    logger.warning("Impossible de récupérer la version du firmware")
+    return firmware_manager.get_safe_mode_info()
 
 
 def can_execute_printer_command(command: str, printer=None) -> tuple[bool, str]:
@@ -58,13 +55,13 @@ def can_execute_printer_command(command: str, printer=None) -> tuple[bool, str]:
     """
     if firmware_manager.is_command_safe(command):
         return True, ""
-    
+
     # Récupérer le message de blocage
     blocked_info = firmware_manager.get_blocked_commands()
     reason = blocked_info.get(command, "Commande non autorisée en mode safe")
-    
+
     warning = firmware_manager.get_warning_message()
-    
+
     return False, f"{reason}. {warning}"
 
 
@@ -75,17 +72,17 @@ def get_firmware_status_for_ui() -> dict:
         dict: Informations à afficher dans l'UI
     """
     info = firmware_manager.get_safe_mode_info()
-    
+
     # Ajouter un message utilisateur
-    if info['safe_mode']:
-        info['user_message'] = (
+    if info["safe_mode"]:
+        info["user_message"] = (
             "⚠️ Votre imprimante a un firmware non testé. "
             "L'atelier fonctionne en mode sécurisé. "
             "Certaines commandes doivent être exécutées sur l'écran de l'imprimante."
         )
     else:
-        info['user_message'] = "✅ Firmware supporté - Toutes les fonctionnalités sont disponibles"
-    
+        info["user_message"] = "✅ Firmware supporté - Toutes les fonctionnalités sont disponibles"
+
     return info
 
 
@@ -96,7 +93,7 @@ def get_blocked_commands_list() -> list[dict]:
         list: Liste des commandes bloquées avec leurs raisons
     """
     blocked = firmware_manager.get_blocked_commands()
-    
+
     return [
         {
             "command": cmd,

@@ -6,7 +6,6 @@ Shared by the web workshop and the ``cc2 slice`` command so both behave the same
 from __future__ import annotations
 
 import re
-import time
 from pathlib import Path
 from typing import Any
 

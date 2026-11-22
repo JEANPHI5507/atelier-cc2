@@ -1,13 +1,13 @@
 import asyncio
-import time
 import json
+import time
 from pathlib import Path
 
+import fakeprinter as sim
 import httpx
 import pytest
 import trimesh
 
-import fakeprinter as sim
 from elegoo_lab import comfy, config, mesh
 
 
@@ -43,8 +43,8 @@ async def test_sim_print_cycle(printer):
 
 
 async def test_wrong_access_code():
-    from pycentauri.client import PrinterError
     import pycentauri.connect as connect
+    from pycentauri.client import PrinterError
     s = sim.Sim(port=18841, http_port=18851)
     task = asyncio.create_task(s.serve())
     await asyncio.sleep(0.2)
@@ -137,7 +137,7 @@ def test_multicolor_parts_change_tool_at_junction(tmp_path):
 def test_paint_codes_roundtrip_and_remap():
     from elegoo_lab import colors
     assert [colors.encode_state(s) for s in (1, 2, 3, 4)] == ["4", "8", "0C", "1C"]
-    for s in range(0, 10):
+    for s in range(10):
         assert colors.paint_states(colors.encode_state(s)) == {s}
     assert colors.remap_paint("8", {2: 4}) == "1C"
     # triangle split in two (split=1, special side 0) with leaves 1 and 2: bits 1,0|0,0|0,0,1,0|0,0,0,1
@@ -149,6 +149,7 @@ def test_paint_codes_roundtrip_and_remap():
 
 def test_coloured_mesh_to_canvas_and_slice(tmp_path):
     import numpy as np
+
     from elegoo_lab import colors, printprep, slicer
     if not (slicer.TOOLS / "squashfs-root" / "AppRun").exists():
         pytest.skip("slicer non installé (make slicer)")
@@ -212,6 +213,7 @@ def test_standard_3mf_colours_and_roundtrip(tmp_path):
 def test_3mf_reader_unusual_shapes_and_cache(tmp_path):
     import os
     import zipfile
+
     from elegoo_lab import threemf
     head = ('<?xml version="1.0"?>\n<model unit="centimeter" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02"'
             ' xmlns:m="http://schemas.microsoft.com/3dmanufacturing/material/2015/02" xmlns:s="http://schemas.slic3r.org/3mf/2017/06">')
@@ -240,7 +242,9 @@ def test_3mf_reader_unusual_shapes_and_cache(tmp_path):
 def test_variable_layer_height_follows_the_slopes(tmp_path):
     import re
     import zipfile
+
     import numpy as np
+
     from elegoo_lab import couches, printprep, settings, slicer
     ball = trimesh.creation.icosphere(4, radius=15)
     ball.apply_translation([0, 0, 15])
@@ -267,6 +271,7 @@ def test_variable_layer_height_follows_the_slopes(tmp_path):
 
 def test_painted_supports_and_seam_reach_the_slicer():
     import zipfile
+
     from elegoo_lab import colors, printprep, slicer, threemf
     foot, cap = trimesh.creation.box((8, 8, 20)), trimesh.creation.box((30, 30, 4))
     foot.apply_translation([0, 0, 10])
@@ -330,6 +335,7 @@ def test_pieces_placed_by_hand_stay_on_the_plate():
 def test_two_models_on_one_plate_then_one_piece_resized(web):
     """« + Pièce »: two library models side by side in a new model, colours shared; one piece then resized on the plate."""
     import numpy as np
+
     from elegoo_lab import colors, compose, threemf
     client, lib = web
     trimesh.creation.box((20, 20, 20)).export(lib / "bloc.stl")
@@ -355,6 +361,7 @@ def test_two_models_on_one_plate_then_one_piece_resized(web):
 def test_composed_plate_loses_one_piece(web):
     """« Supprimer cette pièce »: one piece leaves the plate in a new model; the others keep place and size."""
     import numpy as np
+
     from elegoo_lab import threemf
     client, lib = web
     trimesh.creation.box((20, 20, 20)).export(lib / "bloc.stl")
@@ -383,7 +390,9 @@ def test_composed_plate_loses_one_piece(web):
 
 def test_compact_preview_glb_is_face_for_face():
     import struct
+
     import numpy as np
+
     from elegoo_lab import colors
     src = config.MODELS_DIR / "boule.stl"
     trimesh.creation.icosphere(2, radius=10).export(src)
@@ -404,6 +413,7 @@ def test_compact_preview_glb_is_face_for_face():
 
 def test_economy_mode_purge_and_tower(tmp_path):
     import numpy as np
+
     from elegoo_lab import colors, printprep, slicer
     fm = colors.flush_matrix(["#FFFF00", "#101010"])  # yellow, black
     assert fm[0] == 0 and fm[1] < fm[2]  # yellow->black needs less purge than black->yellow
@@ -422,6 +432,7 @@ def test_economy_mode_purge_and_tower(tmp_path):
 
 def test_a_bled_review_reinforces_the_purge(tmp_path):
     import numpy as np
+
     from elegoo_lab import colors, library, printprep, slicer
     if not (slicer.TOOLS / "squashfs-root" / "AppRun").exists():
         pytest.skip("slicer non installé")
@@ -443,6 +454,7 @@ def test_a_bled_review_reinforces_the_purge(tmp_path):
 
 def test_cut_oversized_into_pieces_with_dowels():
     import numpy as np
+
     from elegoo_lab import cut
     m = trimesh.creation.box((60, 60, 300))
     m.apply_translation((30, 30, 150))
@@ -497,6 +509,7 @@ async def test_connection_check_on_simulator():
 
 def test_smart_cut_goes_through_the_neck():
     import numpy as np
+
     from elegoo_lab import cut
     # a 300 mm "figure": wide body, thin neck at z=190, wide head
     body = trimesh.creation.box((80, 80, 180)); body.apply_translation((0, 0, 90))
@@ -576,7 +589,9 @@ def test_a_colour_needs_grams_before_any_slicing(web):
     """The colour step says how many grams each colour will use (from the model's volume), so a nearly
     empty spool is caught before slicing, not when the print is already running."""
     from types import SimpleNamespace as NS
+
     import numpy as np
+
     from elegoo_lab import spools
     # solid 160 cm³, split in two equal colours: Décoratif ≈ 30 g each, Solide ≈ 95 g each
     model = [{"index": 1, "share": 50.0}, {"index": 2, "share": 50.0}]
@@ -630,6 +645,7 @@ def test_one_colour_model_takes_a_loaded_spool(tmp_path):
 
 def test_advanced_settings_reach_the_gcode(tmp_path):
     import re
+
     from elegoo_lab import printprep, settings, slicer
     with pytest.raises(ValueError):
         settings.build({"parois": 40})
@@ -687,7 +703,9 @@ def test_zip_upload_and_broken_step_rejected(web):
 def web(tmp_path, monkeypatch, fake_printer_env):
     """The workshop API on a throw-away library (no printer connection: lifespan not started)."""
     from fastapi.testclient import TestClient
-    from elegoo_lab import app as app_mod, config
+
+    from elegoo_lab import app as app_mod
+    from elegoo_lab import config
     lib = tmp_path / "models"
     lib.mkdir()
     monkeypatch.setattr(config, "MODELS_DIR", lib)
@@ -712,7 +730,6 @@ def test_web_refuses_other_sites(web):
 
 def test_the_assistant_acts_through_the_workshop_tools(web, monkeypatch):
     """The chatbot, API engine: Mistral is faked, its tool calls run for real (resize → a new model in the library)."""
-    from types import SimpleNamespace as NS
     from elegoo_lab import assistant
     client, lib = web
     trimesh.creation.box((20, 20, 20)).export(lib / "cube.stl")
@@ -953,7 +970,9 @@ def test_parametric_parts_are_closed_and_validated(tmp_path, monkeypatch):
 
 def test_phone_access_needs_the_code(web, monkeypatch):
     from fastapi.testclient import TestClient
-    from elegoo_lab import access, app as app_mod
+
+    from elegoo_lab import access
+    from elegoo_lab import app as app_mod
     client, lib = web
     code = access.ensure_code()
     assert code and access.ensure_code() is None and "code_hash" in config.CONFIG_FILE.read_text()
@@ -1063,6 +1082,7 @@ def test_section_for_the_tablet(tmp_path):
 
 def test_colours_now_and_next(web):
     from types import SimpleNamespace as NS
+
     from elegoo_lab import suivi_couleurs
     client, lib = web
     g = ["M6211 A1 L200 T0", "M73 P0 R30"]
@@ -1096,7 +1116,9 @@ def test_colours_now_and_next(web):
 
 
 def test_english_dictionary_and_server_translation():
-    import json, re
+    import json
+    import re
+
     from elegoo_lab import i18n
     d = json.loads(i18n.DICT.read_text())
     assert len(d["exact"]) > 1000 and len(d["patterns"]) > 100
@@ -1116,9 +1138,12 @@ def test_english_dictionary_and_server_translation():
 
 def test_pwa_and_https_for_the_phone(web, monkeypatch, tmp_path):
     import ssl
+
     from cryptography import x509
     from fastapi.testclient import TestClient
-    from elegoo_lab import access, app as app_mod, certs
+
+    from elegoo_lab import access, certs
+    from elegoo_lab import app as app_mod
     client, lib = web
     monkeypatch.setattr(config, "ROOT", tmp_path)
     code = access.ensure_code()
@@ -1215,7 +1240,9 @@ def test_spool_stock_and_costs(tmp_path, monkeypatch):
 async def test_ai_watch_pauses_a_failed_print_and_gallery_keeps_it(tmp_path, monkeypatch):
     import io
     import shutil
+
     from PIL import Image
+
     from elegoo_lab import alerts, gallery, vision
     monkeypatch.setattr(config, "MODELS_DIR", tmp_path)
     monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "config.toml")
@@ -1362,6 +1389,7 @@ def test_usage_puts_plastic_where_it_matters(tmp_path):
 
 def test_cc2_knowledge_errors_materials_maintenance(tmp_path, monkeypatch):
     import time
+
     from elegoo_lab import alerts, errors, gallery, launch, maintenance
     monkeypatch.setattr(config, "MODELS_DIR", tmp_path)
     monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "config.toml")
@@ -1424,8 +1452,10 @@ def test_orientations_advise_the_obvious(tmp_path):
 def test_library_knows_each_file(tmp_path, monkeypatch):
     import base64
     import io
+
     from PIL import Image
-    from elegoo_lab import library, stock, thumbnail
+
+    from elegoo_lab import library, stock
     monkeypatch.setattr(config, "MODELS_DIR", tmp_path)
     trimesh.creation.box((20, 20, 20)).export(tmp_path / "chat.stl")
     (tmp_path / "chat_canvas.3mf").write_bytes(b"x")                      # a technical by-product
@@ -1677,6 +1707,7 @@ def test_own_spools_are_recognised_and_sliced(tmp_path, monkeypatch):
 
 def test_specks_melt_into_their_surroundings_but_hand_paint_stays():
     import numpy as np
+
     from elegoo_lab import colors, threemf
     s = trimesh.creation.icosphere(subdivisions=4)
     lab = (s.triangles_center[:, 2] > 0).astype(int)          # two halves
@@ -1712,6 +1743,7 @@ def test_model_repainted_with_the_loaded_spools(tmp_path):
 
 def test_assembly_takes_the_spools_colours(tmp_path):
     import zipfile
+
     from elegoo_lab import colorize, colors
     a, b = tmp_path / "a.stl", tmp_path / "b.stl"
     trimesh.creation.box((10, 10, 10)).export(a)
@@ -1724,8 +1756,9 @@ def test_assembly_takes_the_spools_colours(tmp_path):
 
 
 def test_name_added_inside_a_line_drawing(tmp_path):
-    import numpy as np
     import manifold3d as mf
+    import numpy as np
+
     from elegoo_lab import addtext, colors
     ring = (mf.CrossSection.circle(40, 96) - mf.CrossSection.circle(37, 96)).extrude(2.0)   # a drawn circle, 2 mm
     m = ring.to_mesh()
@@ -1838,7 +1871,9 @@ def test_model_renamed_while_read_is_not_found_not_an_error(web, monkeypatch):
 
 def test_tailscale_name_goes_into_the_certificate(tmp_path, monkeypatch):
     import subprocess
+
     from cryptography import x509
+
     from elegoo_lab import access, certs
     monkeypatch.setattr(config, "ROOT", tmp_path)
     status = {"Self": {"Online": True, "TailscaleIPs": ["100.101.102.103", "fd7a::1"], "DNSName": "pc.tail1.ts.net."}}
@@ -1886,6 +1921,7 @@ def test_backup_copies_the_library_and_keeps_old_versions(tmp_path, monkeypatch)
     """Real rsync and git; ssh is a stand-in that runs the "remote" side in a local folder."""
     import os
     import shutil
+
     from elegoo_lab import sauvegarde
     if not shutil.which("rsync"):
         pytest.skip("rsync absent")
@@ -1915,6 +1951,7 @@ def test_backup_copies_the_library_and_keeps_old_versions(tmp_path, monkeypatch)
 
 def test_backup_to_a_usb_disk_never_fills_the_pc_disk(tmp_path, monkeypatch):
     import shutil
+
     from elegoo_lab import sauvegarde
     if not shutil.which("rsync"):
         pytest.skip("rsync absent")
@@ -1933,6 +1970,7 @@ def test_backup_to_a_usb_disk_never_fills_the_pc_disk(tmp_path, monkeypatch):
 def test_old_printed_gcodes_go_their_models_stay():
     import json
     import os
+
     from elegoo_lab import library
     lib, old = config.MODELS_DIR, time.time() - 40 * 86400
     for m in ("coeur", "sapin", "etoile", "renne", "boule"):
@@ -2028,6 +2066,7 @@ def test_add_pauses_each_piece_of_a_piece_by_piece_print(tmp_path):
 def _piece_plate(tmp_path, name, gap_mm=10.0, extruders=(1, 2), heights=(20, 20)):
     """A plate 3MF of two cubes with the given gap, colours and heights (piece by piece in tests)."""
     import numpy as np
+
     from elegoo_lab import colorize, colors, threemf
     objs, x = [], 0.0
     for k, (e, h) in enumerate(zip(extruders, heights)):
@@ -2073,8 +2112,10 @@ def test_small_pieces_plate_leaves_room_for_the_prime_tower(tmp_path):
     """write_plate said nothing about the prime tower, so OrcaSlicer put one itself: on a plate filling
     the bed width it landed in the CC2's unprintable corner and the whole slice failed with -102 (seen
     on a real cut model). The plate now keeps the tower's place and writes it into the file."""
-    import numpy as np
     import zipfile
+
+    import numpy as np
+
     from elegoo_lab import colors, printprep, slicer, threemf
     cols = ["#008755", "#D22630"]
     items = [(f"petite{k}", np.asarray(trimesh.creation.box((60, 20, 8)).vertices) + [0, 0, 4],
@@ -2132,7 +2173,9 @@ def test_mirror_and_axis_scale(tmp_path):
 
 def test_import_link_guards():
     """Links: https only, never the house network; zips give their models; names come from the server."""
-    import io, zipfile
+    import io
+    import zipfile
+
     from elegoo_lab import importlink
     for bad in ("http://example.com/a.stl", "https://localhost/a.stl", "https://192.168.1.10/a.stl", "https://127.0.0.1/a.stl"):
         with pytest.raises(importlink.LinkError):
@@ -2222,7 +2265,9 @@ def test_alert_names_are_short():
 def test_plate_check_sees_a_part(tmp_path, monkeypatch):
     """The camera check: same plate = empty, a small coloured part on it = occupied, dark or no reference = unknown."""
     import io
+
     from PIL import Image, ImageDraw
+
     from elegoo_lab import bedcheck, config
     monkeypatch.setattr(config, "MODELS_DIR", tmp_path)
 
@@ -2248,7 +2293,7 @@ def test_print_review(web):
     (lib / "orque.stl").write_bytes(b"solid x")
     g = lib / "orque_0.20mm_PLA.gcode"
     g.write_text("M190 S65\nT0\nT1\n;LAYER_CHANGE\n" + "; nozzle_temperature = 230,230\n; enable_support = 1\n"
-                 "; filament_settings_id = \"Elegoo PLA Silk @ECC2\"\n")
+                 '; filament_settings_id = "Elegoo PLA Silk @ECC2"\n')
     client.app.state  # noqa: B018
     from elegoo_lab import library
     library.record(g.name, source="orque.stl")
@@ -2312,7 +2357,9 @@ def test_paths_overview_is_lighter_and_cached(tmp_path):
 def test_ntfy_end_of_print_offers_the_review(monkeypatch):
     """The "finished" alert on the phone opens the workshop, with a « Faire le bilan » button on that print."""
     import asyncio
+
     import httpx
+
     from elegoo_lab import alerts
     sent = {}
 
@@ -2333,8 +2380,11 @@ def test_ntfy_end_of_print_offers_the_review(monkeypatch):
 
 def test_more_parametric_parts():
     """The new generators: every variant builds, sizes follow the standards, bad choices are refused."""
-    import base64, io
+    import base64
+    import io
+
     from PIL import Image
+
     from elegoo_lab import parametric
     sz = lambda k, v=None: parametric.preview(k, v or {})[1]
     assert sz("gridfinity", {"cases_x": 2, "cases_y": 1, "hauteur_u": 6, "empilable": False})[:3] == [83.5, 41.5, 42.0]   # 42 mm grid, 7 mm units
@@ -2355,6 +2405,7 @@ def test_more_parametric_parts():
 def test_simplify_colour_specks():
     """In each layer, a colour under the threshold takes the layer's main colour; hand-painted faces never change."""
     import numpy as np
+
     from elegoo_lab import colors, threemf
     box = trimesh.creation.box((20, 20, 2)).subdivide().subdivide()
     part = threemf.Part("p", np.asarray(box.vertices), np.asarray(box.faces))

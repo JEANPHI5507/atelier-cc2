@@ -177,7 +177,7 @@ def rename(old: str, new: str) -> str:
     if Path(new).suffix.lower() != src.suffix.lower():
         new += src.suffix
     if not NAME_OK.match(new) or new.startswith("."):
-        raise ValueError("nom invalide (pas de / \\ : * ? \" < > |, 120 caractères au plus)")
+        raise ValueError('nom invalide (pas de / \\ : * ? " < > |, 120 caractères au plus)')
     dest = config.MODELS_DIR / new
     if dest.exists():
         raise ValueError(f"« {new} » existe déjà")

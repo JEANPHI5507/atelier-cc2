@@ -37,7 +37,7 @@ def _write_key(path: Path, key: ec.EllipticCurvePrivateKey) -> None:
 
 
 def _now() -> dt.datetime:
-    return dt.datetime.now(dt.timezone.utc)
+    return dt.datetime.now(dt.UTC)
 
 
 def _ca() -> tuple[ec.EllipticCurvePrivateKey, x509.Certificate]:

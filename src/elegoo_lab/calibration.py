@@ -6,9 +6,9 @@ what to look at once printed. Colour tests are written as painted 3MF so they ex
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
 
 import manifold3d as mf
 import numpy as np
@@ -58,7 +58,7 @@ def _tower(out: Path) -> None:
     _mf((outer - inner).translate([BED / 2 - 15, BED / 2 - 15, 0])).export(out)
 
 
-def tune(gcode: Path, test: "Test") -> list[dict[str, float]]:
+def tune(gcode: Path, test: Test) -> list[dict[str, float]]:
     """Give each band of the tower its own value: the command goes in at the first layer of the band.
     The slicer's own pressure advance lines are commented out so they cannot undo the bands, and the
     flow factor is reset at the end so the next print is normal. Returns [{"from_mm", "to_mm", "value"}]."""

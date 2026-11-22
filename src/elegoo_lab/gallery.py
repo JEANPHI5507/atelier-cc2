@@ -49,7 +49,7 @@ class Recorder:
         self.save()
 
     @classmethod
-    def resume(cls, filename: str) -> "Recorder":
+    def resume(cls, filename: str) -> Recorder:
         """The workshop restarted mid-print: carry on with that print's open entry (its start time, its frames)."""
         for meta in entries():
             if meta.get("issue") == "en cours" and meta.get("fichier") == Path(filename).name:

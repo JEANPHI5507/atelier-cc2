@@ -13,7 +13,6 @@ import base64
 import contextvars
 import io
 import math
-from typing import Any
 
 import manifold3d as mf
 import numpy as np

@@ -9,9 +9,10 @@ colour from the CANVAS.
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import manifold3d as mf
 import numpy as np

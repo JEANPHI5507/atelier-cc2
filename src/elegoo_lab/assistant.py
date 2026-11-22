@@ -325,7 +325,7 @@ def chat_events(name: str, message: str, history: list[dict[str, str]] | None = 
 
 PROTO = ("PROTOCOLE. Tu réponds UNIQUEMENT avec un objet JSON, sans rien d'autre autour :\n"
          "- pour faire exécuter un ou plusieurs outils de l'atelier : {\"outils\": "
-         "[{\"outil\": \"<nom>\", \"arguments\": {...}}, …]} (un seul suffit aussi : {\"outil\": …, \"arguments\": …})\n"
+         '[{"outil": "<nom>", "arguments": {...}}, …]} (un seul suffit aussi : {"outil": …, "arguments": …})\n'
          "- pour répondre à l'utilisateur : {\"reponse\": \"<texte>\"}")
 
 CLISYSTEM = (SYSTEM + " " + LAPP + " TES SKILLS (chargées avec l'outil « skill », en silence, dès qu'elles "
@@ -605,7 +605,7 @@ def chat_cli(name: str, message: str, history: list[dict[str, str]] | None = Non
                     last = f"l'outil {tool} a rendu {vu[sig]}"
                 if not nouveau:                     # the brain loops on a tool it already ran: force the answer
                     prompt = ("Résultats DEJA obtenus, ne rappelle AUCUN outil : " + last +
-                              ". Termine selon le protocole avec une {\"reponse\": …} qui porte ce résultat.")
+                              '. Termine selon le protocole avec une {"reponse": …} qui porte ce résultat.')
                     continue
                 side2 = _sidecar_ply(cur)
                 prompt = ("Résultat des outils de l'atelier : " + last + ". Modèle courant : « " + cur + " »"
@@ -793,7 +793,7 @@ def chat_api(name: str, message: str, history: list[dict[str, str]] | None = Non
     only repeat tools. ``emit`` receives the same live events as the CLI engine."""
     key = api_key()
     if not key:
-        raise ValueError("pas de clé API : ajoute [assistant] api_key = \"ta-clé\" dans config.toml (moteur : Mistral)")
+        raise ValueError('pas de clé API : ajoute [assistant] api_key = "ta-clé" dans config.toml (moteur : Mistral)')
     cur = name
     outils: list[str] = []
     vu: dict[str, str] = {}                    # (fichier|outil+arguments) -> résultat : le même appel ne tourne jamais deux fois

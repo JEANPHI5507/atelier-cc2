@@ -12,8 +12,9 @@ from __future__ import annotations
 
 import re
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import numpy as np
 from scipy import ndimage

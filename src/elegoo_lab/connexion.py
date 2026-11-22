@@ -36,7 +36,7 @@ async def check(host: str, access_code: str, mqtt_port: int = 1883, http_port: i
     try:
         await asyncio.wait_for(asyncio.open_connection(host, mqtt_port), timeout=4)
         steps.append(_step("Réseau", True, f"L'imprimante répond sur {host} (port {mqtt_port})."))
-    except (OSError, asyncio.TimeoutError) as err:
+    except (TimeoutError, OSError) as err:
         steps.append(_step("Réseau", False, f"Rien ne répond sur {host}:{mqtt_port} ({type(err).__name__}).",
                            "Vérifie que l'imprimante est allumée, sur le même réseau que ce PC, et que l'adresse IP est la "
                            "bonne. Astuce : fixe son IP dans ta box (bail DHCP statique)."))

@@ -10,7 +10,6 @@ Ce module permet de :
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 # 4CD Versions de firmware testées et supportées
 # Format: (version_min, version_max, description)
@@ -73,11 +72,10 @@ class FirmwareVersion:
             parts = version_string.split(".")
             if len(parts) == 4:
                 return int(parts[0]), int(parts[1]), int(parts[2]), int(parts[3])
-            elif len(parts) == 3:
+            if len(parts) == 3:
                 return int(parts[0]), int(parts[1]), int(parts[2]), 0
-            else:
-                # Version inconnue, retourner 0.0.0.0
-                return 0, 0, 0, 0
+            # Version inconnue, retourner 0.0.0.0
+            return 0, 0, 0, 0
         except (ValueError, AttributeError):
             return 0, 0, 0, 0
 
@@ -103,7 +101,7 @@ class FirmwareVersion:
         - Un nombre positif si self > other
         """
         other_major, other_minor, other_patch, other_build = self._parse_version(other)
-        
+
         if self.major != other_major:
             return self.major - other_major
         if self.minor != other_minor:
@@ -128,11 +126,11 @@ class FirmwareManager:
     """Gère la détection du firmware et le mode safe."""
 
     def __init__(self):
-        self._detected_version: Optional[FirmwareVersion] = None
+        self._detected_version: FirmwareVersion | None = None
         self._safe_mode: bool = False
 
     @property
-    def detected_version(self) -> Optional[FirmwareVersion]:
+    def detected_version(self) -> FirmwareVersion | None:
         """Retourne la version de firmware détectée."""
         return self._detected_version
 
@@ -153,7 +151,7 @@ class FirmwareManager:
         self._detected_version = FirmwareVersion(version_string)
         # Activer le mode safe si le firmware n'est pas supporté
         self._safe_mode = not self._detected_version.is_supported()
-        
+
         if self._safe_mode:
             logger.warning(
                 f"Firmware inconnu détecté: {version_string}. "
@@ -174,11 +172,11 @@ class FirmwareManager:
         if not self._safe_mode:
             # En mode normal, toutes les commandes sont autorisées
             return True
-        
+
         # En mode safe, vérifier si la commande est dans la liste des commandes sûres
         if command in SAFE_COMMANDS:
             return True
-        
+
         # Vérifier si la commande est explicitement bloquée
         if command in BLOCKED_COMMANDS_IN_SAFE_MODE:
             logger.warning(
@@ -186,7 +184,7 @@ class FirmwareManager:
                 f"Raison: {BLOCKED_COMMANDS_IN_SAFE_MODE[command]}"
             )
             return False
-        
+
         # Par défaut, autoriser la commande (pour ne pas être trop restrictif)
         logger.warning(f"Commande non vérifiée en mode safe: {command}. Autorisée par défaut.")
         return True
@@ -199,7 +197,7 @@ class FirmwareManager:
         """Retourne un message d'avertissement pour l'UI."""
         if not self._safe_mode or self._detected_version is None:
             return ""
-        
+
         return (
             f"⚠️ Firmware inconnu détecté: {self._detected_version.version_string}. "
             f"Mode safe activé. Certaines commandes doivent être exécutées sur l'écran de l'imprimante. "
@@ -217,7 +215,7 @@ class FirmwareManager:
                 "support_level": "Firmware non détecté",
                 "blocked_commands": {},
             }
-        
+
         return {
             "safe_mode": self._safe_mode,
             "firmware_detected": True,
@@ -247,8 +245,7 @@ def check_firmware_version(version_string: str) -> tuple[bool, str]:
     fw = FirmwareVersion(version_string)
     if fw.is_supported():
         return True, f"Firmware supporté: {version_string}"
-    else:
-        return False, f"Firmware non supporté: {version_string} - {fw.get_support_level()}"
+    return False, f"Firmware non supporté: {version_string} - {fw.get_support_level()}"
 
 
 def is_safe_mode_active() -> bool:

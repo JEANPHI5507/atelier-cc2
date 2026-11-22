@@ -16,8 +16,9 @@ import re
 import threading
 import time
 from collections import deque
+from collections.abc import AsyncIterator, Callable
 from pathlib import Path
-from typing import Any, AsyncIterator, Callable
+from typing import Any
 
 from . import config
 
@@ -165,7 +166,7 @@ async def send_ntfy(ev: dict[str, Any]) -> bool:
 class TermHandler(logging.Handler):
     """Warnings of the workshop and of pycentauri go to the live terminal too."""
 
-    def __init__(self, watcher: "Watcher") -> None:
+    def __init__(self, watcher: Watcher) -> None:
         super().__init__(logging.WARNING)
         self.watcher = watcher
 
