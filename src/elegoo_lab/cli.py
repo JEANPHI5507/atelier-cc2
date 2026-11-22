@@ -502,28 +502,92 @@ def gen(
 
 @app.command("doctor")
 def doctor() -> None:
-    """Vérifie la configuration, l'imprimante et ComfyUI."""
+    """Vérifie la configuration, l'imprimante, OrcaSlicer, le modèle IA, la caméra et ComfyUI."""
     import socket
+    import shutil
+    import sys
+    from pathlib import Path
 
     cfg = config.load()
     ok = lambda b: typer.style("OK ", fg="green") if b else typer.style("KO ", fg="red")  # noqa: E731
+    
+    # 1. Configuration
+    typer.echo("\n=== Configuration ===")
     typer.echo(f"{ok(config.CONFIG_FILE.exists())}config.toml ({config.CONFIG_FILE})")
+    
+    # 2. Python et dépendances
+    typer.echo("\n=== Environnement Python ===")
+    typer.echo(f"{ok(sys.version_info >= (3, 12))}Python {sys.version.split()[0]} (requis: >= 3.12)")
+    
+    try:
+        import uv
+        typer.echo(f"{ok(True)}uv {uv.__version__} installé")
+    except ImportError:
+        typer.echo(f"{ok(False)}uv non installé (requis pour la gestion des dépendances)")
+    
+    # 3. OrcaSlicer
+    typer.echo("\n=== OrcaSlicer ===")
+    orca_path = Path(config.TOOLS_DIR) / "orcaslicer" / "squashfs-root" / "AppRun"
+    orca_ok = orca_path.exists()
+    typer.echo(f"{ok(orca_ok)}OrcaSlicer {'installé' if orca_ok else 'NON installé'}")
+    if not orca_ok:
+        typer.echo("    → Exécute 'make slicer' pour l'installer")
+    
+    # 4. Modèle IA (Obico)
+    typer.echo("\n=== Modèle IA (détection de spaghetti) ===")
+    try:
+        from . import vision
+        model_ok = vision.model_loaded()
+        typer.echo(f"{ok(model_ok)}Modèle IA {'chargé' if model_ok else 'NON chargé'}")
+        if not model_ok:
+            typer.echo("    → Exécute 'make ia' pour l'installer")
+    except Exception:
+        typer.echo(f"{ok(False)}Modèle IA non disponible")
+    
+    # 5. Imprimante
+    typer.echo("\n=== Imprimante (CC2) ===")
     if cfg.printer.host:
         try:
             socket.create_connection((cfg.printer.host, 1883), 3).close()
             up = True
         except OSError:
             up = False
-        typer.echo(f"{ok(up)}imprimante {cfg.printer.host}:1883 (MQTT) — code d'accès {'défini' if cfg.printer.access_code else 'MANQUANT'}")
+        typer.echo(f"{ok(up)}Connexion MQTT {cfg.printer.host}:1883")
+        typer.echo(f"{ok(bool(cfg.printer.access_code))}Code d'accès {'défini' if cfg.printer.access_code else 'MANQUANT'}")
         if not up:
-            typer.echo("    → imprimante allumée ? même réseau ? mode « LAN Only » activé sur l'écran ?")
+            typer.echo("    → Vérifie : imprimante allumée ? même réseau ? mode « LAN Only » activé ?")
     else:
-        typer.echo(f"{ok(False)}imprimante non configurée (host vide dans config.toml)")
+        typer.echo(f"{ok(False)}Imprimante non configurée (host vide dans config.toml)")
+    
+    # 6. Caméra
+    typer.echo("\n=== Caméra ===")
     try:
-        s = comfy_mod.Comfy(cfg.comfyui_url, timeout=3).stats()
-        typer.echo(f"{ok(True)}ComfyUI {cfg.comfyui_url} — {[d.get('name') for d in s.get('devices', [])]}")
-    except comfy_mod.ComfyError as err:
-        typer.echo(f"{ok(False)}{err}")
+        from . import camfeed
+        typer.echo(f"{ok(True)}Module caméra disponible")
+    except ImportError:
+        typer.echo(f"{ok(False)}Module caméra non disponible")
+    
+    # 7. Espace disque
+    typer.echo("\n=== Espace disque ===")
+    total, used, free = shutil.disk_usage("/")
+    typer.echo(f"{ok(free > 10 * 1024**3)}Espace libre: {free / 1024**3:.1f} Go (recommandé: > 10 Go)")
+    
+    # 8. ComfyUI
+    typer.echo("\n=== ComfyUI (optionnel) ===")
+    if cfg.comfyui_url:
+        try:
+            s = comfy_mod.Comfy(cfg.comfyui_url, timeout=3).stats()
+            devices = [d.get('name') for d in s.get('devices', [])]
+            typer.echo(f"{ok(True)}ComfyUI {cfg.comfyui_url} — {devices}")
+        except comfy_mod.ComfyError as err:
+            typer.echo(f"{ok(False)}ComfyUI non accessible: {err}")
+    else:
+        typer.echo(f"{ok(True)}ComfyUI non configuré (optionnel)")
+    
+    # Résumé
+    typer.echo("\n=== Résumé ===")
+    typer.echo("Toutes les vérifications sont terminées.")
+    typer.echo("Si des éléments sont en KO, suivez les instructions pour les corriger.")
 
 
 if __name__ == "__main__":
