@@ -8,6 +8,7 @@ use it too. ``cc2 simulateur`` starts it with the workshop on a demo library of 
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 import math
@@ -277,10 +278,8 @@ class Sim:
                     if (first >> 1) & 3:
                         w.write(_pkt(0x40, body[i:i + 2]))
                         i += 2
-                    try:
+                    with contextlib.suppress(json.JSONDecodeError, KeyError):
                         await self._on_publish(topic, json.loads(body[i:]))
-                    except (json.JSONDecodeError, KeyError):
-                        pass
                 elif kind == 12:
                     w.write(_pkt(0xD0, b""))
                 elif kind == 14:

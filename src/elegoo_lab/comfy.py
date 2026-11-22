@@ -12,6 +12,7 @@ Anything in the workflow can also be overridden via ``overrides``
 
 from __future__ import annotations
 
+import contextlib
 import json
 import random
 import time
@@ -57,10 +58,8 @@ class Comfy:
 
     def free(self) -> None:
         """Unload models and free VRAM (ComfyUI keeps them loaded between prompts)."""
-        try:
+        with contextlib.suppress(httpx.HTTPError):
             self.http.post("/free", json={"unload_models": True, "free_memory": True})
-        except httpx.HTTPError:
-            pass
 
     def upload_image(self, path: Path) -> str:
         with path.open("rb") as f:

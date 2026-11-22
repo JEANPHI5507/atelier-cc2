@@ -94,7 +94,7 @@ class FirmwareVersion:
 
     def _compare(self, other: str) -> int:
         """Compare cette version avec une autre.
-        
+
         Retourne:
         - Un nombre négatif si self < other
         - 0 si self == other
@@ -162,10 +162,10 @@ class FirmwareManager:
 
     def is_command_safe(self, command: str) -> bool:
         """Vérifie si une commande est autorisée.
-        
+
         Args:
             command: Nom de la commande à vérifier
-            
+
         Returns:
             True si la commande est autorisée, False sinon
         """
@@ -235,10 +235,10 @@ firmware_manager = FirmwareManager()
 
 def check_firmware_version(version_string: str) -> tuple[bool, str]:
     """Vérifie si une version de firmware est supportée.
-    
+
     Args:
         version_string: Chaîne de version du firmware
-        
+
     Returns:
         Tuple de (is_supported, message)
     """
@@ -255,10 +255,10 @@ def is_safe_mode_active() -> bool:
 
 def can_execute_command(command: str) -> bool:
     """Vérifie si une commande peut être exécutée.
-    
+
     Args:
         command: Nom de la commande
-        
+
     Returns:
         True si la commande peut être exécutée, False sinon
     """

@@ -172,7 +172,8 @@ def add(src: Path, text: str, *, font: str = "manuscrite", size_mm: float | None
         # try heights across the free space: at each, centre the word between the strokes and grow it
         # as much as it fits; then, among the nearly-biggest, the longest line from stroke to stroke
         # (straight across the heart rather than tucked in a corner)
-        fits = lambda t: (t - inner).area() <= 0.005 * t.area()
+        def fits(t):
+            return (t - inner).area() <= 0.005 * t.area()
         rx0, ry0, rx1, ry1 = inner.bounds()
         tries = []
         for y in np.linspace(ry0, ry1, 32)[1:-1]:

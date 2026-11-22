@@ -15,13 +15,13 @@ logger = logging.getLogger(__name__)
 
 def check_firmware_on_connection(attrs) -> dict:
     """Vérifie le firmware lors de la connexion à l'imprimante.
-    
+
     Cette fonction doit être appelée après avoir récupéré les attributs
     de l'imprimante (via pycentauri).
-    
+
     Args:
         attrs: Objet Attributes de pycentauri contenant firmware_version
-        
+
     Returns:
         dict: Informations sur le firmware et le mode safe
     """
@@ -45,11 +45,11 @@ def check_firmware_on_connection(attrs) -> dict:
 
 def can_execute_printer_command(command: str, printer=None) -> tuple[bool, str]:
     """Vérifie si une commande peut être exécutée sur l'imprimante.
-    
+
     Args:
         command: Nom de la commande à vérifier
         printer: Objet printer de pycentauri (optionnel)
-        
+
     Returns:
         tuple: (is_allowed, message)
     """
@@ -67,7 +67,7 @@ def can_execute_printer_command(command: str, printer=None) -> tuple[bool, str]:
 
 def get_firmware_status_for_ui() -> dict:
     """Retourne les informations sur le firmware pour l'interface utilisateur.
-    
+
     Returns:
         dict: Informations à afficher dans l'UI
     """
@@ -88,7 +88,7 @@ def get_firmware_status_for_ui() -> dict:
 
 def get_blocked_commands_list() -> list[dict]:
     """Retourne la liste des commandes bloquées pour l'UI.
-    
+
     Returns:
         list: Liste des commandes bloquées avec leurs raisons
     """

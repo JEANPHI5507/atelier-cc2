@@ -73,11 +73,11 @@ def _new_model_path(name: str) -> Path:
 
 def _base_args(body: Any) -> dict[str, Any]:
     """The slicing choices of a request, as prepare_and_slice takes them (comparisons and estimates)."""
-    return dict(mapping=body.mapping, filaments=body.filaments, quality=body.quality, infill=body.infill,
-                supports=body.supports, plate_only=body.plate_only, height_mm=body.height_mm, mode=body.mode,
-                slot_colours=body.slot_colours, plate=body.plate, advanced=body.advanced, rotate=tuple(body.rotate),
-                copies=body.copies, orient=body.orient, usage=body.usage, palette=_pal(body.palette),
-                moves=_moves(body), scales=_scales(body), shift=tuple(body.shift[:2]) if body.shift else None)
+    return {"mapping": body.mapping, "filaments": body.filaments, "quality": body.quality, "infill": body.infill,
+                "supports": body.supports, "plate_only": body.plate_only, "height_mm": body.height_mm, "mode": body.mode,
+                "slot_colours": body.slot_colours, "plate": body.plate, "advanced": body.advanced, "rotate": tuple(body.rotate),
+                "copies": body.copies, "orient": body.orient, "usage": body.usage, "palette": _pal(body.palette),
+                "moves": _moves(body), "scales": _scales(body), "shift": tuple(body.shift[:2]) if body.shift else None}
 
 
 def _scales(body: Any) -> dict[int, float] | None:

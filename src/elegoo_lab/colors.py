@@ -86,7 +86,7 @@ def _walk(code: str, leaf: Callable[[int], int]) -> str:
     node()
     while len(out) % 4:
         out.append(0)
-    return "".join("%X" % sum(out[j + k] << k for k in range(4)) for j in range(0, len(out), 4))[::-1]
+    return "".join(f"{sum(out[j + k] << k for k in range(4)):X}" for j in range(0, len(out), 4))[::-1]
 
 
 def paint_states(code: str) -> set[int]:
@@ -106,7 +106,7 @@ def encode_state(state: int) -> str:
 # --- loading: every format -> parts with a colour label per face ------------------------------
 
 def _hex(rgb: np.ndarray) -> str:
-    return "#%02X%02X%02X" % tuple(int(round(c)) for c in rgb[:3])
+    return "#{:02X}{:02X}{:02X}".format(*tuple(int(round(c)) for c in rgb[:3]))
 
 
 def _rgb(h: str) -> np.ndarray:
@@ -383,10 +383,7 @@ def _mesh_project(path: Path) -> threemf.Project:
 
 
 def _load(path: Path) -> threemf.Project:
-    if path.suffix.lower() == ".3mf":
-        pr = threemf.read(path)
-    else:
-        pr = threemf.cached(path, _load_mesh)
+    pr = threemf.read(path) if path.suffix.lower() == ".3mf" else threemf.cached(path, _load_mesh)
     _apply_retouch(path, pr)
     return pr
 
@@ -863,7 +860,7 @@ def _piece_par_piece(pr: threemf.Project, offset: np.ndarray) -> str | None:
             raise ValueError(f"Pièce par pièce : « {label} » fait {hi[2] - lo[2]:.0f} mm de haut, plus que les {height:.0f} mm "
                              f"que la tête peut survoler en allant à la pièce suivante : imprime-la à part, ou en couche par couche.")
         boxes.append((o, k, label, lo, hi))
-    for (oa, _, na, la, ha), (ob, _, nb, lb, hb) in itertools.combinations(boxes, 2):
+    for (_oa, _, na, la, ha), (_ob, _, nb, lb, hb) in itertools.combinations(boxes, 2):
         dx = max(lb[0] - ha[0], la[0] - hb[0], 0.0)
         dy = max(lb[1] - ha[1], la[1] - hb[1], 0.0)
         gap = (dx * dx + dy * dy) ** 0.5

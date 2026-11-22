@@ -27,13 +27,13 @@ CODES: dict[int, tuple[str, str]] = {
     702: ("Ventilateur de la gorge de la buse en défaut", "Éteins et vérifie qu'il tourne librement : sans lui, la gorge de la buse peut surchauffer."),
     703: ("Ventilateur de la pièce en défaut", "Vérifie qu'il tourne librement et que rien ne l'obstrue."),
     704: ("Échec du nivellement du plateau",
-          "Pose l'imprimante sur un support rigide et plat, plateau propre et bien en place, puis relance. "
-          "Signalé : si la buse insiste toujours au même endroit, arrête (elle peut abîmer le PEI) et rebranche les câbles des capteurs de pesée."),
+          ("Pose l'imprimante sur un support rigide et plat, plateau propre et bien en place, puis relance. "
+          "Signalé : si la buse insiste toujours au même endroit, arrête (elle peut abîmer le PEI) et rebranche les câbles des capteurs de pesée.")),
     705: ("Le ventilateur n° 1 est en défaut", "Vérifie qu'il tourne librement ; sinon contacte le support Elegoo."),
     706: ("Ventilateur du caisson en défaut", "Vérifie qu'il tourne librement ; sinon contacte le support Elegoo."),
     707: ("Le capot avant de la tête (avec son ventilateur) s'est décroché",
-          "Remets-le en place et vérifie ses 3 aimants. Signalé : des déchets de purge qui s'accumulent sous la tête peuvent le déloger : "
-          "vide le bac de purge et nettoie la goulotte et l'essuyeur."),
+          ("Remets-le en place et vérifie ses 3 aimants. Signalé : des déchets de purge qui s'accumulent sous la tête peuvent le déloger : "
+          "vide le bac de purge et nettoie la goulotte et l'essuyeur.")),
     801: ("La communication avec la tête d'impression est perdue",
           "Éteins et débranche avant de toucher à quoi que ce soit, puis vérifie le câble USB-C de la tête (il porte du 24 V) et ses broches."),
     802: ("La communication avec le capteur du plateau est perdue", "Éteins puis rallume ; vérifie les câbles sous le plateau."),

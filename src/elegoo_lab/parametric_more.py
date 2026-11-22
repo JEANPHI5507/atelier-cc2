@@ -94,7 +94,8 @@ def phone_stand(largeur: float, angle: float, epaisseur_appareil: float, hauteur
     back = [(y0, t), (y0 + hauteur * math.cos(a), t + hauteur * math.sin(a)),
             (y0 + hauteur * math.cos(a) + t / math.sin(a), t + hauteur * math.sin(a)), (y0 + t / math.sin(a), t)]
     strut = [(y0 + hauteur * 0.5 * math.cos(a) + t, t + hauteur * 0.5 * math.sin(a)), (base_d, t), (base_d - 2 * t, t)]
-    poly = lambda pts: mf.CrossSection([pts], mf.FillRule.NonZero)   # either winding: the outlines are drawn clockwise
+    def poly(pts):
+        return mf.CrossSection([pts], mf.FillRule.NonZero)   # either winding: the outlines are drawn clockwise
     profile = (mf.CrossSection.square([base_d, t]) + poly(back) + poly(strut)
                + mf.CrossSection.square([4.0, 12.0]).translate([10.0, t - 0.01]))
     solid = profile.extrude(largeur).rotate([90, 0, 0])

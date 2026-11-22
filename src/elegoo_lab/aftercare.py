@@ -66,8 +66,8 @@ ISSUES: dict[str, tuple[str, str, str, Fix]] = {
                 lambda u: {"mode": "equilibre"}),
     "tour": ("Tour de purge tombée ou décollée",
              "La buse revient de chaque purge en suintant : le fil fait des boucles sur la tour et la buse finit par les accrocher.",
-             "Ne remets pas la tour : reprends, quelques fils tomberont à sa place. L'atelier imprime déjà la tour avec une bordure "
-             "de 8 mm et lève la buse de 0,8 mm ; nettoie le plateau à cet endroit. Pour une petite pièce, le mode Économie n'a pas de tour.",
+             ("Ne remets pas la tour : reprends, quelques fils tomberont à sa place. L'atelier imprime déjà la tour avec une bordure "
+             "de 8 mm et lève la buse de 0,8 mm ; nettoie le plateau à cet endroit. Pour une petite pièce, le mode Économie n'a pas de tour."),
              lambda u: {}),
     "pied": ("Base évasée (pied d'éléphant)",
              "Première couche écrasée par un plateau trop chaud.",
@@ -105,8 +105,8 @@ def tips(entry: dict[str, Any]) -> list[str]:
     """What to do with the part now, for this print."""
     u = used(config.MODELS_DIR / entry["fichier"])
     u["couleurs"] = max(u["couleurs"], len(library.load_index().get(entry["fichier"], {}).get("couleurs") or []))
-    out = [f"Attends que le plateau redescende sous 35 °C (il était à {u['plateau']} °C) : la pièce se décolle alors "
-           "presque seule. Sinon, retire la plaque et plie-la doucement."]
+    out = [(f"Attends que le plateau redescende sous 35 °C (il était à {u['plateau']} °C) : la pièce se décolle alors "
+           "presque seule. Sinon, retire la plaque et plie-la doucement.")]
     plan = supports_plan(config.MODELS_DIR / entry["fichier"]) if u["supports"] else None
     if plan:
         out += plan["tips"]

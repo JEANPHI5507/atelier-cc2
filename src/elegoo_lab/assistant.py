@@ -12,6 +12,7 @@ orientation) and reports back, so the brain answers factually.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import queue
@@ -404,10 +405,8 @@ def _scan_meshes() -> dict[str, float]:
     try:
         for p in config.MODELS_DIR.iterdir():
             if p.suffix.lower() in mesh.MESH_EXT:
-                try:
+                with contextlib.suppress(OSError):
                     out[p.name] = p.stat().st_mtime
-                except OSError:
-                    pass
     except OSError:
         pass
     return out
@@ -476,7 +475,7 @@ def chat_cli(name: str, message: str, history: list[dict[str, str]] | None = Non
         with tempfile.TemporaryFile(mode="w+", encoding="utf-8") as ef:
             sp = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=ef,
                                   cwd=str(config.MODELS_DIR.parent),
-                                  env={k: v for k, v in _CLI_ENV.items()})
+                                  env=dict(_CLI_ENV.items()))
             entries: list[dict[str, Any]] = []
             sel = selectors.DefaultSelector()
             sel.register(sp.stdout, selectors.EVENT_READ)
@@ -536,12 +535,10 @@ def chat_cli(name: str, message: str, history: list[dict[str, str]] | None = Non
         if emit:                               # live mode: one CLI run, events out as they happen
             return _spawn_stream(args)
         sp = subprocess.run(args, capture_output=True, text=True, timeout=CLI_TIMEOUT,
-                            cwd=str(config.MODELS_DIR.parent), env={k: v for k, v in _CLI_ENV.items()})
+                            cwd=str(config.MODELS_DIR.parent), env=dict(_CLI_ENV.items()))
         entries = None
-        try:
+        with contextlib.suppress(ValueError, TypeError):
             entries = json.loads(sp.stdout)
-        except (ValueError, TypeError):
-            pass
         return entries, sp
 
     prompt = head + "ÉCHANGE.\n" + talk
@@ -573,7 +570,6 @@ def chat_cli(name: str, message: str, history: list[dict[str, str]] | None = Non
                 ([{"outil": j["outil"], "arguments": j.get("arguments", {})}] if "outil" in j else [])
             if calls:
                 last = ""
-                deja: set[str] = set()
                 nouveau = False
                 for c in calls:
                     if not isinstance(c, dict):
@@ -708,7 +704,7 @@ def slice_brain(name: str, contexte: dict[str, Any], qualities: list[str] | None
             "--approval-policy", "auto-approve", *off, *extra, "--system-prompt-file", system_file]
     try:
         sp = subprocess.run(args, capture_output=True, text=True, timeout=SLICE_BRAIN_TIMEOUT,
-                            cwd=str(config.MODELS_DIR.parent), env={k: v for k, v in _CLI_ENV.items()})
+                            cwd=str(config.MODELS_DIR.parent), env=dict(_CLI_ENV.items()))
     except subprocess.TimeoutExpired as err:
         raise ValueError("le tranchage IA n'a pas répondu à temps, tranche sans IA ou réessaie") from err
     finally:
@@ -729,10 +725,8 @@ def slice_brain(name: str, contexte: dict[str, Any], qualities: list[str] | None
     if isinstance(rep, dict):
         if rep.get("qualite"):
             _qualite(rep["qualite"])
-        try:
+        with contextlib.suppress(TypeError, ValueError):
             out["remplissage"] = max(0, min(100, int(rep.get("remplissage"))))
-        except (TypeError, ValueError):
-            pass
         if str(rep.get("supports", "")).strip() in ("aucun", "arbre", "arbre_fin", "arbre_solide", "colonnes"):
             out["supports"] = str(rep["supports"]).strip()
         if rep.get("usage") in printprep.USAGES:
@@ -755,10 +749,8 @@ def slice_brain(name: str, contexte: dict[str, Any], qualities: list[str] | None
                 out["reglages"] = garde
         rot = rep.get("rotate")
         if isinstance(rot, (list, tuple)) and len(rot) == 3:
-            try:
+            with contextlib.suppress(TypeError, ValueError):
                 out["rotate"] = [float(a) for a in rot]
-            except (TypeError, ValueError):
-                pass
         exp = str(rep.get("explication", "")).strip()
         if exp:
             out["explication"] = exp[:500]
