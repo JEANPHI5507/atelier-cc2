@@ -98,6 +98,7 @@ def test_comfy_generate_roundtrip(tmp_path, monkeypatch):
         comfy.load_workflow("nope")
 
 
+@pytest.mark.slicing
 def test_slice_cylinder_and_overrides(tmp_path):
     from elegoo_lab import slicer
     if not (slicer.TOOLS / "squashfs-root" / "AppRun").exists():
@@ -114,6 +115,7 @@ def test_slice_cylinder_and_overrides(tmp_path):
         slicer.slice_model(tmp_path / "x.txt", tmp_path / "o4")
 
 
+@pytest.mark.slicing
 def test_multicolor_parts_change_tool_at_junction(tmp_path):
     from elegoo_lab import colorize, slicer
     if not (slicer.TOOLS / "squashfs-root" / "AppRun").exists():
@@ -147,6 +149,7 @@ def test_paint_codes_roundtrip_and_remap():
     assert colors.paint_states(colors.remap_paint(split, {1: 4})) == {4, 2}
 
 
+@pytest.mark.slicing
 def test_coloured_mesh_to_canvas_and_slice(tmp_path):
     import numpy as np
 
@@ -193,6 +196,7 @@ def _std_3mf(path):
                    '<Relationship Target="/3D/3dmodel.model" Id="r" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/></Relationships>')
 
 
+@pytest.mark.slicing
 def test_standard_3mf_colours_and_roundtrip(tmp_path):
     from elegoo_lab import colors, printprep, slicer, threemf
     src = tmp_path / "std.3mf"
@@ -239,6 +243,7 @@ def test_3mf_reader_unusual_shapes_and_cache(tmp_path):
     assert threemf.read(src).objects[0].parts[0].vertices[0].tolist() == [20, 20, 30]  # a new version is read again
 
 
+@pytest.mark.slicing
 def test_variable_layer_height_follows_the_slopes(tmp_path):
     import re
     import zipfile
@@ -269,6 +274,7 @@ def test_variable_layer_height_follows_the_slopes(tmp_path):
     assert min(round(b - a, 2) for a, b in zip(zs, zs[1:])) < 0.2
 
 
+@pytest.mark.slicing
 def test_painted_supports_and_seam_reach_the_slicer():
     import zipfile
 
@@ -411,6 +417,7 @@ def test_compact_preview_glb_is_face_for_face():
     assert np.allclose(pos.reshape(-1, 3), ref.vertices, atol=1e-5)
 
 
+@pytest.mark.slicing
 def test_economy_mode_purge_and_tower(tmp_path):
     import numpy as np
 
@@ -430,6 +437,7 @@ def test_economy_mode_purge_and_tower(tmp_path):
     assert eco["total_m"] < qual["total_m"] and sum(eco["purge_m"]) > 0
 
 
+@pytest.mark.slicing
 def test_a_bled_review_reinforces_the_purge(tmp_path):
     import numpy as np
 
@@ -643,6 +651,7 @@ def test_one_colour_model_takes_a_loaded_spool(tmp_path):
     assert launch.plan(g, canvas)["slot_map"][0]["tray_id"] == 2      # near-white T0 would also have passed
 
 
+@pytest.mark.slicing
 def test_advanced_settings_reach_the_gcode(tmp_path):
     import re
 
@@ -668,6 +677,7 @@ def test_advanced_settings_reach_the_gcode(tmp_path):
         printprep.prepare_and_slice(src, out_dir=tmp_path / "b", copies=50, height_mm=60)       # does not fit
 
 
+@pytest.mark.slicing
 def test_off_dae_slice_and_the_temps_of_the_profile(tmp_path):
     """Formats beyond the usual four slice too (OFF, DAE), and the result shows the profile's temperatures."""
     from elegoo_lab import printprep, slicer
@@ -935,6 +945,7 @@ def test_the_assistant_journals_live_events(web, monkeypatch):
     assert events[-1]["reply"] == "Voilà." and events[-1]["outils"] == ["fiche"]
 
 
+@pytest.mark.slicing
 def test_web_preview_slice_and_jobs(web):
     from elegoo_lab import slicer
     client, lib = web
@@ -954,7 +965,11 @@ def test_web_preview_slice_and_jobs(web):
 
 
 def test_parametric_parts_are_closed_and_validated(tmp_path, monkeypatch):
+    from pathlib import Path
+
     from elegoo_lab import colors, config, mesh, parametric
+    if not Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf").exists():
+        pytest.skip("DejaVuSans-Bold font not available")
     monkeypatch.setattr(config, "MODELS_DIR", tmp_path)
     for key in parametric.KINDS:
         p = parametric.create(key, {})
@@ -1361,6 +1376,7 @@ def test_printer_name_stays_ascii():
     assert payload["filename"].isascii()
 
 
+@pytest.mark.slicing
 def test_usage_puts_plastic_where_it_matters(tmp_path):
     from elegoo_lab import printprep, slicer, stock
     assert printprep.usage_overrides("decoratif", None)["sparse_infill_pattern"] == "lightning"
@@ -1512,6 +1528,7 @@ def test_purge_counted_like_the_firmware():
     assert out == pytest.approx([(206 + 46) / 1000, (29 + 29) / 1000])
 
 
+@pytest.mark.slicing
 def test_several_copies_can_be_dropped_one_by_one(tmp_path):
     from elegoo_lab import printprep, slicer
     if not (slicer.TOOLS / "squashfs-root" / "AppRun").exists():
@@ -1679,6 +1696,7 @@ def test_rebuild_drops_a_flat_sheet_and_closes_a_broken_mesh(tmp_path, monkeypat
     assert note["title"] == "Maillage reconstruit" and any("Feuilles" in i for i in note["items"])
 
 
+@pytest.mark.slicing
 def test_own_spools_are_recognised_and_sliced(tmp_path, monkeypatch):
 
     from elegoo_lab import catalog, slicer, spools
@@ -1756,10 +1774,14 @@ def test_assembly_takes_the_spools_colours(tmp_path):
 
 
 def test_name_added_inside_a_line_drawing(tmp_path):
+    from pathlib import Path
+
     import manifold3d as mf
     import numpy as np
 
     from elegoo_lab import addtext, colors
+    if not Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf").exists():
+        pytest.skip("DejaVuSans-Bold font not available")
     ring = (mf.CrossSection.circle(40, 96) - mf.CrossSection.circle(37, 96)).extrude(2.0)   # a drawn circle, 2 mm
     m = ring.to_mesh()
     src = tmp_path / "cercle.stl"
@@ -2108,6 +2130,7 @@ def test_piece_by_piece_groups_colours_and_checks_the_head_path(tmp_path):
     assert "ordre" in names                                                   # the choice reaches the web UI
 
 
+@pytest.mark.slicing
 def test_small_pieces_plate_leaves_room_for_the_prime_tower(tmp_path):
     """write_plate said nothing about the prime tower, so OrcaSlicer put one itself: on a plate filling
     the bed width it landed in the CC2's unprintable corner and the whole slice failed with -102 (seen
@@ -2141,6 +2164,7 @@ def test_small_pieces_plate_leaves_room_for_the_prime_tower(tmp_path):
     assert r.gcode[0].exists()             # this plate died with -102 before the tower had its place
 
 
+@pytest.mark.slicing
 def test_piece_by_piece_slices_the_plate_with_far_fewer_changes(tmp_path):
     """Two one-colour pieces of different colours on (well spaced) one plate: one change per colour
     instead of one at nearly every layer."""
@@ -2382,10 +2406,13 @@ def test_more_parametric_parts():
     """The new generators: every variant builds, sizes follow the standards, bad choices are refused."""
     import base64
     import io
+    from pathlib import Path
 
     from PIL import Image
 
     from elegoo_lab import parametric
+    if not Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf").exists():
+        pytest.skip("DejaVuSans-Bold font not available")
     sz = lambda k, v=None: parametric.preview(k, v or {})[1]
     assert sz("gridfinity", {"cases_x": 2, "cases_y": 1, "hauteur_u": 6, "empilable": False})[:3] == [83.5, 41.5, 42.0]   # 42 mm grid, 7 mm units
     for piece in ("vis", "ecrou", "rondelle", "entretoise"):

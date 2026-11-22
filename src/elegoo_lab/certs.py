@@ -47,7 +47,8 @@ def _ca() -> tuple[ec.EllipticCurvePrivateKey, x509.Certificate]:
         return (serialization.load_pem_private_key(key_p.read_bytes(), None),
                 x509.load_pem_x509_certificate(crt_p.read_bytes()))
     key = ec.generate_private_key(ec.SECP256R1())
-    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, f"Atelier CC2 – autorité locale ({socket.gethostname()})"),
+    hostname = socket.gethostname()[:20]  # Limit hostname to 20 chars to fit in CN (max 64)
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, f"Atelier CC2 – autorité locale ({hostname})"),
                       x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Atelier CC2")])
     crt = (x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(key.public_key())
            .serial_number(x509.random_serial_number())
