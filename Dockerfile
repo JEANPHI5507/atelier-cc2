@@ -31,12 +31,11 @@ COPY docker-entrypoint.sh /home/appuser/app/docker-entrypoint.sh
 RUN chmod +x /home/appuser/app/docker-entrypoint.sh
 
 # Définir l'utilisateur
-USER appuser
-
 # Installer uv et les dépendances Python
 RUN pip install uv && \
-    uv sync --frozen
+    /root/.local/bin/uv sync --frozen
 
+USER appuser
 # Variables d'environnement
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \

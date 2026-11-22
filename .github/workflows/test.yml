@@ -53,7 +53,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v1
         with:
-          uv-version: ${{ env.UV_VERSION }}
+          version: ${{ env.UV_VERSION }}
 
       - name: Install Dependencies
         run: |
@@ -80,7 +80,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v1
         with:
-          uv-version: ${{ env.UV_VERSION }}
+          version: ${{ env.UV_VERSION }}
 
       - name: Install Dependencies
         run: |
@@ -116,7 +116,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v1
         with:
-          uv-version: ${{ env.UV_VERSION }}
+          version: ${{ env.UV_VERSION }}
 
       - name: Install Dependencies
         run: |
@@ -152,7 +152,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v1
         with:
-          uv-version: ${{ env.UV_VERSION }}
+          version: ${{ env.UV_VERSION }}
 
       - name: Install Dependencies
         run: |
