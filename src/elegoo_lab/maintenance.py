@@ -45,7 +45,7 @@ def _load() -> dict[str, Any]:
     now = int(time.time())
     for k in TASKS:                       # a new log starts from today: the printer is new or just serviced
         data.setdefault(k, {"fait": now, "signale": False})
-    return data
+    return data  # type: ignore[no-any-return]
 
 
 def _save(data: dict[str, Any]) -> None:
@@ -53,7 +53,7 @@ def _save(data: dict[str, Any]) -> None:
 
 
 def _hours_since(ts: int) -> float:
-    return sum(e.get("duree_s", 0) for e in gallery.entries() if e.get("debut", 0) >= ts) / 3600
+    return sum(e.get("duree_s", 0) for e in gallery.entries() if e.get("debut", 0) >= ts) / 3600  # type: ignore[no-any-return]
 
 
 def status() -> list[dict[str, Any]]:

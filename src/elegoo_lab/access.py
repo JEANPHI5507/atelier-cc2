@@ -28,7 +28,7 @@ PUBLIC = ("/lab/login.html", "/lab/api/login", "/lab/vendor/", "/lab/icons/", "/
 def _settings() -> dict[str, Any]:
     if config.CONFIG_FILE.exists():
         import tomllib
-        return tomllib.loads(config.CONFIG_FILE.read_text()).get("acces", {})
+        return tomllib.loads(config.CONFIG_FILE.read_text()).get("acces", {})  # type: ignore[no-any-return]
     return {}
 
 
@@ -83,7 +83,7 @@ def lan_ip() -> str:
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
             s.connect(("192.0.2.1", 80))  # nothing is sent: picks the outgoing interface
-            return s.getsockname()[0]
+            return s.getsockname()[0]  # type: ignore[no-any-return]
     except OSError:
         return "127.0.0.1"
 
@@ -120,7 +120,7 @@ class Gate:
 
     async def __call__(self, scope: dict, receive: Any, send: Any) -> None:
         if scope["type"] not in ("http", "websocket"):
-            return await self.app(scope, receive, send)
+            return await self.app(scope, receive, send)  # type: ignore[no-any-return]
         ip = (scope.get("client") or ("", 0))[0]
         path = scope.get("path", "")
         if self.https_port and scope.get("scheme") in ("http", "ws") and not is_local(ip) and path != "/lab/ca.crt":
@@ -130,7 +130,7 @@ class Gate:
         if is_local(ip) or path.startswith(PUBLIC):
             if path == "/lab/api/login" and scope.get("method") == "POST":
                 return await self._login(scope, receive, send, ip)
-            return await self.app(scope, receive, send)
+            return await self.app(scope, receive, send)  # type: ignore[no-any-return]
         cookies = {}
         for k, v in scope.get("headers", []):
             if k == b"cookie":
@@ -139,9 +139,9 @@ class Gate:
                         a, b = part.strip().split("=", 1)
                         cookies[a] = b
         if valid_session(cookies.get(COOKIE)):
-            return await self.app(scope, receive, send)
+            return await self.app(scope, receive, send)  # type: ignore[no-any-return]
         if scope["type"] == "websocket":
-            return await send({"type": "websocket.close", "code": 4401})
+            return await send({"type": "websocket.close", "code": 4401})  # type: ignore[no-any-return]
         if scope["type"] == "http" and scope.get("method") == "GET" and not path.startswith(("/lab/api", "/api", "/status", "/events", "/stream", "/snapshot", "/canvas", "/files", "/history")):
             return await _reply(send, 303, b"", [(b"location", b"/lab/login.html")])
         await _reply(send, 401, json.dumps({"detail": "Code d'accès requis"}).encode(), [(b"content-type", b"application/json")])

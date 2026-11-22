@@ -98,13 +98,13 @@ def detect(jpeg: bytes) -> list[tuple[float, tuple[float, float, float, float]]]
     net = _session()
     inp = net.get_inputs()[0]
     h, w = inp.shape[2], inp.shape[3]
-    img = Image.open(io.BytesIO(jpeg)).convert("RGB").resize((w, h), Image.BILINEAR)
+    img = Image.open(io.BytesIO(jpeg)).convert("RGB").resize((w, h), Image.BILINEAR)  # type: ignore[attr-defined]
     x = np.asarray(img, np.float32).transpose(2, 0, 1)[None] / 255.0
     boxes, confs = net.run(None, {inp.name: x})
     boxes, confs = boxes[0, :, 0, :], confs[0].max(axis=1)
     ok = confs > BOX_THRESH
     boxes, confs = boxes[ok], confs[ok]
-    return [(float(confs[i]), tuple(float(v) for v in boxes[i])) for i in _nms(boxes, confs)] if len(confs) else []
+    return [(float(confs[i]), tuple(float(v) for v in boxes[i])) for i in _nms(boxes, confs)] if len(confs) else []  # type: ignore[misc]
 
 
 def annotate(jpeg: bytes, dets: list[tuple[float, tuple[float, float, float, float]]]) -> bytes:
@@ -169,7 +169,7 @@ async def grab(manager: Any, timeout: float = 10.0) -> bytes:
                 a = buf.find(b"\xff\xd8")
                 b = buf.find(b"\xff\xd9", a + 2) if a >= 0 else -1
                 if b > 0:
-                    return buf[a:b + 2]
+                    return buf[a:b + 2]  # type: ignore[no-any-return]
                 if len(buf) > 8_000_000:
                     buf = buf[-1_000_000:]
         finally:

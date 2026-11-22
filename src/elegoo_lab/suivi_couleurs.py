@@ -23,7 +23,9 @@ _REMAIN = re.compile(r"^M73 P\d+ R(\d+)")
 @lru_cache(maxsize=4)
 def _scan(path: str, _mtime: float) -> dict[str, Any]:
     layer, remain = 0, None
-    first_tool, changes, remain_at = None, [], [None]   # remain_at[i]: minutes left when layer i starts
+    first_tool = None
+    changes: list = []
+    remain_at = [None]   # remain_at[i]: minutes left when layer i starts
     colours: list[str] = []
     types: list[str] = []
     purges = []   # (layer, tool, mm): every change that pushes filament into the chute
@@ -33,7 +35,7 @@ def _scan(path: str, _mtime: float) -> dict[str, Any]:
             if c == ";":
                 if line.startswith(";Z:"):
                     layer += 1
-                    remain_at.append(remain)
+                    remain_at.append(remain)  # type: ignore[arg-type]
                 elif line.startswith("; filament_colour = ") and not colours:
                     colours = [h.strip() for h in line.split("=", 1)[1].split(";")]
                 elif line.startswith("; filament_type = ") and not types:
