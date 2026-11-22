@@ -140,11 +140,11 @@ def _thread(d: float, pitch: float, length: float, inner: bool, play: float, ste
     nz = max(8, int(length / pitch * 16))
     th = np.linspace(0, 2 * np.pi, steps, endpoint=False)
     zs = np.linspace(0, length, nz + 1)
-    T, Z = np.meshgrid(th, zs)
-    phase = ((Z - pitch * T / (2 * np.pi)) / pitch) % 1.0
+    t, z = np.meshgrid(th, zs)
+    phase = ((z - pitch * t / (2 * np.pi)) / pitch) % 1.0
     tooth = np.clip(1 - np.abs(phase - 0.5) * 2 * 1.6 + 0.3, 0, 1)   # trapezoid: flat crests and roots
-    R = r_minor + (r_major - r_minor) * tooth
-    v = np.c_[(R * np.cos(T)).ravel(), (R * np.sin(T)).ravel(), Z.ravel()]
+    r = r_minor + (r_major - r_minor) * tooth
+    v = np.c_[(r * np.cos(t)).ravel(), (r * np.sin(t)).ravel(), z.ravel()]
     idx = np.arange(len(v)).reshape(nz + 1, steps)
     a, b = idx[:-1], np.roll(idx[:-1], -1, axis=1)
     c, e = idx[1:], np.roll(idx[1:], -1, axis=1)
@@ -294,9 +294,9 @@ def lithophane(photo: str, largeur: float, epaisseur_min: float, epaisseur_max: 
     g = np.asarray(Image.fromarray((g * 255).astype(np.uint8)).resize((nx, ny), Image.LANCZOS), float) / 255
     hgt = epaisseur_min + (1 - g[::-1]) * (epaisseur_max - epaisseur_min)
     xs, ys = np.arange(nx) * step, np.arange(ny) * step
-    X, Y = np.meshgrid(xs, ys)
-    top = np.c_[X.ravel(), Y.ravel(), hgt.ravel()]
-    bot = np.c_[X.ravel(), Y.ravel(), np.zeros(X.size)]
+    x, y = np.meshgrid(xs, ys)
+    top = np.c_[x.ravel(), y.ravel(), hgt.ravel()]
+    bot = np.c_[x.ravel(), y.ravel(), np.zeros(x.size)]
     v = np.r_[top, bot]
     idx = np.arange(nx * ny).reshape(ny, nx)
     a, b, c, d = idx[:-1, :-1].ravel(), idx[:-1, 1:].ravel(), idx[1:, :-1].ravel(), idx[1:, 1:].ravel()
