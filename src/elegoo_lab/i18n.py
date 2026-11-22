@@ -18,7 +18,7 @@ def language() -> str:
         import tomllib
         lang = tomllib.loads(config.CONFIG_FILE.read_text()).get("interface", {}).get("langue")
         if lang in ("fr", "en"):
-            return lang
+            return lang  # type: ignore[no-any-return]
     return "fr"
 
 

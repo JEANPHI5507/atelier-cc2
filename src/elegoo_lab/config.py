@@ -34,7 +34,8 @@ class Config:
 def slicer_path() -> str | None:
     """Optional override: path to an OrcaSlicer/ElegooSlicer executable (AppRun or AppImage)."""
     if CONFIG_FILE.exists():
-        return tomllib.loads(CONFIG_FILE.read_text()).get("slicer", {}).get("path") or None
+        path = tomllib.loads(CONFIG_FILE.read_text()).get("slicer", {}).get("path")
+        return path or None  # type: ignore[no-any-return]
     return None
 
 

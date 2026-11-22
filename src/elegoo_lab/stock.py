@@ -47,7 +47,7 @@ def load() -> dict[str, Any]:
     for i in range(TRAYS):
         data["trays"].setdefault(str(i), {"poids_g": SPOOL_G, "restant_g": SPOOL_G, "prix_kg": PRICE_KG,
                                           "matiere": "PLA", "couleur": "", "nom": "", "code": "", "depuis": 0})
-    return data
+    return data  # type: ignore[no-any-return]
 
 
 def save(data: dict[str, Any]) -> None:
@@ -135,7 +135,7 @@ def set_tray(tray: int, *, restant_g: float | None = None, poids_g: float | None
                 raise ValueError(f"restant entre 0 et {cur['poids_g']:.0f} g")
             cur["restant_g"] = float(restant_g)
         save(data)
-        return cur
+        return cur  # type: ignore[no-any-return]
 
 
 def _per_tray(per_filament_m: list[float], purge_m: list[float] | None, route: dict | None) -> dict[int, tuple[float, float]]:
