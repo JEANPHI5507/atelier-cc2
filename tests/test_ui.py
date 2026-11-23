@@ -121,7 +121,7 @@ def browser():
 
 @pytest.fixture
 def page(browser, site):
-    ctx = browser.new_context(viewport={"width": 1366, "height": 860})
+    ctx = browser.new_context(locale="fr-FR", viewport={"width": 1366, "height": 860})
     pg = ctx.new_page()
     pg.errors = []
     pg.on("pageerror", lambda e: pg.errors.append(str(e)))

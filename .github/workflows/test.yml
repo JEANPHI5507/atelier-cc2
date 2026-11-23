@@ -127,8 +127,11 @@ jobs:
         run: |
           uv sync
 
-      - name: Install Playwright chromium and its system libraries
+      - name: Install slicer, fonts and Playwright chromium
         run: |
+          sudo apt-get update
+          sudo apt-get install -y libopengl0 libglu1-mesa libwebkit2gtk-4.1-0 fonts-dejavu-core fonts-urw-base35
+          make slicer
           uv run playwright install chromium --with-deps
 
       - name: Run UI Tests
