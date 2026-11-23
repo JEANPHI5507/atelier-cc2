@@ -4581,9 +4581,7 @@ def test_access_code_helpers(tmp_path, monkeypatch):
     access.set_code("4321")
     assert access.check_code("4321")
     assert not access.check_code(code)
-    import pytest as _p
-
-    with _p.raises(ValueError):
+    with pytest.raises(ValueError):
         access.set_code("ab")  # non numérique
 
 
