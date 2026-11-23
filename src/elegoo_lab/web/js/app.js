@@ -6,8 +6,10 @@ import { closeCamera, openPrinter, pollPrinter } from './printer.js';
 import { openStart } from './setup.js';
 
 /* theme */
+const mqLight = matchMedia('(prefers-color-scheme: light)');
+const resolveTheme = t => t === 'auto' ? (mqLight.matches ? 'sable' : 'noir') : t;
 function applyTheme(t) {
-  document.documentElement.dataset.theme = t;
+  document.documentElement.dataset.theme = resolveTheme(t);
   document.querySelectorAll('[data-theme-pick]').forEach(b => b.classList.toggle('on', b.dataset.themePick === t));
   try { localStorage.setItem('cc2-theme', t); } catch {}
   document.querySelector('meta[name=theme-color]')?.setAttribute('content', getComputedStyle(document.documentElement).getPropertyValue('--bg').trim());   // phone status bar
@@ -18,6 +20,8 @@ const narrow = () => matchMedia('(max-width: 600px)').matches;
 // on a phone only the current swatch shows: tapping it moves to the next theme
 document.querySelectorAll('[data-theme-pick]').forEach(b => b.onclick = () =>
   applyTheme(narrow() && b.classList.contains('on') ? THEMES[(THEMES.indexOf(b.dataset.themePick) + 1) % THEMES.length] : b.dataset.themePick));
+const onSchemeChange = () => { try { if ((localStorage.getItem('cc2-theme') || 'noir') === 'auto') applyTheme('auto'); } catch {} };
+if (mqLight.addEventListener) mqLight.addEventListener('change', onSchemeChange); else mqLight.addListener(onSchemeChange);
 
 /* tabs & dialogs */
 for (const t of ['start', 'lab', 'ui', 'gal']) $('t-' + t).onclick = () => {

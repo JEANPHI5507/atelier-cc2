@@ -787,3 +787,19 @@ def test_help_dialog(page):
     page.click("#help [data-close]")
     page.wait_for_function("!document.getElementById('help').open")
     assert page.errors == []
+
+
+def test_theme_auto_follows_system_scheme(browser, site):
+    for scheme, theme in (("dark", "noir"), ("light", "sable")):
+        ctx = browser.new_context(viewport={"width": 1366, "height": 860}, color_scheme=scheme)
+        pg = ctx.new_page()
+        errors = []
+        pg.on("pageerror", lambda e, errs=errors: errs.append(str(e)))
+        pg.goto(site["base"] + "/lab/")
+        pg.wait_for_selector('[data-theme-pick="auto"]')
+        pg.click('[data-theme-pick="auto"]')
+        assert pg.evaluate("document.documentElement.dataset.theme") == theme  # thème résolu
+        assert pg.evaluate("localStorage.getItem('cc2-theme')") == "auto"  # choix brut persisté
+        assert pg.eval_on_selector('[data-theme-pick="auto"]', "b => b.classList.contains('on')")
+        assert errors == []
+        ctx.close()
