@@ -82,6 +82,20 @@ def level_each_print() -> bool:
     return True
 
 
+def ui_mode() -> str:
+    """'debutant' or 'avance' ([interface] mode in config.toml). A fresh install starts in débutant mode;
+    an existing config.toml that never had the key stays 'avance' — the user already knows the workshop.
+    """
+    if CONFIG_FILE.exists():
+        raw = tomllib.loads(CONFIG_FILE.read_text())
+        iface = raw.get("interface", {})
+        mode = iface.get("mode")
+        if mode in ("debutant", "avance"):
+            return str(mode)
+        return "avance" if "interface" in raw else "debutant"
+    return "debutant"
+
+
 def write_atomic(path: Path, text: str, mode: int | None = None) -> None:
     """Replace a file in one step: a power cut or a crash leaves the old content or the new one, never a
     half-written or empty file (the library, spools, gallery and logs are the user's only copy)."""

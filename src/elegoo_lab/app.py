@@ -194,6 +194,10 @@ class LangIn(BaseModel):
     lang: str
 
 
+class ModeIn(BaseModel):
+    mode: str
+
+
 class PrepareIn(BaseModel):
     mapping: dict[int, int] = {}  # source colour index -> CANVAS slot (1..4)
     filaments: list[str] = ["PLA"]  # filament per slot
@@ -809,6 +813,18 @@ def lab_router(cfg: config.Config) -> APIRouter:
             raise HTTPException(422, "fr ou en")
         config.save("interface", langue=body.lang)
         return {"langue": body.lang}
+
+    @r.get("/mode")
+    def get_mode() -> dict[str, str]:
+        """Display mode: 'debutant' hides the advanced options, 'avance' shows everything."""
+        return {"mode": config.ui_mode()}
+
+    @r.post("/mode")
+    def set_mode(body: ModeIn) -> dict[str, str]:
+        if body.mode not in ("debutant", "avance"):
+            raise HTTPException(422, "debutant ou avance")
+        config.save("interface", mode=body.mode)
+        return {"mode": body.mode}
 
     @r.get("/couleurs")
     async def colour_plan(request: Request) -> dict[str, Any]:

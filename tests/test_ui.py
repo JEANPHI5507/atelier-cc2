@@ -697,3 +697,17 @@ def test_review_from_the_phone_link(page, site):
     assert bilan["issues"] == ["fils"]
     assert bilan["notes"] == {"details": 1, "global": 4}
     assert not page.errors
+
+
+def test_mode_debutant_hides_advanced(page):
+    # config neuve du fixture -> mode débutant : #adv masqué, puis le bouton Mode affiche tout
+    page.wait_for_selector("#mode")
+    page.wait_for_function("document.getElementById('mode-t').textContent !== ''")
+    assert page.eval_on_selector("body", "b => b.classList.contains('mode-debutant')")
+    assert page.eval_on_selector("#adv", "el => getComputedStyle(el).display") == "none"
+    assert page.eval_on_selector("#ln-more", "el => getComputedStyle(el).display") == "none"
+    page.click("#mode")
+    page.wait_for_function("!document.body.classList.contains('mode-debutant')")
+    assert page.eval_on_selector("#adv", "el => getComputedStyle(el).display") != "none"
+    assert page.eval_on_selector("#mode-t", "el => el.textContent") == "Avancé"
+    assert page.errors == []
