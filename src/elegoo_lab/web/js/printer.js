@@ -231,9 +231,12 @@ async function pvCanvas() {
     const norm = (t, pos) => { const col = String(t.filament_color || t.color || ''), on = t.status === 1 || t.status === 2;
       return { pos, id: t.tray_id, on, colour: /^#[0-9A-Fa-f]{6}$/.test(col) ? col : '#888888', type: t.filament_type || t.type || '', name: t.filament_name || '' }; };
     $('pv-trays').innerHTML = trays.length ? trays.map(norm).map(t => { const k = left(t.pos), pct = k ? Math.round(100 * k.restant_g / k.poids_g) : 0;
-      return `<button class="tray ${t.id === c.active_tray_id ? 'active' : ''}" data-tray="${t.pos}" title="Modifier le stock de la bobine ${t.pos + 1}">
-      <div class="spool-c" style="background:${t.on ? t.colour : 'transparent'}"></div><div class="tn">${t.pos + 1} · ${esc(t.on ? t.type || '?' : 'vide')}</div>
+      const active = t.on && t.id === c.active_tray_id;
+      return `<button class="tray ${active ? 'active' : ''}" data-tray="${t.pos}" title="Modifier le stock de la bobine ${t.pos + 1}">
+      <svg class="spool-c" viewBox="0 0 44 44" aria-hidden="true"><circle class="rim" cx="22" cy="22" r="19" ${t.on ? '' : 'stroke-dasharray="4 3"'}/><circle class="fill" cx="22" cy="22" r="14" fill="${t.on ? t.colour : '#888888'}" opacity="${t.on ? Math.max(0.12, pct / 100).toFixed(2) : 0.08}"/><circle class="hub" cx="22" cy="22" r="5"/></svg>
+      <div class="tn">${t.pos + 1} · ${esc(t.on ? t.type || '?' : 'Vide')}</div>
       <div class="tt">${t.on ? esc(t.name) : 'Vide'}</div>
+      ${active ? '<div class="tag-now">en cours</div>' : ''}
       ${t.on && k ? `<div class="gauge ${k.restant_g < st.low_g ? 'low' : ''}"><i style="width:${pct}%"></i></div><div class="tt"><b>${fmtG(k.restant_g)}</b> restants</div>` : ''}</button>`; }).join('')
       : '<div class="empty" style="grid-column:1/-1">CANVAS non détecté</div>';
     spoolQuestions(st, trays.map(norm));

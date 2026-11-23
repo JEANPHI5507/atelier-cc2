@@ -371,7 +371,12 @@
   .gauge.low i { background: var(--bad); }
   .tray { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 8px; text-align: center; min-width: 0; }
   .tray.active { border-color: var(--acc); box-shadow: 0 0 0 2px var(--acc-soft); }
-  .tray .spool-c { width: 34px; height: 34px; border-radius: 50%; margin: 0 auto 6px; border: 3px solid var(--line-strong); box-shadow: inset 0 0 0 6px rgba(0,0,0,.12); }
+  .tray .spool-c { width: 44px; height: 44px; margin: 0 auto 6px; display: block; }
+  .tray .spool-c .rim { fill: none; stroke: var(--line-strong); stroke-width: 3; }
+  .tray .spool-c .hub { fill: var(--bg); stroke: var(--line-strong); stroke-width: 2; }
+  .tray.active .spool-c .rim { stroke: var(--acc); }
+  .tray.active .spool-c { filter: drop-shadow(0 0 5px var(--acc-soft)); }
+  .tray .tag-now { margin-top: 2px; font-size: 11px; font-weight: 700; color: var(--acc); text-transform: uppercase; letter-spacing: .04em; }
   .tray .tn { font-size: 12.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .tray .tt { font-size: 11.5px; color: var(--faint); }
   .seg.wide { width: 100%; } .seg.wide button { flex: 1; padding: 6px 4px; font-size: 12.5px; }

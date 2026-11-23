@@ -5869,3 +5869,22 @@ def test_mode_debutant_assets():
     en = _json.loads((web / "i18n" / "en.json").read_text(encoding="utf-8"))
     for k in ("Débutant", "Avancé", "Mode", "Mode Débutant / Avancé"):
         assert k in en["exact"] and en["exact"][k], k
+
+
+# --- R2.2 : schéma interactif du CANVAS (bobines SVG, bobine active, i18n) ---
+
+
+def test_canvas_spools_schema_assets():
+    import json as _json
+
+    web = Path(config.ROOT) / "src" / "elegoo_lab" / "web"
+    js = (web / "js" / "printer.js").read_text(encoding="utf-8")
+    assert (
+        'class="spool-c"' in js and 'circle class="fill"' in js
+    )  # bobine SVG avec couleur actuelle
+    assert "tag-now" in js and "en cours" in js  # bobine active pendant l'impression
+    css = (web / "css" / "app.css").read_text(encoding="utf-8")
+    assert ".tray .spool-c .rim" in css and ".tray.active .spool-c" in css and ".tag-now" in css
+    en = _json.loads((web / "i18n" / "en.json").read_text(encoding="utf-8"))
+    assert en["exact"].get("Vide") == "Empty"
+    assert any(p[0] == "Modifier le stock de la bobine {}" for p in en["patterns"])
