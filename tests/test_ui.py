@@ -711,3 +711,23 @@ def test_mode_debutant_hides_advanced(page):
     assert page.eval_on_selector("#adv", "el => getComputedStyle(el).display") != "none"
     assert page.eval_on_selector("#mode-t", "el => el.textContent") == "Avancé"
     assert page.errors == []
+
+
+def test_canvas_spools_schema(page, site):
+    # stock de la bobine 1 renseigné d'abord, pour que le clic ouvre la fiche
+    api(
+        site,
+        "/lab/api/bobines/0",
+        {"restant_g": 800, "poids_g": 1000, "prix_kg": 20, "nouvelle": False},
+    )
+    page.click("#t-ui")
+    page.wait_for_selector("#pv-trays .tray", timeout=15000)
+    trays = page.query_selector_all("#pv-trays .tray")
+    assert len(trays) == 4
+    fills = [t.query_selector("svg.spool-c circle.fill").get_attribute("fill") for t in trays]
+    assert fills == ["#E9E9E7", "#F2A900", "#D22630", "#008755"]  # couleurs actuelles du simulateur
+    trays[0].click()
+    page.wait_for_selector("#tray-dlg[open]")
+    assert "Bobine 1" in page.inner_text("#tray-t")
+    page.click("#tray-dlg [data-close]")
+    assert page.errors == []

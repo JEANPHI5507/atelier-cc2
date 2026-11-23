@@ -186,6 +186,7 @@
 "Branche la tablette sur le secteur. Pour la garder allumée sans toucher : réglages de la tablette → écran → ne jamais éteindre (en charge).": "Plug the tablet in. To keep it on without touching it: tablet settings → display → never turn off (while charging).",
 "Buse": "Nozzle",
 "Buse trop chaude ou filament humide : il coule pendant les déplacements.": "Nozzle too hot or damp filament: it oozes during travel moves.",
+"CANVAS injoignable": "CANVAS unreachable",
 "CANVAS non détecté": "CANVAS not detected",
 "Cadre": "Frame",
 "Caisson": "Chamber",
@@ -1049,6 +1050,7 @@
 "Ventilateur de la gorge de la buse en défaut": "Hotend throat fan faulty",
 "Ventilateur de la pièce en défaut": "Part cooling fan faulty",
 "Ventilateur du caisson en défaut": "Chamber fan faulty",
+"Vide": "Empty",
 "Vide = valeur du profil Centauri Carbon 2 (indiquée en gris).": "Empty = Centauri Carbon 2 profile value (shown in grey).",
 "Vidéo": "Video",
 "Vidéo prête à la fin de l'impression": "Video ready at the end of the print",
@@ -1784,7 +1786,7 @@
 ],
 [
 "Modifier le stock de la bobine {}",
-"Edit the stock of spool {}"
+"Edit spool {} stock"
 ],
 [
 "Ménage fait : {} fichier{} supprimé{}",
