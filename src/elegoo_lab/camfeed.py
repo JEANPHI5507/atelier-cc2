@@ -31,8 +31,25 @@ class CameraFeed:
         self.seq = 0
         self.at = 0.0  # when the last picture came
         self.asked = 0.0  # when a page last asked
+        self.same = 0  # identical pictures in a row
+        self.restarts = 0  # stream restarts asked by a page that got no picture
         self.new = asyncio.Condition()
         self.task: asyncio.Task | None = None
+
+    @property
+    def frozen(self) -> bool:
+        """The stream stopped or repeats the same picture (firmware freezes it after a few hours)."""
+        return self.frame is not None and (time.time() - self.at > 30 or self.same >= 10)
+
+    async def restart(self) -> None:
+        """Drop the current subscription: the next next() opens a fresh one."""
+        self.restarts += 1
+        self.at = 0.0
+        self.same = 0
+        if self.task is not None and not self.task.done():
+            self.task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self.task
 
     def _start(self) -> None:
         self.asked = time.time()
@@ -63,6 +80,7 @@ class CameraFeed:
 
     async def _publish(self, jpeg: bytes) -> None:
         async with self.new:
+            self.same = self.same + 1 if jpeg == self.frame else 0
             self.frame, self.seq, self.at = jpeg, self.seq + 1, time.time()
             self.new.notify_all()
 

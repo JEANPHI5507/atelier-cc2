@@ -1088,7 +1088,17 @@ def lab_router(cfg: config.Config) -> APIRouter:
         st = request.app.state
         if getattr(st, "camfeed", None) is None:
             st.camfeed = camfeed.CameraFeed(st.manager.camera)
-        got = await st.camfeed.next(st.camfeed.seq if after < 0 else after)
+        feed = st.camfeed
+        got = await feed.next(feed.seq if after < 0 else after)
+        if not got:  # nothing new came: restart the stream once, then answer
+            await feed.restart()
+            got = await feed.next(feed.seq if after < 0 else after)
+        w = getattr(st, "watcher", None)
+        if w is not None:
+            if got:
+                w.camera_ok()
+            else:
+                w.camera_frozen()
         if not got:
             raise HTTPException(503, "caméra indisponible")
         return Response(

@@ -699,6 +699,24 @@ class Watcher:
         with contextlib.suppress(Exception):
             await asyncio.wait_for(self.light(), timeout=10)
 
+    def camera_frozen(self) -> None:
+        """A page's camera stream stopped giving pictures (also outside a print): say it once."""
+        if self.cam_warned:
+            return
+        self.cam_warned = True
+        self.emit(
+            "camera",
+            "la caméra ne donne plus d'image. Le flux a été redémarré ; si elle reste figée, "
+            "défaut connu du firmware ≥ 01.03.01.89 : elle revient après un arrêt complet de l'imprimante.",
+        )
+
+    def camera_ok(self) -> None:
+        """Pictures flow again: a later freeze will be reported again."""
+        self.cam_warned = False
+        self.cam_fail = 0
+        self.cam_same = 0
+        self.cam_last = None
+
     def _camera_health(self, jpeg: bytes | None) -> None:
         """Firmware 01.03.01.89 and later: the stream may freeze after a few hours (back after a power cycle)."""
         if jpeg is None:
