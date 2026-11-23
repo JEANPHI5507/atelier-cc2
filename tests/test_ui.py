@@ -334,7 +334,12 @@ def test_add_a_piece_then_resize_it_on_the_plate(page, site):
     page.evaluate(
         """() => {
         const el = document.getElementById('chat-sec');
-        new MutationObserver(() => { el.hidden = true; }).observe(el, { attributes: true, attributeFilter: ['hidden'] }); }"""
+        const mo = new MutationObserver(() => {
+            if (el.hidden) return;
+            mo.disconnect();
+            el.hidden = true;
+            mo.observe(el, { attributes: true, attributeFilter: ['hidden'] }); });
+        mo.observe(el, { attributes: true, attributeFilter: ['hidden'] }); }"""
     )  # the chat floats over the tools and reopens at each model pick
     page.click("#files .file[data-n='cube.stl']")
     page.wait_for_selector("#vtools [data-vt='add']:not([hidden])", timeout=30000)
