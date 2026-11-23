@@ -848,3 +848,6 @@
                 color: var(--txt); font-size: 14px; }
   .fw-warning svg { flex: none; }
   .fw-warning button { margin-left: auto; }
+
+/* R2.1 mode Débutant : les options avancées disparaissent ; le bouton Mode de l'en-tête les ramène */
+body.mode-debutant .advanced { display: none !important; }

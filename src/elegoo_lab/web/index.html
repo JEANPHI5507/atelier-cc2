@@ -3,6 +3,7 @@
 <head>
 <meta name="google" content="notranslate">
 <script src="js/i18n.js"></script>
+<script src="js/mode.js"></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Atelier Centauri Carbon 2</title>
@@ -55,6 +56,7 @@
   <button class="btn ghost" id="phone-open" hidden title="Ouvrir l'atelier sur le téléphone"><svg class="i"><use href="#i-phone"/></svg><span>Téléphone</span></button>
   <button class="btn ghost" id="lang" data-cap="Langue" title="Langue · Language" translate="no" onclick="I18N.set(I18N.lang === 'en' ? 'fr' : 'en')"><b id="lang-t">EN</b></button>
 <script>document.getElementById('lang-t').textContent = I18N.lang === 'en' ? 'FR' : 'EN';</script>
+  <button class="btn ghost" id="mode" data-cap="Mode" title="Mode Débutant / Avancé" onclick="UI_MODE.toggle()"><b id="mode-t">Débutant</b></button>
   <div class="themes" role="radiogroup" aria-label="Thème" data-cap="Thème"><button data-theme-pick="noir" title="Noir" style="background:#000;border-color:#48484a"></button><button data-theme-pick="ardoise" title="Ardoise" style="background:#465060"></button><button data-theme-pick="sauge" title="Sauge" style="background:#4a5751"></button><button data-theme-pick="sable" title="Sable" style="background:#dad0c0"></button></div>
   <span class="pill" id="printer" title="État de l'imprimante"><span class="led"></span><span id="printer-txt">Connexion…</span><span id="printer-temp"></span></span>
 </header>
@@ -213,7 +215,7 @@
               <option value="colonnes">Colonnes — surfaces planes en surplomb</option>
             </select></div>
           <div class="switch" id="plate-row" hidden><label for="plate-only">Seulement depuis le plateau (rien ne s'appuie sur le modèle)</label><input id="plate-only" type="checkbox"></div>
-          <details id="adv" style="margin-top:14px"><summary style="cursor:pointer;color:var(--dim);font-size:13px">Réglages avancés <span id="adv-n" class="note"></span></summary>
+          <details id="adv" class="advanced" style="margin-top:14px"><summary style="cursor:pointer;color:var(--dim);font-size:13px">Réglages avancés <span id="adv-n" class="note"></span></summary>
             <p class="note" style="margin:10px 0">Vide = valeur du profil Centauri Carbon 2 (indiquée en gris).</p>
             <div id="adv-fields"></div>
             <button class="btn ghost" id="adv-reset" style="height:30px">Tout remettre par défaut</button>
@@ -337,7 +339,7 @@
           <div id="pv-files"></div>
         </div>
         <div class="card o2 fold-all">
-          <div class="card-h"><h3>Historique</h3><a class="btn ghost" href="/ui/" target="_blank" rel="noopener" title="Interface d'origine de pycentauri">Interface avancée</a></div>
+          <div class="card-h"><h3>Historique</h3><a class="btn ghost advanced" href="/ui/" target="_blank" rel="noopener" title="Interface d'origine de pycentauri">Interface avancée</a></div>
           <div id="pv-hist"></div>
         </div>
       </div>
@@ -611,7 +613,7 @@
     <div id="ln-warn" style="margin-top:6px"></div>
     <h4 class="ln-h">Options de l'imprimante</h4>
     <div class="switch"><label for="ln-level">Nivellement complet du plateau <small class="note">(la CC2 nivelle déjà la zone de la pièce ; ≈ 2 min de plus, utile après un changement de plateau)</small></label><input type="checkbox" id="ln-level"></div>
-    <details class="ln-more" id="ln-more"><summary>Autres options <span class="note" id="ln-sum"></span></summary>
+    <details class="ln-more advanced" id="ln-more"><summary>Autres options <span class="note" id="ln-sum"></span></summary>
     <div class="switch" style="margin-top:10px"><label for="ln-check">Vérifications de l'imprimante avant de démarrer</label><input type="checkbox" id="ln-check"></div>
     <div class="switch" style="margin-top:10px"><label for="ln-video">Timelapse de l'imprimante <small class="note">(en plus de celui de l'atelier)</small></label><input type="checkbox" id="ln-video"></div>
     <div class="field" style="margin-top:12px"><label>Disposition du plateau <small class="note">(laisse A sauf si l'écran de la CC2 indique B)</small></label>

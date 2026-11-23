@@ -5820,3 +5820,52 @@ def test_web_live_sim_more_endpoints(tmp_path, monkeypatch):
         loop.call_soon_threadsafe(loop.stop)
         th.join(timeout=5)
         loop.close()
+
+
+# --- R2.1 : mode Débutant (bascule persistée dans config.toml, endpoints, assets UI) ---
+
+
+def test_config_ui_mode_defaults(tmp_path, monkeypatch):
+    from elegoo_lab import config
+
+    monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "config.toml")
+    assert config.ui_mode() == "debutant"  # installation neuve
+    (tmp_path / "config.toml").write_text('[interface]\nlangue = "fr"\n')
+    assert config.ui_mode() == "avance"  # config existante sans la clé : utilisateur déjà connu
+    config.save("interface", mode="debutant")
+    assert config.ui_mode() == "debutant"
+    assert 'mode = "debutant"' in (tmp_path / "config.toml").read_text()
+    config.save("interface", mode="avance")
+    assert config.ui_mode() == "avance"
+
+
+def test_web_mode_endpoint(web):
+    from elegoo_lab import config
+
+    client, _lib = web
+    hdrs = {"Origin": "http://testserver"}
+    r = client.get("/lab/api/mode")
+    assert r.status_code == 200 and r.json()["mode"] in ("debutant", "avance"), r.text
+    r = client.post("/lab/api/mode", json={"mode": "avance"}, headers=hdrs)
+    assert r.status_code == 200 and r.json()["mode"] == "avance"
+    assert config.ui_mode() == "avance"  # persisté dans config.toml
+    r = client.post("/lab/api/mode", json={"mode": "bidule"}, headers=hdrs)
+    assert r.status_code == 422
+
+
+def test_mode_debutant_assets():
+    import json as _json
+
+    web = Path(config.ROOT) / "src" / "elegoo_lab" / "web"
+    html = (web / "index.html").read_text(encoding="utf-8")
+    assert 'id="mode"' in html and "js/mode.js" in html and 'id="mode-t"' in html
+    assert 'id="adv" class="advanced"' in html  # réglages avancés masqués en mode débutant
+    assert 'class="ln-more advanced"' in html
+    assert "btn ghost advanced" in html  # lien « Interface avancée » masqué aussi
+    css = (web / "css" / "app.css").read_text(encoding="utf-8")
+    assert "body.mode-debutant .advanced" in css
+    js = (web / "js" / "mode.js").read_text(encoding="utf-8")
+    assert "/lab/api/mode" in js and "mode-debutant" in js
+    en = _json.loads((web / "i18n" / "en.json").read_text(encoding="utf-8"))
+    for k in ("Débutant", "Avancé", "Mode", "Mode Débutant / Avancé"):
+        assert k in en["exact"] and en["exact"][k], k
