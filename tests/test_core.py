@@ -3769,3 +3769,622 @@ def test_simplify_colour_specks():
     states = [st.copy()]
     assert colors.simplify_layers([part], states, 2.5, 0.03) == 0
     assert states[0][0] == 2
+
+
+# --- INF.3: couverture — modules faiblement couverts (firmware, settings, spools, printprep, sauvegarde, cli) ---
+
+
+def test_firmware_version_and_manager():
+    from elegoo_lab import firmware
+
+    v = firmware.FirmwareVersion("02.01.00.00")
+    assert (v.major, v.minor, v.patch, v.build) == (2, 1, 0, 0)
+    assert str(v) == "02.01.00.00"
+    assert firmware.FirmwareVersion("x").major == 0  # illisible -> 0.0.0.0
+    assert firmware.FirmwareVersion("02.00.02.01").is_supported()
+    assert not firmware.FirmwareVersion("01.00.00.00").is_supported()
+    assert "Complètement" in firmware.FirmwareVersion("02.00.02.01").get_support_level()
+    assert "inconnu" in firmware.FirmwareVersion("00.00.00.01").get_support_level()
+    ok, msg = firmware.check_firmware_version("02.00.02.05")
+    assert ok and "supporté" in msg
+    ok, msg = firmware.check_firmware_version("09.09.09.09")
+    assert not ok and "non supporté" in msg
+
+    m = firmware.FirmwareManager()
+    assert m.detected_version is None and not m.is_supported and not m.safe_mode
+    assert m.get_warning_message() == ""
+    info = m.get_safe_mode_info()
+    assert info["firmware_detected"] is False and info["blocked_commands"] == {}
+    m.set_detected_version("02.00.02.01")
+    assert m.is_supported and not m.safe_mode
+    assert m.is_command_safe("homing")  # hors mode safe, tout passe
+    m.set_detected_version("99.00.00.00")
+    assert m.safe_mode and not m.is_supported
+    assert not m.is_command_safe("homing")
+    assert m.is_command_safe("status")
+    assert "homing" in m.get_blocked_commands()
+    assert "99.00.00.00" in m.get_warning_message()
+    assert m.get_safe_mode_info()["safe_mode"] is True
+
+
+def test_settings_build_validates_every_choice_kind():
+    from elegoo_lab import settings
+
+    proc, fil = settings.build(None)
+    assert proc["curr_bed_type"] == "Textured PEI Plate"
+    proc, _ = settings.build({"motif": "gyroide"}, plate="pei_lisse")
+    assert proc["sparse_infill_pattern"] == "gyroid" and proc["curr_bed_type"] == "High Temp Plate"
+    proc, fil = settings.build({"parois": 3, "temp_buse": 210, "avance_pression": 0.04})
+    assert proc["wall_loops"] == "3"
+    assert fil["nozzle_temperature"] == ["210"]
+    assert fil["enable_pressure_advance"] == ["1"]
+    for bad in ({"motif": "inconnu"}, {"parois": 99}, {"temp_buse": 999}, {"bidule": 1}):
+        with pytest.raises(ValueError):
+            settings.build(bad)
+    with pytest.raises(ValueError):
+        settings.build(None, plate="inconnu")
+
+
+def test_spools_loaded_and_own(monkeypatch):
+    from elegoo_lab import slicer, spools
+
+    monkeypatch.setattr(slicer, "filaments", lambda: ["PLA", "PLA Silk"])
+
+    canvas = {
+        "canvas_info": {
+            "canvas_list": [
+                {
+                    "canvas_id": 1,
+                    "tray_list": [
+                        {
+                            "tray_id": 1,
+                            "status": 2,
+                            "filament_color": "#ff0000",
+                            "filament_type": "PLA",
+                            "filament_name": "Rouge",
+                        },
+                        {"tray_id": 2, "status": 0, "filament_color": "#00FF00"},  # vide
+                        {
+                            "tray_id": 3,
+                            "status": 1,
+                            "filament_color": "pas-une-couleur",
+                        },  # invalide
+                    ],
+                }
+            ]
+        }
+    }
+    trays = spools.loaded(canvas)
+    assert len(trays) == 1
+    assert trays[0]["color"] == "#FF0000" and trays[0]["tray_id"] == 1 and trays[0]["pos"] == 0
+    assert spools.loaded({}) == []
+    assert spools.loaded({"canvas_list": []}) == []
+    t = spools.own({"color": "#FF0000", "type": "PLA"}, mine=[])
+    assert t["color"] == "#FF0000"  # sans catalogue perso: inchangé
+    assert spools.filament_for({"type": "PLA"}) == "PLA"
+    assert spools.filament_for({"type": "PLA", "filament_name": "Silk rouge"}) == "PLA Silk"
+    assert spools.filament_for({"type": "TPU"}) == "PLA"  # matière inconnue -> défaut
+
+
+def test_printprep_usage_support_pauses(tmp_path):
+    from elegoo_lab import printprep
+
+    with pytest.raises(ValueError):
+        printprep.usage_overrides("inconnu", None)
+    ov = printprep.usage_overrides("decoratif", 30)
+    assert "sparse_infill_density" not in ov  # le remplissage perso gagne
+    assert "sparse_infill_density" in printprep.usage_overrides("decoratif", None)
+    assert printprep.suggest_usage(Path("boite_x.stl")) == "fonctionnel"
+    assert printprep.suggest_usage(Path("figurine.stl")) == printprep.DEFAULT_USAGE
+    on, ov = printprep.support_overrides(True)
+    assert on and ov == {}
+    on, ov = printprep.support_overrides("colonnes", plate_only=True)
+    assert on and ov["support_type"] == "normal(auto)" and ov["support_on_build_plate_only"] == "1"
+    assert printprep.support_overrides(False) == (False, {})
+    with pytest.raises(ValueError):
+        printprep.support_overrides("inconnu")
+    g = tmp_path / "p.gcode"
+    g.write_text(";LAYER_CHANGE\n;Z:0.2\nG1\n;LAYER_CHANGE\n;Z:0.4\nG1\n;LAYER_CHANGE\n;Z:0.6\n")
+    placed = printprep.add_pauses(g, [0.5])
+    assert placed and placed[0]["mm"] == 0.5
+
+
+def test_sauvegarde_status_overdue_and_disk(tmp_path, monkeypatch):
+    from elegoo_lab import sauvegarde
+
+    monkeypatch.setattr(sauvegarde, "_file", lambda: tmp_path / "sauvegarde.json")
+    assert sauvegarde.status().get("ok") is None
+    assert "Aucune sauvegarde" in (sauvegarde.overdue() or "")
+    sauvegarde._record(ok=int(time.time()))
+    assert sauvegarde.overdue() is None
+    assert sauvegarde.status()["ok"] > 0
+    assert sauvegarde._same_disk(tmp_path, tmp_path)
+    disk = sauvegarde.usb_disk()
+    assert disk is None or disk.is_dir()
+
+
+def test_cli_models_list_and_info(tmp_path, monkeypatch):
+    from typer.testing import CliRunner
+
+    from elegoo_lab import cli, config
+
+    lib = tmp_path / "models"
+    lib.mkdir()
+    monkeypatch.setattr(config, "MODELS_DIR", lib)
+    monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "config.toml")
+    trimesh.creation.box((10, 20, 30)).export(lib / "cube.stl")
+    r = CliRunner().invoke(cli.app, ["models", "list"])
+    assert r.exit_code == 0 and "cube.stl" in r.output
+    r = CliRunner().invoke(cli.app, ["models", "info", "cube.stl"])
+    assert r.exit_code == 0 and "10" in r.output
+
+
+def test_couches_bands_on_a_box():
+    import numpy as np
+
+    from elegoo_lab import couches
+
+    m = trimesh.creation.box((10, 10, 5))
+    m.apply_translation([0, 0, 2.5])  # resting on z = 0
+    bands = couches.bands(np.asarray(m.vertices), np.asarray(m.faces), 0.2, "pentes")
+    assert bands and bands[0][0] == 0.0
+    assert abs(bands[-1][1] - 5.0) < 1e-6
+    assert all(0.08 <= h <= 0.28 for _, _, h in bands)
+
+
+def test_parametric_shapes(monkeypatch):
+    from elegoo_lab import parametric
+
+    repo_font = Path(parametric.__file__).parent / "fonts" / "Sacramento-Regular.ttf"
+    # polices système (DejaVu/URW) absentes hors CI : on branche la police du repo
+    monkeypatch.setattr(parametric, "FONT", repo_font)
+    monkeypatch.setattr(parametric, "SCRIPT_FONT", repo_font)
+    monkeypatch.setattr(parametric.text_section, "__defaults__", (repo_font,))
+    parts = parametric.box(50, 40, 20, 2, 0.2, 3)
+    assert [p[0] for p in parts] == ["boite", "couvercle"]
+    h = parametric.hook(30, 40, 20, 3, 4)
+    assert len(h) == 1 and h[0][0] == "crochet"
+    o = parametric.organiser(60, 40, 15, 2, 2, 2, 2, 3)
+    assert o[0][0] == "organiseur"
+    with pytest.raises(ValueError):
+        parametric.organiser(10, 10, 5, 4, 4, 2, 1, 2)  # compartiments trop petits
+    lab = parametric.label("ABC", 10, 2, 1, 3, True)
+    assert [p[0] for p in lab] == ["plaque", "texte"]
+    with pytest.raises(ValueError):
+        parametric.label("   ", 10, 2, 1, 3, False)
+
+
+def test_parametric_more_shapes():
+    from elegoo_lab import parametric_more as pm
+
+    b = pm.gridfinity_bin(1, 1, 2, 1, 1, False, True)
+    assert b and b[0][0]
+    g = pm.gear(12, 2.0, 5, 4, 20)
+    assert g and g[0][0]
+    v = pm.hardware("vis", "M5", 20, 0.2)
+    assert v and v[0][0] == "vis"
+    with pytest.raises(ValueError):
+        pm.hardware("vis", "M99", 20, 0.2)
+
+
+def test_addtext_writes_a_3mf(tmp_path, monkeypatch):
+    from elegoo_lab import addtext, parametric
+
+    repo_font = Path(parametric.__file__).parent / "fonts" / "Sacramento-Regular.ttf"
+    monkeypatch.setattr(parametric, "FONT", repo_font)
+    monkeypatch.setattr(parametric, "SCRIPT_FONT", repo_font)
+    monkeypatch.setattr(parametric.text_section, "__defaults__", (repo_font,))
+    monkeypatch.setitem(addtext.FONTS, "manuscrite", repo_font)
+    monkeypatch.setitem(addtext.FONTS, "droite", repo_font)
+    src = tmp_path / "m.stl"
+    trimesh.creation.box((30, 30, 5)).export(src)
+    out = tmp_path / "out.3mf"
+    addtext.add(src, "ABC", size_mm=8, out=out)
+    assert out.exists() and out.stat().st_size > 0
+    with pytest.raises(ValueError):
+        addtext.add(src, "x" * 50, out=tmp_path / "o2.3mf")  # texte trop long
+    with pytest.raises(ValueError):
+        addtext.add(src, "ABC", angle=120, out=tmp_path / "o3.3mf")  # angle hors bornes
+
+
+def test_web_simple_get_endpoints(web):
+    client, _lib = web
+    for path in (
+        "/lab/api/setup",
+        "/lab/api/parametric",
+        "/lab/api/queue",
+        "/lab/api/entretien",
+        "/lab/api/lancement",
+        "/lab/api/models",
+    ):
+        r = client.get(path)
+        assert r.status_code == 200, path
+
+
+def test_slicer_gcode_helpers():
+    from elegoo_lab import slicer
+
+    g = b"G28\nBED_MESH_CALIBRATE\nG1 X0\n"
+    out = slicer.without_bed_mesh(g)
+    assert b"BED_MESH_CALIBRATE" in out and out != g  # commenté, pas supprimé
+    p = slicer.without_purge(b"M6211 T2 L10\nG1 E5\n")
+    assert (
+        b"CANVAS_SWITCH_FILAMENT T=2" in p and b"M6211 T2 L10" in p
+    )  # remplacée, ligne gardée en commentaire
+    with pytest.raises(slicer.SliceError):
+        slicer.binary()  # pas d'OrcaSlicer dans l'environnement de test
+
+
+async def test_importlink_validation():
+    import io
+    import zipfile
+
+    from elegoo_lab import importlink
+
+    with pytest.raises(importlink.LinkError):
+        importlink._check_host("http://example.com/x.stl")  # http refusé
+    with pytest.raises(importlink.LinkError):
+        importlink._check_host("https://127.0.0.1/x.stl")  # réseau local refusé
+    with pytest.raises(importlink.LinkError):
+        await importlink.fetch("https://127.0.0.1:9/x.stl")  # jamais de réseau local
+    assert importlink._name("https://x.com/a/b.stl", None) == "b.stl"
+    assert importlink._name("https://x.com/a", 'filename="truc 3mf.stl"') == "truc 3mf.stl"
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("a.stl", b"solid\nendsolid")
+    assert importlink._from_zip(buf.getvalue()) == [("a.stl", b"solid\nendsolid")]
+
+
+def test_vision_nms_and_no_model():
+    import numpy as np
+
+    from elegoo_lab import vision
+
+    boxes = np.array([[0, 0, 10, 10], [1, 1, 11, 11], [50, 50, 60, 60]], dtype=float)
+    confs = np.array([0.9, 0.8, 0.7])
+    assert vision._nms(boxes, confs) == [0, 2]  # la 2e est noyée dans la 1re
+    assert not vision.model_ready()  # pas de modèle IA téléchargé en test
+
+
+def test_spools_match_pairs_colours_to_trays(monkeypatch):
+    from elegoo_lab import slicer, spools
+
+    monkeypatch.setattr(slicer, "filaments", lambda: ["PLA"])
+    trays = [
+        {"color": c, "type": "PLA", "tray_id": i + 1, "pos": i, "status": 2}
+        for i, c in enumerate(["#FF0000", "#0000FF"])
+    ]
+    model = [
+        {"index": 0, "hex": "#FF0000", "share": 0.7},
+        {"index": 1, "hex": "#0000FF", "share": 0.3},
+    ]
+    m = spools.match(model, trays)
+    assert m["mapping"][0] == 1 and m["mapping"][1] == 2
+    with pytest.raises(ValueError):
+        spools.match(model, [])
+    with pytest.raises(ValueError):
+        spools.match([], trays)
+
+
+def test_cli_models_prepare_and_backup_status(tmp_path, monkeypatch):
+    from typer.testing import CliRunner
+
+    from elegoo_lab import cli, config
+
+    lib = tmp_path / "models"
+    lib.mkdir()
+    monkeypatch.setattr(config, "MODELS_DIR", lib)
+    monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "config.toml")
+    trimesh.creation.box((10, 20, 30)).export(lib / "cube.stl")
+    out = lib / "out.stl"
+    r = CliRunner().invoke(cli.app, ["models", "prepare", "cube.stl", "--out", str(out)])
+    assert r.exit_code == 0, r.output
+    assert out.exists() and out.stat().st_size > 0
+    r = CliRunner().invoke(cli.app, ["sauvegarde", "etat"])
+    assert r.exit_code == 0
+
+
+def test_web_model_detail_endpoints(web):
+    client, _lib = web
+    stl = trimesh.creation.box((20, 20, 10)).export(file_type="stl")
+    r = client.post(
+        "/lab/api/models",
+        files={"file": ("cube.stl", stl)},
+        headers={"Origin": "http://testserver"},
+    )
+    assert r.status_code == 200
+    for path in ("info", "colors", "marks", "pieces", "orientations", "advice", "defects"):
+        rr = client.get(f"/lab/api/models/cube.stl/{path}")
+        assert rr.status_code == 200, path
+
+
+def test_assistant_pure_helpers(tmp_path, monkeypatch):
+    from elegoo_lab import assistant, config
+
+    monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "config.toml")
+    assert assistant._json_only('{"a": 1}') == {"a": 1}
+    assert assistant._json_only('```json\n{"b": 2}\n```') == {"b": 2}
+    assert assistant._json_only('du texte {"c": 3} et la fin') == {"c": 3}
+    assert assistant._json_only("rien") == {}
+    assert "inconnu" in assistant.run_tool("bidule", {}, "x.stl")["erreur"]
+    assert "n'est plus" in assistant.run_tool("fiche", {}, "absent.stl")["erreur"]
+    lib = tmp_path / "models"
+    lib.mkdir()
+    monkeypatch.setattr(config, "MODELS_DIR", lib)
+    trimesh.creation.box((10, 10, 10)).export(lib / "cube.stl")
+    assert assistant.run_tool("fiche", {}, "cube.stl")
+    assert "cube.stl" in assistant._scan_meshes()
+
+
+def test_printprep_layer_helpers(monkeypatch):
+    from pathlib import Path as _P
+
+    from elegoo_lab import library, printprep
+
+    assert printprep._layer_mm("0.20mm Standard") == 0.2
+    assert printprep._layer_mode(None) == "pentes"
+    assert printprep._layer_mode(None, usage="profil") == ""
+    assert printprep._real_colours(["#FF0000"], None, 2)[0] == "#FF0000"
+    monkeypatch.setattr(
+        library, "load_index", lambda: {"m.stl": {"retour": {"issues": ["couleurs"]}}}
+    )
+    assert printprep.bled_purge(_P("m.stl")) is True
+    monkeypatch.setattr(library, "load_index", dict)
+    assert printprep.bled_purge(_P("m.stl")) is False
+
+
+def test_parametric_more_text_and_stand_shapes(monkeypatch):
+    from elegoo_lab import parametric, parametric_more as pm
+
+    repo_font = Path(parametric.__file__).parent / "fonts" / "Sacramento-Regular.ttf"
+    monkeypatch.setattr(parametric, "FONT", repo_font)
+    monkeypatch.setattr(parametric, "SCRIPT_FONT", repo_font)
+    monkeypatch.setattr(parametric.text_section, "__defaults__", (repo_font,))
+    monkeypatch.setattr(pm, "FONT", repo_font)
+    monkeypatch.setattr(pm, "SCRIPT_FONT", repo_font)
+    k = pm.keychain("LUC", "manuscrite", 8, 3, 1)
+    assert k and k[0][0]
+    o = pm.ornament("etoile", "", 30, 3, 1)
+    assert o and o[0][0]
+    s = pm.phone_stand(60, 60, 8, 120, True)
+    assert s and s[0][0]
+    c = pm.cable_comb(4, 6, 10, 2, False)
+    assert c and c[0][0]
+
+
+def test_web_more_get_endpoints(web):
+    client, _lib = web
+    for path in (
+        "/lab/api/bobines",
+        "/lab/api/slicer",
+    ):  # les autres ont besoin du manager (lifespan)
+        r = client.get(path)
+        assert r.status_code == 200, path
+
+
+def test_firmware_integration_helpers():
+    from types import SimpleNamespace
+
+    from elegoo_lab import firmware, firmware_integration as fi
+
+    info = fi.check_firmware_on_connection(SimpleNamespace(firmware_version="02.00.02.01"))
+    assert info["firmware_detected"] and info["is_supported"]
+    firmware.firmware_manager._detected_version = None
+    firmware.firmware_manager._safe_mode = False
+    info = fi.check_firmware_on_connection(SimpleNamespace(firmware_version=None))
+    assert info["firmware_detected"] is False
+    ok, msg = fi.can_execute_printer_command("status")
+    assert ok and msg == ""
+    assert fi.get_blocked_commands_list()
+    firmware.firmware_manager._detected_version = None
+    firmware.firmware_manager._safe_mode = False
+
+
+def test_cli_colors_and_slice_profiles(tmp_path, monkeypatch):
+    from typer.testing import CliRunner
+
+    from elegoo_lab import cli, config
+
+    lib = tmp_path / "models"
+    lib.mkdir()
+    monkeypatch.setattr(config, "MODELS_DIR", lib)
+    monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "config.toml")
+    trimesh.creation.box((10, 10, 10)).export(lib / "cube.stl")
+    r = CliRunner().invoke(cli.app, ["colors", "cube.stl"])
+    assert r.exit_code == 0 and "bobine" in r.output
+    r = CliRunner().invoke(cli.app, ["slice-profiles"])
+    assert r.exit_code == 1 and "Slicer" in r.output  # pas d'OrcaSlicer en local
+
+
+def test_assistant_resize_tool(tmp_path, monkeypatch):
+    from elegoo_lab import assistant, config
+
+    lib = tmp_path / "models"
+    lib.mkdir()
+    monkeypatch.setattr(config, "MODELS_DIR", lib)
+    monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "config.toml")
+    trimesh.creation.box((10, 10, 10)).export(lib / "cube.stl")
+    r = assistant.run_tool("redimensionner", {"hauteur": 5}, "cube.stl")
+    assert "erreur" not in r, r
+    assert any("h5mm" in p.name for p in lib.glob("*.ply"))  # _baked écrit un PLY
+
+
+def test_sauvegarde_run_without_disk(tmp_path, monkeypatch):
+    from elegoo_lab import sauvegarde
+
+    monkeypatch.setattr(sauvegarde, "_file", lambda: tmp_path / "s.json")
+    monkeypatch.setattr(sauvegarde, "usb_disk", lambda: None)
+    with pytest.raises(RuntimeError, match="disque"):
+        sauvegarde.run(if_needed=True)
+
+
+def test_web_library_endpoints(web):
+    client, _lib = web
+    stl = trimesh.creation.box((20, 20, 10)).export(file_type="stl")
+    client.post(
+        "/lab/api/models",
+        files={"file": ("cube.stl", stl)},
+        headers={"Origin": "http://testserver"},
+    )
+    r = client.get("/lab/api/models")
+    assert r.status_code == 200 and any(m.get("name") == "cube.stl" for m in r.json())
+    assert client.get("/lab/api/models/cube.stl").status_code == 200
+    r = client.get("/lab/api/models/cube.stl/thumb.png")
+    assert r.status_code == 200 and r.headers["content-type"] == "image/png"
+    assert client.get("/lab/api/library/cleanup").status_code == 200
+    r = client.post(
+        "/lab/api/models/cube.stl/rename",
+        json={"name": "cube2.stl"},
+        headers={"Origin": "http://testserver"},
+    )
+    assert r.status_code == 200 and r.json()["name"] == "cube2.stl"
+    r = client.post(
+        "/lab/api/library/delete",
+        json={"names": ["cube2.stl"]},
+        headers={"Origin": "http://testserver"},
+    )
+    assert r.status_code == 200 and "cube2.stl" in r.json()["deleted"]
+
+
+def test_cli_service_etat_no_unit(tmp_path, monkeypatch):
+    import subprocess
+
+    from typer.testing import CliRunner
+
+    from elegoo_lab import cli, config
+
+    monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "config.toml")
+    monkeypatch.setattr(cli, "UNIT_DIR", tmp_path / "units")
+    r = CliRunner().invoke(cli.app, ["service", "etat"])
+    assert r.exit_code == 0 and "Pas de service" in r.output
+    (tmp_path / "units").mkdir()
+    (tmp_path / "units" / "cc2-atelier.service").write_text("[Unit]\n")
+    monkeypatch.setattr(
+        cli,
+        "_systemctl",
+        lambda *a, **k: subprocess.CompletedProcess(
+            a, 0, "active" if a[0] == "is-active" else "enabled", ""
+        ),
+    )
+    r = CliRunner().invoke(cli.app, ["service", "etat"])
+    assert r.exit_code == 0 and "en marche" in r.output
+
+
+def test_assistant_cli_detail():
+    from elegoo_lab import assistant
+
+    assert "connecté" in assistant._cli_detail("Reading API keys from file\n401 Unauthorized")
+    assert "offre" in assistant._cli_detail("subscription not available for this model")
+    assert assistant._cli_detail("") == "sortie vide"
+
+
+def test_parametric_more_lithophane():
+    from elegoo_lab import parametric_more as pm
+
+    l = pm.lithophane(None, 60, 2, 4, 3)
+    assert l and l[0][0]
+    with pytest.raises(ValueError):
+        pm.lithophane(None, 60, 4, 2, 3)  # max <= min
+
+
+def test_slicer_fr_and_header(tmp_path):
+    from elegoo_lab import slicer
+
+    g = tmp_path / "p.gcode"
+    g.write_text(
+        "; total layer number: 10\n; estimated printing time (normal mode): 1h 2m\n"
+        "; total filament used [mm]: 1234\n; nozzle_temperature: 220\n"
+    )
+    h = slicer._header(g)
+    assert h and any("1234" in v for v in h.values())
+    assert isinstance(slicer._fr("some english warning"), str)
+
+
+def test_assistant_cli_message():
+    from elegoo_lab import assistant
+
+    out = '[{"role": "assistant", "type": "message", "content": [{"text": "Bonjour"}]}]'
+    assert assistant._cli_message(out) == "Bonjour"
+    assert assistant._cli_message("pas du json") == ""
+    assert assistant._cli_message([]) == ""
+
+
+def test_web_texte_and_parametric_preview(web, monkeypatch):
+    from elegoo_lab import addtext, parametric
+
+    repo_font = Path(parametric.__file__).parent / "fonts" / "Sacramento-Regular.ttf"
+    monkeypatch.setattr(parametric, "FONT", repo_font)
+    monkeypatch.setattr(parametric, "SCRIPT_FONT", repo_font)
+    monkeypatch.setattr(parametric.text_section, "__defaults__", (repo_font,))
+    monkeypatch.setitem(addtext.FONTS, "manuscrite", repo_font)
+    monkeypatch.setitem(addtext.FONTS, "droite", repo_font)
+    client, _lib = web
+    stl = trimesh.creation.box((40, 20, 5)).export(file_type="stl")
+    client.post(
+        "/lab/api/models",
+        files={"file": ("plaque.stl", stl)},
+        headers={"Origin": "http://testserver"},
+    )
+    r = client.post(
+        "/lab/api/models/plaque.stl/texte",
+        json={"texte": "ABC", "police": "droite", "angle": 0, "taille": 8},
+        headers={"Origin": "http://testserver"},
+    )
+    assert r.status_code == 200, r.text
+    r = client.post(
+        "/lab/api/parametric/boite/preview",
+        json={"longueur": 50, "largeur": 40, "hauteur": 20, "paroi": 2, "jeu": 0.2, "rayon": 3},
+        headers={"Origin": "http://testserver"},
+    )
+    assert r.status_code == 200 and r.headers["content-type"] == "model/gltf-binary", r.text
+
+
+def test_cli_code_acces(tmp_path, monkeypatch):
+    from typer.testing import CliRunner
+
+    from elegoo_lab import cli, config
+
+    monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "config.toml")
+    r = CliRunner().invoke(cli.app, ["code-acces", "123456"])
+    assert r.exit_code == 0 and "123456" in r.output
+    r = CliRunner().invoke(cli.app, ["code-acces", "ab"])
+    assert r.exit_code != 0  # code non numérique refusé
+
+
+def test_assistant_more_tools(tmp_path, monkeypatch):
+    from elegoo_lab import assistant, config
+
+    lib = tmp_path / "models"
+    lib.mkdir()
+    monkeypatch.setattr(config, "MODELS_DIR", lib)
+    monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "config.toml")
+    trimesh.creation.box((10, 10, 10)).export(lib / "cube.stl")
+    assert "erreur" not in assistant.run_tool("reparer", {}, "cube.stl")
+    assert "erreur" not in assistant.run_tool(
+        "faire_pivoter", {"rx": 0, "ry": 0, "rz": 90}, "cube.stl"
+    )
+    r = assistant.run_tool("orienter", {}, "cube.stl")
+    assert r.get("poses"), r
+
+
+def test_web_forme_endpoint(web):
+    client, _lib = web
+    stl = trimesh.creation.box((30, 30, 10)).export(file_type="stl")
+    client.post(
+        "/lab/api/models",
+        files={"file": ("plaque.stl", stl)},
+        headers={"Origin": "http://testserver"},
+    )
+    r = client.post(
+        "/lab/api/models/plaque.stl/forme",
+        json={
+            "forme": "cylindre",
+            "operation": "percer",
+            "taille": [6, 6, 30],
+            "position": [15, 15, 5],
+            "axe": "z",
+            "couleur": 1,
+        },
+        headers={"Origin": "http://testserver"},
+    )
+    assert r.status_code == 200, r.text
