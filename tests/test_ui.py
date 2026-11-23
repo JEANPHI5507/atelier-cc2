@@ -17,7 +17,21 @@ from pathlib import Path
 import pytest
 import trimesh
 
-CHROME = shutil.which("google-chrome") or shutil.which("chromium")
+
+def _find_chrome() -> str | None:
+    found = shutil.which("google-chrome") or shutil.which("chromium")
+    if found:
+        return found
+    try:  # fallback: the browser shipped by playwright itself
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as p:
+            return p.chromium.executable_path
+    except Exception:
+        return None
+
+
+CHROME = _find_chrome()
 pytestmark = pytest.mark.skipif(not CHROME, reason="Chrome absent")
 TESTS = Path(__file__).parent
 
@@ -107,7 +121,7 @@ def browser():
 
 @pytest.fixture
 def page(browser, site):
-    ctx = browser.new_context(viewport={"width": 1366, "height": 860})
+    ctx = browser.new_context(locale="fr-FR", viewport={"width": 1366, "height": 860})
     pg = ctx.new_page()
     pg.errors = []
     pg.on("pageerror", lambda e: pg.errors.append(str(e)))
@@ -184,8 +198,12 @@ def test_printer_tab_forms_reach_the_server(page, site):
     assert api(site, "/lab/api/surveillance")["timelapse"] is False
     page.click("#sv-tl")
     page.click("#mc-check")  # machine default option
-    page.wait_for_timeout(800)
-    assert api(site, "/lab/api/lancement")["printer_check"] is False
+    for _ in range(25):  # the server writes it behind, occasionally slower than 800 ms
+        if api(site, "/lab/api/lancement")["printer_check"] is False:
+            break
+        page.wait_for_timeout(200)
+    else:
+        raise AssertionError("printer_check n'est pas passé à False")
     if page.is_visible("#mt-list .mt-more > summary"):  # tasks that are not due are folded away
         page.click("#mt-list .mt-more > summary")
     page.click("#mt-list [data-mt='plateau']")
@@ -317,6 +335,16 @@ def test_add_a_piece_then_resize_it_on_the_plate(page, site):
     """« + Pièce » puts another library model beside this one; in « Déplacer » a touched piece gets its size slider."""
     trimesh.creation.cylinder(radius=6, height=30).export(site["lib"] / "pion.stl")
     page.reload()
+    page.evaluate(
+        """() => {
+        const el = document.getElementById('chat-sec');
+        const mo = new MutationObserver(() => {
+            if (el.hidden) return;
+            mo.disconnect();
+            el.hidden = true;
+            mo.observe(el, { attributes: true, attributeFilter: ['hidden'] }); });
+        mo.observe(el, { attributes: true, attributeFilter: ['hidden'] }); }"""
+    )  # the chat floats over the tools and reopens at each model pick
     page.click("#files .file[data-n='cube.stl']")
     page.wait_for_selector("#vtools [data-vt='add']:not([hidden])", timeout=30000)
     page.click("#vtools [data-vt='add']")
@@ -606,7 +634,7 @@ def test_make_preview_follows_the_sizes(page, site):
 def test_make_dialog_fits_a_phone(browser, site):
     """The phone bug of 2026-11-11: the made-to-measure dialog was twice the screen's width."""
     ctx = browser.new_context(
-        viewport={"width": 412, "height": 915}, is_mobile=True, has_touch=True
+        locale="fr-FR", viewport={"width": 412, "height": 915}, is_mobile=True, has_touch=True
     )
     pg = ctx.new_page()
     pg.goto(site["base"] + "/lab/")

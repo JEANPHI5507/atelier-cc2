@@ -80,19 +80,19 @@ jobs:
 
       - name:  Run Ruff (Linting)
         run: |
-          uv run ruff check src/ tests/
+          uv run ruff check src/ tests/ scripts/
 
       - name:  Run Mypy (Type Checking)
         run: |
-          uv run mypy src/elegoo_lab --ignore-missing-imports
+          uv run mypy src/elegoo_lab scripts --ignore-missing-imports
 
       - name:  Check Python Formatting (Black)
         run: |
-          uv run black --check src/ tests/
+          uv run black --check src/ tests/ scripts/
 
       - name:  Check Imports (isort)
         run: |
-          uv run isort --check-only src/ tests/
+          uv run isort --check-only src/ tests/ scripts/
 
   #  Job 2: Excution des tests unitaires (sans slicing)
   test-unit:
@@ -160,16 +160,24 @@ jobs:
 
       - name:  Install OrcaSlicer
         run: |
-          make slicer || echo "OrcaSlicer installation skipped"
+          make slicer
 
-      - name:  Install OpenGL Libraries
+      - name:  Install Slicer Runtime Libraries
         run: |
           sudo apt-get update
-          sudo apt-get install -y libopengl0 libglu1-mesa
+          sudo apt-get install -y libopengl0 libglu1-mesa libwebkit2gtk-4.1-0
 
       - name:  Run Slicing Tests
         run: |
-          uv run pytest tests/test_core.py -v --tb=short -m "slicing" || true
+          uv run pytest tests/test_core.py -v --tb=short -m "slicing" --cov=src/elegoo_lab --cov-report=xml
+
+      - name:  Upload Coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: ./coverage.xml
+          flags: slicingtests
+        continue-on-error: true
 
   #  Job 4: Vrification du JavaScript
   lint-js:
@@ -213,7 +221,7 @@ jobs:
 
       - name:  Build Package
         run: |
-          uv build || true
+          uv build
 
   #  Job 6: Build et Push Docker (si sur main)
   docker:

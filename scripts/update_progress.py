@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""4D6 Script pour mettre à jour automatiquement le fichier PROGRESS.md.
+"""4D6 Script pour mettre à jour automatiquement le fichier PROGRESS.md.
 
 Utilisation:
     python scripts/update_progress.py --token VOTRE_GITHUB_TOKEN
@@ -15,11 +15,9 @@ import argparse
 import re
 import sys
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Optional, cast
 
 import httpx
-
----
 
 # 4C4 Configuration
 REPO_OWNER = "JEANPHI5507"
@@ -27,7 +25,6 @@ REPO_NAME = "atelier-cc2"
 ROADMAP_FILE = "ROADMAP.md"
 PROGRESS_FILE = "PROGRESS.md"
 
----
 
 class GitHubAPI:
     """Client simple pour l'API GitHub."""
@@ -43,9 +40,9 @@ class GitHubAPI:
             "X-GitHub-Api-Version": "2022-11-28",
         }
 
-    async def get_issues(self, state: str = "all", labels: str = None) -> List[Dict]:
+    async def get_issues(self, state: str = "all", labels: str = None) -> list[dict]:
         """Récupère toutes les issues du dépôt."""
-        params = {"state": state, "per_page": 100}
+        params: dict[str, str] = {"state": state, "per_page": "100"}
         if labels:
             params["labels"] = labels
 
@@ -58,9 +55,9 @@ class GitHubAPI:
             if response.status_code != 200:
                 print(f"534 Erreur lors de la récupération des issues: {response.status_code}")
                 return []
-            return response.json()
+            return cast("list[dict]", response.json())
 
-    async def get_milestones(self) -> List[Dict]:
+    async def get_milestones(self) -> list[dict]:
         """Récupère tous les milestones du dépôt."""
         async with httpx.AsyncClient() as client:
             response = await client.get(
@@ -71,9 +68,9 @@ class GitHubAPI:
             if response.status_code != 200:
                 print(f"534 Erreur lors de la récupération des milestones: {response.status_code}")
                 return []
-            return response.json()
+            return cast("list[dict]", response.json())
 
-    async def get_pull_requests(self, state: str = "all") -> List[Dict]:
+    async def get_pull_requests(self, state: str = "all") -> list[dict]:
         """Récupère toutes les PR du dépôt."""
         async with httpx.AsyncClient() as client:
             response = await client.get(
@@ -84,15 +81,16 @@ class GitHubAPI:
             if response.status_code != 200:
                 print(f"534 Erreur lors de la récupération des PR: {response.status_code}")
                 return []
-            return response.json()
+            return cast("list[dict]", response.json())
 
----
 
-def parse_roadmap(roadmap_content: str) -> Dict:
+def parse_roadmap(roadmap_content: str) -> dict:
     """Parse le fichier ROADMAP.md pour extraire les tâches organisées par phase."""
     phases = {}
     current_phase = None
-    current_tasks = []
+    current_description = ""
+    current_due_on = ""
+    current_tasks: list[dict] = []
 
     lines = roadmap_content.split("\n")
     for line in lines:
@@ -130,13 +128,15 @@ def parse_roadmap(roadmap_content: str) -> Dict:
             complexity = task_match.group(4).count("⭐")
             status = task_match.group(5).strip()
 
-            current_tasks.append({
-                "id": task_id,
-                "title": title,
-                "description": description,
-                "complexity": complexity,
-                "status": status,
-            })
+            current_tasks.append(
+                {
+                    "id": task_id,
+                    "title": title,
+                    "description": description,
+                    "complexity": complexity,
+                    "status": status,
+                }
+            )
             continue
 
     # Ajouter la dernière phase
@@ -150,7 +150,6 @@ def parse_roadmap(roadmap_content: str) -> Dict:
 
     return phases
 
----
 
 def get_phase_number(phase_title: str) -> int:
     """Extrait le numéro de la phase."""
@@ -159,13 +158,12 @@ def get_phase_number(phase_title: str) -> int:
         return int(match.group(1))
     return 0
 
----
 
 def generate_progress_markdown(
-    phases: Dict,
-    issues: List[Dict] = None,
-    pull_requests: List[Dict] = None,
-    milestones: List[Dict] = None,
+    phases: dict,
+    issues: list[dict] = None,
+    pull_requests: list[dict] = None,
+    milestones: list[dict] = None,  # noqa: ARG001
 ) -> str:
     """Génère le contenu du fichier PROGRESS.md."""
     now = datetime.now().strftime("%d %B %Y")
@@ -213,7 +211,6 @@ def generate_progress_markdown(
 > *Dernière mise à jour : {now}*
 > *Ce fichier suit l'avancement des tâches de la [ROADMAP.md](ROADMAP.md).*
 
----
 
 ## 4CD **Sommaire**
 1. [Statistiques Globales](#statistiques-globales)
@@ -224,7 +221,6 @@ def generate_progress_markdown(
 6. [Contributeurs Actifs](#contributeurs-actifs)
 7. [Prochaines Étapes](#prochaines-tapes)
 
----
 
 ## 4C8 **Statistiques Globales**
 
@@ -252,13 +248,19 @@ def generate_progress_markdown(
     for phase_name, phase_data in phases.items():
         phase_number = get_phase_number(phase_name)
         priority_emoji = "🔴" if phase_number == 1 else "🟡" if phase_number <= 4 else "🟢"
-        priority_text = "Haute" if phase_number == 1 else "Moyenne" if phase_number <= 4 else "Faible"
+        priority_text = (
+            "Haute" if phase_number == 1 else "Moyenne" if phase_number <= 4 else "Faible"
+        )
 
         stats = phase_stats[phase_name]
         phase_completion = (stats["completed"] / stats["total"] * 100) if stats["total"] > 0 else 0
 
         status_emoji = "🟢" if phase_completion == 100 else "🟡" if phase_completion > 0 else "🔴"
-        status_text = "Terminée" if phase_completion == 100 else "En Cours" if phase_completion > 0 else "À venir"
+        status_text = (
+            "Terminée"
+            if phase_completion == 100
+            else "En Cours" if phase_completion > 0 else "À venir"
+        )
 
         markdown += f"### {priority_emoji} **{phase_name}** *({priority_text} Priorité)*\n"
         markdown += f"**Objectif** : {phase_data['description']}\n"
@@ -269,7 +271,19 @@ def generate_progress_markdown(
         markdown += "|----|-------|--------|--------------|----|------------|----------|\n"
 
         for task in phase_data["tasks"]:
-            status_emoji = "✅" if task["status"] == "✅ Terminée" or task["status"] == "Terminée" else "🟡" if task["status"] == "🟡 En Cours" or task["status"] == "En Cours" else "🔴" if task["status"] == "🔴 Bloquée" or task["status"] == "Bloquée" else "🟢"
+            status_emoji = (
+                "✅"
+                if task["status"] == "✅ Terminée" or task["status"] == "Terminée"
+                else (
+                    "🟡"
+                    if task["status"] == "🟡 En Cours" or task["status"] == "En Cours"
+                    else (
+                        "🔴"
+                        if task["status"] == "🔴 Bloquée" or task["status"] == "Bloquée"
+                        else "🟢"
+                    )
+                )
+            )
             status_text = task["status"].replace("✅ ", "").replace("🟡 ", "").replace("🔴 ", "")
             markdown += f"| {task['id']} | {task['title']} | {status_emoji} {status_text} | - | - | - | - |\n"
 
@@ -278,7 +292,6 @@ def generate_progress_markdown(
     # Ajouter les sections restantes
     markdown += """---
 
----
 
 ## 469 **Tâches en Cours**
 """
@@ -352,7 +365,6 @@ def generate_progress_markdown(
 3. **Créer des milestones GitHub** pour chaque phase.
 4. **Organiser des réunions de synchronisation** si nécessaire.
 
----
 
 ## 4CD **Comment Mettre à Jour ce Fichier**
 
@@ -367,7 +379,6 @@ Utilisez le script `scripts/update_progress.py` :
 python scripts/update_progress.py --token VOTRE_GITHUB_TOKEN
 ```
 
----
 
 ## 49A **Ressources Utiles**
 - [ROADMAP.md](ROADMAP.md) - Feuille de route détaillée
@@ -375,19 +386,16 @@ python scripts/update_progress.py --token VOTRE_GITHUB_TOKEN
 - [Guide de Développement](guide/developpement.md) - Documentation technique
 - [Dépôt GitHub](https://github.com/JEANPHI5507/atelier-cc2) - Code source
 
----
 
 ## 3F3 **Licence**
 Ce fichier est sous licence **MIT** (comme le reste du projet).
 
----
 
 *Ce fichier est généré et maintenu par la communauté Atelier CC2. 64F*
 """
 
     return markdown
 
----
 
 async def main():
     parser = argparse.ArgumentParser(description="Mettre à jour le fichier PROGRESS.md")
@@ -398,7 +406,7 @@ async def main():
 
     # Lire le fichier ROADMAP
     try:
-        with open(ROADMAP_FILE, "r", encoding="utf-8") as f:
+        with open(ROADMAP_FILE, encoding="utf-8") as f:
             roadmap_content = f.read()
     except FileNotFoundError:
         print(f"534 Erreur: Fichier {ROADMAP_FILE} introuvable")
@@ -421,7 +429,9 @@ async def main():
         issues = await github.get_issues()
         pull_requests = await github.get_pull_requests()
         milestones = await github.get_milestones()
-        print(f"4A1 Récupéré {len(issues)} issues, {len(pull_requests)} PR, {len(milestones)} milestones")
+        print(
+            f"4A1 Récupéré {len(issues)} issues, {len(pull_requests)} PR, {len(milestones)} milestones"
+        )
 
     # Générer le markdown
     markdown = generate_progress_markdown(phases, issues, pull_requests, milestones)
@@ -436,7 +446,6 @@ async def main():
             f.write(markdown)
         print(f"\n527 Fichier {args.output} mis à jour avec succès !")
 
----
 
 if __name__ == "__main__":
     import asyncio
