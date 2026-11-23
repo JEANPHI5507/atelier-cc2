@@ -63,7 +63,7 @@
 | R1.5 | Documentation des limites CC2 | ✅ **Terminé** | Vibe Code | [#4](https://github.com/JEANPHI5507/atelier-cc2/pull/4) | 2026-11-23 | 2026-11-23 |
 | R1.6 | Gestion des erreurs caméra | ✅ **Terminé** | Vibe Code | [#7](https://github.com/JEANPHI5507/atelier-cc2/pull/7) | 2026-11-23 | 2026-11-23 |
 
-**Prochaine Tâche Prioritaire** : Phase 2 restante (INF.2 Docker Hub — secrets DOCKER_HUB_* à configurer), puis Phase 3 (R2.7 thème sombre en cours, R2.8 accessibilité… ; R2.1–R2.6 ✅ #17/#19/#21/#23/#25/#27)
+**Prochaine Tâche Prioritaire** : Phase 2 restante (INF.2 Docker Hub — secrets DOCKER_HUB_* à configurer), puis Phase 3 (R2.9 maquette UI moderne en cours, R2.8 accessibilité clavier en attente ; R2.1–R2.7 ✅ #17/#19/#21/#23/#25/#27/#29)
 
 ---
 
@@ -80,6 +80,7 @@
 | R2.4 | Backup auto guidé depuis l'UI : statut/copie/timer horaire (API /lab/api/sauvegarde*, carte onglet Démarrage) | Vibe Code | 2026-11-23 | [#23](https://github.com/JEANPHI5507/atelier-cc2/pull/23) |
 | R2.5 | Assistant guidé : bouton « Workflow guidé » + checklist pas à pas dans le chat (fiche/pose/bobines/tranchage/lancement) | Vibe Code | 2026-11-23 | [#25](https://github.com/JEANPHI5507/atelier-cc2/pull/25) |
 | R2.6 | Tutoriels intégrés : bouton « Aide » + 3 tutos animés SVG/CSS (CANVAS, impression, suivi) + liens guides GitHub | Vibe Code | 2026-11-23 | [#27](https://github.com/JEANPHI5507/atelier-cc2/pull/27) |
+| R2.7 | Thème « Auto » suivant prefers-color-scheme : noir OLED en sombre, sable en clair, suivi en direct | Vibe Code | 2026-11-23 | [#29](https://github.com/JEANPHI5507/atelier-cc2/pull/29) |
 | R2.2 | Visualisation CANVAS 3D | ⏳ **À faire** | - | - | - | - |
 | R2.3 | Notifications Intelligentes | ⏳ **À faire** | - | - | - | - |
 | R2.4 | Backup Automatique | ⏳ **À faire** | - | - | - | - |
@@ -124,7 +125,7 @@
 | Contributeur | Tâches Assignées | PR Ouvertes | PR Mergées | Dernière Contribution |
 |--------------|------------------|-------------|------------|----------------------|
 | JEANPHI5507 | 4 | 1 | 4 | 2024-11-22 |
-| Vibe Code | 18 | 0 | 16 | 2026-11-23 |
+| Vibe Code | 19 | 0 | 17 | 2026-11-23 |
 
 ---
 

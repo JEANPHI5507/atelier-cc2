@@ -83,7 +83,7 @@
 | **R2.4** | 💾 **Backup automatique** | Carte « Sauvegarder la bibliothèque » (onglet Démarrage) : statut, copie immédiate, timer horaire systemd — API /lab/api/sauvegarde*. | ⭐⭐ | ✅ **Terminé** | [#22](https://github.com/JEANPHI5507/atelier-cc2/issues/22) | [#23](https://github.com/JEANPHI5507/atelier-cc2/pull/23) | 2026-11-23 |
 | **R2.5** | 🧭 **Assistant guidé** | Bouton « Workflow guidé » dans le chat : checklist pas à pas (fiche, pose, bobines, tranchage, lancement) — GET /models/{name}/workflow. | ⭐⭐⭐⭐ | ✅ **Terminé** | [#24](https://github.com/JEANPHI5507/atelier-cc2/issues/24) | [#25](https://github.com/JEANPHI5507/atelier-cc2/pull/25) | 2026-11-23 |
 | **R2.6** | 📚 **Tutoriels Intégrés** | Bouton « Aide » + 3 tutos animés SVG/CSS (sans vidéo) : CANVAS, impression, suivi ; liens guides GitHub, prefers-reduced-motion. | ⭐⭐ | ✅ **Terminé** | [#26](https://github.com/JEANPHI5507/atelier-cc2/issues/26) | [#27](https://github.com/JEANPHI5507/atelier-cc2/pull/27) | 2026-11-23 |
-| **R2.7** | 5C4 **Thème Sombre pour Tablette** | Meilleure lisibilité sur écrans OLED. | ⭐ | 53D4CA **À faire** | [#13](https://github.com/JEANPHI5507/atelier-cc2/issues/13) | - | - |
+| **R2.7** | 🖥️ **Thème Sombre pour Tablette** | 5e thème « Auto » suivant prefers-color-scheme : noir OLED (#000) en sombre, sable en clair, suivi en direct du changement système. | ⭐ | ✅ **Terminé** | [#28](https://github.com/JEANPHI5507/atelier-cc2/issues/28) | [#29](https://github.com/JEANPHI5507/atelier-cc2/pull/29) | 2026-11-23 |
 | **R2.8** | 421 **Accessibilité** | Raccourcis clavier, navigation au clavier, contraste WCAG. | ⭐⭐ | 53D4CA **À faire** | [#14](https://github.com/JEANPHI5507/atelier-cc2/issues/14) | - | - |
 
 **Livrables Phase 2 :**
