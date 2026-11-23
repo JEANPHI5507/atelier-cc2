@@ -820,3 +820,16 @@ def test_maquette_page_in_app(page, site):
         page.evaluate("document.documentElement.dataset.theme") != th0
     )  # bascule sombre/clair persistée
     assert page.errors == []
+
+
+def test_printer_dashboard_maquette_style(page, site):
+    page.click("#t-ui")
+    page.wait_for_selector("#pv-trays .tray", timeout=15000)  # données sim chargées
+    page.wait_for_selector("#pv-ring")
+    assert page.inner_text("#pv-ring-t").strip().endswith("%")  # anneau live « NN% »
+    assert len(page.query_selector_all("#pv-job .kpis .kpi")) == 4  # 4 KPI premium
+    href = page.eval_on_selector("#pv-job .card-h a[href]", "a => a.getAttribute('href')")
+    assert href == "maquette/"  # lien vers la maquette servie par l'app
+    off = page.eval_on_selector("#pv-ring", "c => parseFloat(c.style.strokeDashoffset || '100')")
+    assert 0 <= off <= 100
+    assert page.errors == []
