@@ -4388,3 +4388,136 @@ def test_web_forme_endpoint(web):
         headers={"Origin": "http://testserver"},
     )
     assert r.status_code == 200, r.text
+
+
+# --- INF.3 bloc 2 : endpoints web restants (sans manager), config assistant, cli ---
+
+
+def test_web_endpoints_round2(web):
+    client, _lib = web
+    H = {"Origin": "http://testserver"}
+    stl = trimesh.creation.box((20, 20, 10)).export(file_type="stl")
+    client.post("/lab/api/models", files={"file": ("cube.stl", stl)}, headers=H)
+    client.post(
+        "/lab/api/models",
+        files={"file": ("p.gcode", b"G28\n;LAYER_CHANGE\n;Z:0.2\nG1 X1\n")},
+        headers=H,
+    )
+    assert client.get("/lab/api/models/p.gcode/coupe").status_code == 200
+    assert client.get("/lab/api/models/cube.stl/cut-preview.glb").status_code == 200
+    assert client.post("/lab/api/langue", json={"lang": "en"}, headers=H).status_code == 200
+    assert client.post("/lab/api/entretien/plateau", headers=H).status_code == 200
+    assert client.post("/lab/api/lancement", json={"printer_check": False}, headers=H).status_code == 200
+    assert client.post("/lab/api/models/cube.stl/optimize", json={}, headers=H).status_code == 200
+    assert client.post("/lab/api/models/cube.stl/repair", json={}, headers=H).status_code == 200
+    assert (
+        client.post("/lab/api/models/cube.stl/retouch", json={"couleur": 1, "zones": []}, headers=H).status_code
+        == 200
+    )
+    r = client.post("/lab/api/setup/check", json={"host": "127.0.0.1", "access_code": "123456"}, headers=H)
+    assert r.status_code == 200, r.text  # answer from connexion.check, ok or not
+    r = client.post("/lab/api/setup/dowel", data={"play": "0.2"}, headers=H)
+    assert r.status_code == 200 and r.json()["dowel_play"] == 0.2
+    assert client.post("/lab/api/queue", json={"name": "p.gcode"}, headers=H).status_code in (200, 409)
+    assert client.get("/lab/api/bilan/x").status_code == 404
+
+
+def test_assistant_config_helpers(tmp_path, monkeypatch):
+    from elegoo_lab import assistant, config
+
+    monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "config.toml")
+    assert assistant.api_key() is None  # pas de clé dans un config vierge
+    assert assistant.model_name()
+    assert assistant.moteur()
+    (tmp_path / "config.toml").write_text('[assistant]\napi_key = "sk-test"\nmodel = "gros"\nmoteur = "cli"\ncommande = "vibe"\n')
+    assert assistant.api_key() == "sk-test"
+    assert assistant.model_name() == "gros"
+    assert assistant.moteur() == "cli"
+    assert assistant.cli_bin() and assistant.cli_bin().endswith("vibe")  # résolu via which
+
+
+def test_cli_help_and_slice_without_slicer(tmp_path, monkeypatch):
+    from typer.testing import CliRunner
+
+    from elegoo_lab import cli, config
+
+    lib = tmp_path / "models"
+    lib.mkdir()
+    monkeypatch.setattr(config, "MODELS_DIR", lib)
+    monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "config.toml")
+    trimesh.creation.box((10, 10, 10)).export(lib / "cube.stl")
+    for args in (["--help"], ["models", "--help"], ["slice", "--help"], ["simulateur", "--help"]):
+        r = CliRunner().invoke(cli.app, args)
+        assert r.exit_code == 0, (args, r.output)
+    r = CliRunner().invoke(cli.app, ["slice", "cube.stl"])
+    assert r.exit_code == 1 and "Slicer" in r.output  # pas d'OrcaSlicer en local
+
+
+def test_stock_and_maintenance_helpers(tmp_path, monkeypatch):
+    from elegoo_lab import maintenance, stock
+
+    monkeypatch.setattr(stock, "_file", lambda: tmp_path / "stock.json")
+    monkeypatch.setattr(maintenance, "_file", lambda: tmp_path / "maint.json")
+    assert stock.grams(10, "PLA") > stock.grams(10, "ABS")  # densité PLA > ABS
+    assert stock.sync([]) == []
+    assert isinstance(stock.load(), dict)
+    assert stock.check("inconnu.gcode") is None
+    st = maintenance.status()
+    assert isinstance(st, list) and st
+    assert isinstance(maintenance.done("plateau"), list)
+    assert isinstance(maintenance.newly_due(), list)
+
+
+def test_colors_pure_helpers(tmp_path):
+    import numpy as np
+
+    from elegoo_lab import colors
+
+    assert colors._hex(np.array([255, 0, 0])) == "#FF0000"
+    assert (colors._rgb("#FF0000") == [255, 0, 0]).all()
+    c = colors.encode_state(5)
+    assert colors.paint_states(c) == {5}
+    assert colors.paint_states(colors.remap_paint(c, {5: 2})) == {2}
+    p = tmp_path / "m.stl"
+    trimesh.creation.box((5, 5, 5)).export(p)
+    colors.save_retouch(p, {"#FF0000": [0, 1, 2]})
+    assert colors.load_retouch(p) == {"#FF0000": [0, 1, 2]}
+    colors.save_marks(p, {"support": [3]})
+    assert colors.load_marks(p) == {"support": [3]}
+
+
+def test_library_helpers(tmp_path, monkeypatch):
+    from elegoo_lab import config, library
+
+    lib = tmp_path / "models"
+    lib.mkdir()
+    monkeypatch.setattr(config, "MODELS_DIR", lib)
+    trimesh.creation.box((5, 5, 5)).export(lib / "a.stl")
+    library.record("a.gcode", source="a.stl", temps_s=10)
+    assert "a.gcode" in library.load_index()
+    assert library.kind("a.stl") == "modele" and library.kind("x.gcode") == "gcode"
+    assert any(m["name"] == "a.stl" for m in library.listing())
+    assert library.rename("a.stl", "b.stl") == "b.stl"
+    assert library.delete(["b.stl"]) == ["b.stl"]
+    assert isinstance(library.cleanup(), list)
+    assert isinstance(library.old_gcodes(), list)
+
+
+def test_threemf_plate_count_and_split(tmp_path):
+    from elegoo_lab import colorize, threemf
+
+    src = tmp_path / "c.stl"
+    trimesh.creation.box((10, 10, 10)).export(src)
+    out = tmp_path / "c.3mf"
+    colorize.build_3mf([(src, 1)], out)  # filament 1..4
+    assert threemf.plate_count(out) >= 1
+    plates = threemf.split_plates(out, tmp_path / "plates")
+    assert isinstance(plates, list)  # une seule plaque ici : rien à découper
+
+
+def test_optimize_plan_on_a_box(tmp_path):
+    from elegoo_lab import optimize
+
+    src = tmp_path / "b.stl"
+    trimesh.creation.box((30, 30, 10)).export(src)
+    assert optimize.plan(src)
