@@ -1114,6 +1114,23 @@ def web(tmp_path, monkeypatch, fake_printer_env):
     return TestClient(app_mod.create_app(enable_control=True)), lib
 
 
+def test_firmware_limits_and_status_endpoints(web):
+    """R1.5: the UI reads the CC2 limitations (blocked commands, versions) from these endpoints."""
+    client, _lib = web
+    lim = client.get("/lab/api/firmware/limits")
+    assert lim.status_code == 200
+    body = lim.json()
+    assert "homing" in body["blocked_commands"]
+    assert body["blocked_commands"]["homing"]
+    assert body["safe_commands"]
+    assert body["supported_versions"]
+    assert body["problematic_versions"]
+    st = client.get("/lab/api/firmware/status")
+    assert st.status_code == 200
+    assert "safe_mode" in st.json()
+    assert "is_supported" in st.json()
+
+
 def test_web_refuses_other_sites(web):
     client, lib = web
     stl = trimesh.creation.box((10, 10, 10)).export(file_type="stl")

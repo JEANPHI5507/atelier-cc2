@@ -70,3 +70,26 @@ Le dépôt du firmware ne contient pas la couche réseau : les commandes du prot
 
 Ne mets à jour que pour corriger un problème : depuis 02.00.02.00, le retour en arrière est bloqué, et une mise à jour
 peut changer le protocole réseau dont dépend l'atelier.
+
+### Versions supportées
+
+- **02.00.00.00 – 02.00.02.00** : partiellement supportées.
+- **02.00.02.01 – 02.01.01.13** : stables, complètement supportées.
+- **02.01.01.14 et plus** : support expérimental.
+- Connues pour poser problème : **02.00.00.00** (connexion MQTT), **02.00.01.00** (détection de filament).
+
+### Commandes réservées à l'écran tactile
+
+En réseau local (LAN Only), le SDK officiel d'Elegoo désactive certaines commandes : l'atelier les **bloque** et te le
+signale. Fais-les sur l'écran de la CC2 — la liste complète s'affiche dans l'onglet **Imprimante → Machine → « À régler
+sur l'écran de la CC2 »** :
+
+- **Mise à l'origine (G28)** et **déplacements manuels (G0, G1)** de la tête.
+- **Calibrations automatiques** (nivellement, vibrations).
+- **Chargement / déchargement de filament** hors CANVAS.
+- **Réglage du Z offset**.
+- **Réglage PID**.
+
+Si le firmware détecté n'est pas reconnu, l'atelier passe en **mode safe** : les commandes ci-dessus sont bloquées et
+un bandeau t'en informe en haut de la page. Les commandes sûres (statut, températures, impression, lumière, caméra,
+fichiers) restent disponibles.

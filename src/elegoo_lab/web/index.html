@@ -63,6 +63,7 @@
   <div id="firmware-warning" class="fw-warning" hidden>
     <svg class="i" style="color:var(--error)"><use href="#i-x"/></svg>
     <span id="fw-message"></span>
+    <button class="btn ghost sm" id="fw-details">Voir les limites</button>
     <button class="btn ghost sm" onclick="document.getElementById('firmware-warning').hidden=true" title="Masquer">×</button>
   </div>
   <section id="lab">
@@ -400,12 +401,9 @@
             <div class="switch" style="margin-top:8px"><label for="mc-check">Vérifications de l'imprimante avant de démarrer</label><input type="checkbox" id="mc-check" data-ctl></div>
             <div class="switch" style="margin-top:8px"><label for="mc-video">Timelapse de l'imprimante</label><input type="checkbox" id="mc-video" data-ctl></div>
             <details class="mc-screen" open><summary>⚠️ À régler sur l'écran de la CC2</summary>
-              <p class="note" style="margin:8px 0 6px; color:var(--error);">⚠️ <b>En réseau local, la CC2 n'accepte pas ces commandes</b> (le SDK officiel d'Elegoo les désactive) : <b>fais-les sur l'écran tactile</b>.</p>
-              <ul><li><b>Mise en origine, déplacer la tête</b> : avant un nettoyage de buse ou un changement de plateau.</li>
-                <li><b>Décalage Z (première couche)</b> : si le test « Première couche » est trop écrasé ou ne colle pas, par pas de 0,02 mm.</li>
-                <li><b>Calibrations automatiques</b> (nivellement, vibrations) : après le transport et tous les quelques mois.</li>
-                <li><b>Charger / décharger un filament</b> hors CANVAS.</li>
-                <li><b>Reprendre</b> une impression en pause : si le bouton de l'atelier ne répond pas, reprends depuis l'écran.</li>
+              <p class="note" style="margin:8px 0 6px; color:var(--error);">⚠️ <b>En réseau local, la CC2 n'accepte pas ces commandes</b> (le SDK officiel d'Elegoo les désactive) : <b>fais-les sur l'écran tactile</b>. <span id="fw-state"></span></p>
+              <ul id="fw-blocked"></ul>
+              <ul><li><b>Reprendre</b> une impression en pause : si le bouton de l'atelier ne répond pas, reprends depuis l'écran.</li>
                 <li><b>Mise à jour du firmware</b> : seulement pour corriger un problème précis. Depuis la 02.00.02.00, le retour à une version antérieure est bloqué ; la 02.01.00.00 (juillet 2026) ajoute la compensation de résonance de l'axe Z. Après une mise à jour, vérifie l'atelier (pycentauri est figé en 0.9.1).</li>
                 <li><b>Mode LAN seulement</b> : nécessaire pour l'atelier ; il coupe l'IA et la vidéo à distance d'Elegoo (l'atelier les remplace).</li></ul>
             </details>
