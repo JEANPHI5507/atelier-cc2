@@ -785,5 +785,5 @@ def test_help_dialog(page):
     assert page.query_selector("#help a[href*='/tree/main/guide']") is not None
     assert "CANVAS" in page.inner_text("#help")
     page.click("#help [data-close]")
-    page.wait_for_selector("#help:not([open])")
+    page.wait_for_function("!document.getElementById('help').open")
     assert page.errors == []
