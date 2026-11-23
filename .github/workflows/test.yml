@@ -127,19 +127,13 @@ jobs:
         run: |
           uv sync
 
-      - name: Install Chrome for Playwright
+      - name: Install Playwright chromium and its system libraries
         run: |
-          sudo apt-get update
-          sudo apt-get install -y chromium-browser
-          export PLAYWRIGHT_BROWSER=chromium
-
-      - name: Install Playwright
-        run: |
-          uv run playwright install chromium
+          uv run playwright install chromium --with-deps
 
       - name: Run UI Tests
         run: |
-          uv run pytest tests/test_ui.py -v --tb=short || echo "UI tests skipped (no display available)"
+          uv run pytest tests/test_ui.py -v --tb=short
 
   # Job 4: Tests d'integration avec le simulateur
   integration-tests:

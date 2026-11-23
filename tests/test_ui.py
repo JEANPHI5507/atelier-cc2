@@ -17,7 +17,21 @@ from pathlib import Path
 import pytest
 import trimesh
 
-CHROME = shutil.which("google-chrome") or shutil.which("chromium")
+
+def _find_chrome() -> str | None:
+    found = shutil.which("google-chrome") or shutil.which("chromium")
+    if found:
+        return found
+    try:  # fallback: the browser shipped by playwright itself
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as p:
+            return p.chromium.executable_path
+    except Exception:
+        return None
+
+
+CHROME = _find_chrome()
 pytestmark = pytest.mark.skipif(not CHROME, reason="Chrome absent")
 TESTS = Path(__file__).parent
 
