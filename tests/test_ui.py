@@ -331,11 +331,13 @@ def test_add_a_piece_then_resize_it_on_the_plate(page, site):
     """« + Pièce » puts another library model beside this one; in « Déplacer » a touched piece gets its size slider."""
     trimesh.creation.cylinder(radius=6, height=30).export(site["lib"] / "pion.stl")
     page.reload()
+    page.evaluate(
+        """() => {
+        const el = document.getElementById('chat-sec');
+        new MutationObserver(() => { el.hidden = true; }).observe(el, { attributes: true, attributeFilter: ['hidden'] }); }"""
+    )  # the chat floats over the tools and reopens at each model pick
     page.click("#files .file[data-n='cube.stl']")
     page.wait_for_selector("#vtools [data-vt='add']:not([hidden])", timeout=30000)
-    page.evaluate(
-        "document.getElementById('chat-sec').hidden = true"
-    )  # the chat floats over the tools
     page.click("#vtools [data-vt='add']")
     page.click("#addp-list [data-addp='pion.stl']")
     page.wait_for_selector("#files .file.sel[data-n='cube + pion.3mf']", timeout=30000)
