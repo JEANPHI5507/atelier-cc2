@@ -4539,3 +4539,95 @@ def test_optimize_plan_on_a_box(tmp_path):
     src = tmp_path / "b.stl"
     trimesh.creation.box((30, 30, 10)).export(src)
     assert optimize.plan(src)
+
+
+# --- INF.3 bloc 3 : endpoints avec lifespan (watcher actif), access, connexion ---
+
+
+def test_web_endpoints_with_lifespan(tmp_path, monkeypatch, fake_printer_env):
+    from fastapi.testclient import TestClient
+
+    from elegoo_lab import app as app_mod, config
+
+    lib = tmp_path / "models"
+    lib.mkdir()
+    monkeypatch.setattr(config, "MODELS_DIR", lib)
+    monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "config.toml")
+    monkeypatch.setattr(app_mod, "JOBS_FILE", lib / ".jobs.json")
+    app = app_mod.create_app(enable_control=True)
+    with TestClient(app) as client:
+        for p in (
+            "/lab/api/events",
+            "/lab/api/surveillance",
+            "/lab/api/plateau",
+            "/lab/api/bobines",
+            "/lab/api/models",
+        ):
+            assert client.get(p).status_code == 200, p
+        assert client.post("/lab/api/surveillance", json={"ia": True}).status_code == 200
+        # pas de connexion réelle au simulateur : 503 propre, pas de crash
+        for p in ("/status", "/lab/api/canvas/bobines", "/lab/api/couleurs"):
+            assert client.get(p).status_code == 503, p
+
+
+def test_access_code_helpers(tmp_path, monkeypatch):
+    from elegoo_lab import access, config
+
+    monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "config.toml")
+    code = access.ensure_code()
+    assert code and code.isdigit()
+    assert access.check_code(code)
+    assert not access.check_code("0" * len(code)) or code == "0" * len(code)
+    access.set_code("4321")
+    assert access.check_code("4321")
+    assert not access.check_code(code)
+    import pytest as _p
+
+    with _p.raises(ValueError):
+        access.set_code("ab")  # non numérique
+
+
+async def test_connexion_check_without_printer():
+    from elegoo_lab import connexion
+
+    out = await connexion.check("127.0.0.1", "x")  # rien n'écoute : étapes en échec, pas de crash
+    assert isinstance(out, dict) and out.get("steps")
+    assert isinstance(connexion.resolve_hint(), str)
+
+
+def test_cli_slice_with_mocked_prepare(tmp_path, monkeypatch):
+    from typer.testing import CliRunner
+
+    from elegoo_lab import cli, config, printprep
+
+    lib = tmp_path / "models"
+    lib.mkdir()
+    monkeypatch.setattr(config, "MODELS_DIR", lib)
+    monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "config.toml")
+    trimesh.creation.box((10, 10, 10)).export(lib / "cube.stl")
+
+    def fake_prepare(src, **kw):
+        (lib / "cube.gcode").write_text("G28\n")
+        return {
+            "gcode": ["cube.gcode"],
+            "layers": 10,
+            "time": "1 h 00",
+            "filament_m": 12.0,
+            "total_m": 12.0,
+            "purge_m": [],
+            "slots": [],
+            "warnings": [],
+            "colour_changes": 0,
+            "split": False,
+        }
+
+    monkeypatch.setattr(printprep, "prepare_and_slice", fake_prepare)
+    r = CliRunner().invoke(cli.app, ["slice", "cube.stl"])
+    assert r.exit_code == 0 and "couches" in r.output, r.output
+
+    def boom(src, **kw):
+        raise ValueError("modèle illisible")
+
+    monkeypatch.setattr(printprep, "prepare_and_slice", boom)
+    r = CliRunner().invoke(cli.app, ["slice", "cube.stl"])
+    assert r.exit_code == 1 and "illisible" in r.output
