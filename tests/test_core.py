@@ -1661,6 +1661,76 @@ async def test_camera_feed_gives_whole_pictures():
     f.task.cancel()
 
 
+async def test_camera_feed_detects_a_frozen_stream_and_restarts():
+    from elegoo_lab import camfeed
+
+    class Relay:  # the same picture over and over, like a firmware-frozen stream
+        async def subscribe(self):
+            async def chunks():
+                for _ in range(12):
+                    yield b"\xff\xd8same\xff\xd9"
+                    await asyncio.sleep(0.01)
+                await asyncio.sleep(60)
+
+            return "multipart/x-mixed-replace", chunks()
+
+    f = camfeed.CameraFeed(Relay())
+    seq = 0
+    for _ in range(11):  # the first picture only starts the count
+        got = await f.next(seq)
+        assert got is not None
+        seq = got[0]
+    assert f.same >= 10
+    assert f.frozen  # R1.6: a frozen stream is detected
+    await f.restart()
+    assert f.restarts == 1
+    assert f.same == 0
+    if f.task is not None:
+        f.task.cancel()
+
+
+def test_camera_frozen_is_reported_once_until_it_recovers(tmp_path, monkeypatch):
+    from elegoo_lab import alerts, config
+
+    monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "config.toml")
+    w = alerts.Watcher(lambda: None)
+    w.observe(0, 0, "", {})  # idle: no print running
+    w.camera_frozen()
+    assert w.events[-1]["kind"] == "camera"
+    w.camera_frozen()
+    assert sum(e["kind"] == "camera" for e in w.events) == 1  # said once
+    w.camera_ok()
+    w.camera_frozen()
+    assert sum(e["kind"] == "camera" for e in w.events) == 2  # a later freeze is reported again
+
+
+def test_camera_endpoint_restarts_the_stream_when_no_picture(
+    tmp_path, monkeypatch, fake_printer_env
+):
+    """R1.6: no new picture -> the stream is restarted once, the watcher warned, then 503."""
+    from fastapi.testclient import TestClient
+
+    from elegoo_lab import app as app_mod, camfeed, config
+
+    class DeadRelay:  # camera away: the subscription fails at once
+        async def subscribe(self):
+            raise RuntimeError("caméra éteinte")
+
+    monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "config.toml")
+    monkeypatch.setattr(camfeed, "WAIT_S", 0.05)  # do not wait the full 3 s twice
+    app = app_mod.create_app(enable_control=True)
+    with TestClient(app) as client:
+        feed = camfeed.CameraFeed(DeadRelay())
+        client.app.state.camfeed = feed  # replace the live one: this camera gives nothing
+        r = client.get("/lab/api/camera?after=0")
+        assert r.status_code == 503
+        assert feed.restarts == 1  # the stream was restarted once before answering
+        w = client.app.state.watcher
+        assert any(e["kind"] == "camera" for e in w.events)  # the watcher warned
+        if feed.task is not None:
+            feed.task.cancel()
+
+
 def test_section_for_the_tablet(tmp_path):
     from elegoo_lab import coupe
 
