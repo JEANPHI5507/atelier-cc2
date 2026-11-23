@@ -22,7 +22,7 @@ function openPrinter() {
   loadQueue();
   $('pv-ro').hidden = !!ctx.control;
   document.querySelectorAll('#pv [data-ctl]').forEach(el => el.disabled = !ctx.control);
-  openCamera(); pvStatus(); pvCanvas(); pvFiles(); svLoad(); mcLoad(); mtLoad(); termLoad();
+  openCamera(); pvStatus(); pvCanvas(); pvFiles(); svLoad(); mcLoad(); mtLoad(); termLoad(); fwLoad();
 }
 /* camera: one whole picture at a time, the next asked once the last is shown (a slow phone gets fewer
    pictures, never late or frozen ones); paused while the page is hidden */
@@ -306,6 +306,21 @@ for (const [id, key] of [['mc-level', 'bedlevel_force'], ['mc-check', 'printer_c
   $(id).onchange = () => api('/lancement', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [key]: $(id).checked }) })
     .then(() => toast('Option enregistrée pour les prochains lancements', 'ok')).catch(e => toast(e.message, 'bad'));
 
+/* firmware: the commands the CC2 refuses over LAN, straight from the backend, plus the warning banner */
+async function fwLoad() {
+  const [st, lim] = await Promise.all([api('/firmware/status').catch(() => null), api('/firmware/limits').catch(() => null)]);
+  if (lim?.blocked_commands) $('fw-blocked').innerHTML = Object.entries(lim.blocked_commands).map(([c, r]) => `<li><b>${esc(c)}</b> : ${esc(r)}</li>`).join('');
+  if (!st) return;
+  const bad = st.safe_mode || (st.detected_version != null && st.is_supported === false);
+  const w = $('firmware-warning');
+  if (bad) { $('fw-message').textContent = st.warning || 'Firmware non reconnu : mode safe actif, les commandes listées ci-dessous sont bloquées.'; w.hidden = false; }
+  else w.hidden = true;
+  $('fw-state').textContent = st.detected_version
+    ? `${st.detected_version} · ${st.is_supported === false ? 'non reconnu' : st.safe_mode ? 'mode safe actif' : 'supporté'} — la liste ci-dessous est ${st.safe_mode ? 'bloquée' : 'à faire sur l’écran'}`
+    : '';
+}
+$('fw-details').onclick = () => { $('t-ui').click(); document.querySelector('.mc-screen')?.scrollIntoView({ block: 'center' }); };
+
 /* maintenance */
 function mtRender(list) {
   const due = list.filter(t => t.a_faire).length;
@@ -376,7 +391,7 @@ $('tm-copy').onclick = async () => {
   try { await navigator.clipboard.writeText(txt); toast('Terminal copié', 'ok'); } catch { toast('Copie impossible ici', 'bad'); }
 };
 
-export { termLoad, termPush, closeCamera, lastSt, mcLoad, mtLoad, mtRender, openCamera, openPrinter, pollPrinter, pvCanvas, pvFiles, pvOpen, pvStatus, pvTimer, stockData, svLoad, svSave, svTimer, trayEdit, traySave };
+export { fwLoad, termLoad, termPush, closeCamera, lastSt, mcLoad, mtLoad, mtRender, openCamera, openPrinter, pollPrinter, pvCanvas, pvFiles, pvOpen, pvStatus, pvTimer, stockData, svLoad, svSave, svTimer, trayEdit, traySave };
 
 /* print queue: shown when something waits; the next print starts by hand once the bed is cleared */
 let queue = [], queueBusy = true;

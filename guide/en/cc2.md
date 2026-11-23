@@ -66,3 +66,25 @@ The firmware repository doesn't include the network layer: the protocol commands
 
 Only update to fix a problem: since 02.00.02.00, downgrading is blocked, and an update may change the network protocol
 the workshop depends on.
+
+### Supported versions
+
+- **02.00.00.00 – 02.00.02.00**: partially supported.
+- **02.00.02.01 – 02.01.01.13**: stable, fully supported.
+- **02.01.01.14 and above**: experimental support.
+- Known to cause problems: **02.00.00.00** (MQTT connection), **02.00.01.00** (filament detection).
+
+### Commands reserved for the touch screen
+
+Over the local network (LAN Only), Elegoo's official SDK disables certain commands: the workshop **blocks** them and
+tells you. Do them on the CC2's screen — the full list is shown in **Printer → Machine → "To set on the CC2's screen"**:
+
+- **Homing (G28)** and **manual moves (G0, G1)** of the print head.
+- **Automatic calibrations** (levelling, vibrations).
+- **Loading / unloading filament** outside the CANVAS.
+- **Z offset adjustment**.
+- **PID tuning**.
+
+If the detected firmware is not recognised, the workshop switches to **safe mode**: the commands above are blocked and
+a banner warns you at the top of the page. Safe commands (status, temperatures, printing, light, camera, files) stay
+available.

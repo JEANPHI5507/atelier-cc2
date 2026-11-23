@@ -211,6 +211,13 @@ def test_printer_tab_forms_reach_the_server(page, site):
     assert page.errors == []
 
 
+def test_firmware_limits_are_listed_on_the_printer_tab(page, site):
+    page.click("#t-ui")
+    page.wait_for_selector("#fw-blocked li", timeout=20000)
+    assert "homing" in page.inner_text("#fw-blocked")
+    assert page.errors == []
+
+
 def test_nozzle_position_is_shown(page):
     page.click("#t-ui")
     page.wait_for_selector("#pv-pos:not([hidden])", timeout=20000)
