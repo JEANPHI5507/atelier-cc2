@@ -91,10 +91,10 @@ jobs:
         run: |
           uv sync
 
-      - name: Install OpenGL dependencies
+      - name: Install slicer runtime dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libopengl0 libglu1-mesa
+          sudo apt-get install -y libopengl0 libglu1-mesa libwebkit2gtk-4.1-0
 
       - name: Install OrcaSlicer
         run: |
@@ -103,7 +103,7 @@ jobs:
       - name: Run Slicing Tests
         run: |
           # Execute uniquement les tests de decoupe
-          uv run pytest tests/test_core.py -v --tb=short -m "slicing" || echo "Slicing tests skipped (OrcaSlicer not available)"
+          uv run pytest tests/test_core.py -v --tb=short -m "slicing"
 
   # Job 3: Tests UI avec Playwright (si Chrome est disponible)
   ui-tests:

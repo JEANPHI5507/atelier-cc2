@@ -84,7 +84,7 @@ jobs:
 
       - name:  Run Mypy (Type Checking)
         run: |
-          uv run mypy src/elegoo_lab --ignore-missing-imports
+          uv run mypy src/elegoo_lab scripts --ignore-missing-imports
 
       - name:  Check Python Formatting (Black)
         run: |
@@ -160,16 +160,16 @@ jobs:
 
       - name:  Install OrcaSlicer
         run: |
-          make slicer || echo "OrcaSlicer installation skipped"
+          make slicer
 
-      - name:  Install OpenGL Libraries
+      - name:  Install Slicer Runtime Libraries
         run: |
           sudo apt-get update
-          sudo apt-get install -y libopengl0 libglu1-mesa
+          sudo apt-get install -y libopengl0 libglu1-mesa libwebkit2gtk-4.1-0
 
       - name:  Run Slicing Tests
         run: |
-          uv run pytest tests/test_core.py -v --tb=short -m "slicing" || true
+          uv run pytest tests/test_core.py -v --tb=short -m "slicing"
 
   #  Job 4: Vrification du JavaScript
   lint-js:
@@ -213,7 +213,7 @@ jobs:
 
       - name:  Build Package
         run: |
-          uv build || true
+          uv build
 
   #  Job 6: Build et Push Docker (si sur main)
   docker:

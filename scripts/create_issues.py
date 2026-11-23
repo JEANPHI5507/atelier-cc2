@@ -15,7 +15,7 @@ import argparse
 import json
 import re
 import sys
-from typing import Optional
+from typing import Optional, cast
 
 import httpx
 
@@ -74,7 +74,7 @@ class GitHubAPI:
                 print(f"534 Erreur lors de la récupération des milestones: {response.status_code}")
                 return None
 
-            milestones = response.json()
+            milestones = cast("list[dict]", response.json())
             for milestone in milestones:
                 if milestone["title"] == title:
                     return milestone
@@ -98,7 +98,7 @@ class GitHubAPI:
                 print(f"534 Erreur lors de la création du milestone: {response.status_code}")
                 print(response.text)
                 return {}
-            return response.json()
+            return cast("dict", response.json())
 
     async def get_label(self, name: str) -> dict | None:
         """Récupère un label par son nom."""
@@ -111,7 +111,7 @@ class GitHubAPI:
                 print(f"534 Erreur lors de la récupération des labels: {response.status_code}")
                 return None
 
-            labels = response.json()
+            labels = cast("list[dict]", response.json())
             for label in labels:
                 if label["name"] == name:
                     return label
@@ -134,7 +134,7 @@ class GitHubAPI:
                 print(f"534 Erreur lors de la création du label: {response.status_code}")
                 print(response.text)
                 return {}
-            return response.json()
+            return cast("dict", response.json())
 
     async def create_issue(
         self,
@@ -144,7 +144,7 @@ class GitHubAPI:
         milestone: int = None,
     ) -> dict:
         """Crée une nouvelle issue."""
-        data = {
+        data: dict[str, object] = {
             "title": title,
             "body": body,
             "labels": labels or [],
@@ -162,7 +162,7 @@ class GitHubAPI:
                 print(f"534 Erreur lors de la création de l'issue: {response.status_code}")
                 print(response.text)
                 return {}
-            return response.json()
+            return cast("dict", response.json())
 
     async def get_issue_by_title(self, title: str) -> dict | None:
         """Récupère une issue par son titre."""
@@ -176,7 +176,7 @@ class GitHubAPI:
                 print(f"534 Erreur lors de la récupération des issues: {response.status_code}")
                 return None
 
-            issues = response.json()
+            issues = cast("list[dict]", response.json())
             for issue in issues:
                 if issue["title"] == title:
                     return issue

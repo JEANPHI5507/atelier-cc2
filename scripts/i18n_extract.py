@@ -106,7 +106,7 @@ for f in sorted((ROOT / "src/elegoo_lab").glob("*.py")):
     }
     for n in ast.walk(tree):
         if isinstance(n, ast.JoinedStr):
-            s = "".join(v.value if isinstance(v, ast.Constant) else "{}" for v in n.values)
+            s = "".join(str(v.value) if isinstance(v, ast.Constant) else "{}" for v in n.values)
         elif isinstance(n, ast.Constant) and isinstance(n.value, str) and id(n) not in docs:
             s = n.value
         else:

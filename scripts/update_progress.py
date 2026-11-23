@@ -15,7 +15,7 @@ import argparse
 import re
 import sys
 from datetime import datetime
-from typing import Optional
+from typing import Optional, cast
 
 import httpx
 
@@ -42,7 +42,7 @@ class GitHubAPI:
 
     async def get_issues(self, state: str = "all", labels: str = None) -> list[dict]:
         """Récupère toutes les issues du dépôt."""
-        params = {"state": state, "per_page": 100}
+        params: dict[str, str] = {"state": state, "per_page": "100"}
         if labels:
             params["labels"] = labels
 
@@ -55,7 +55,7 @@ class GitHubAPI:
             if response.status_code != 200:
                 print(f"534 Erreur lors de la récupération des issues: {response.status_code}")
                 return []
-            return response.json()
+            return cast("list[dict]", response.json())
 
     async def get_milestones(self) -> list[dict]:
         """Récupère tous les milestones du dépôt."""
@@ -68,7 +68,7 @@ class GitHubAPI:
             if response.status_code != 200:
                 print(f"534 Erreur lors de la récupération des milestones: {response.status_code}")
                 return []
-            return response.json()
+            return cast("list[dict]", response.json())
 
     async def get_pull_requests(self, state: str = "all") -> list[dict]:
         """Récupère toutes les PR du dépôt."""
@@ -81,7 +81,7 @@ class GitHubAPI:
             if response.status_code != 200:
                 print(f"534 Erreur lors de la récupération des PR: {response.status_code}")
                 return []
-            return response.json()
+            return cast("list[dict]", response.json())
 
 
 def parse_roadmap(roadmap_content: str) -> dict:
@@ -90,7 +90,7 @@ def parse_roadmap(roadmap_content: str) -> dict:
     current_phase = None
     current_description = ""
     current_due_on = ""
-    current_tasks = []
+    current_tasks: list[dict] = []
 
     lines = roadmap_content.split("\n")
     for line in lines:

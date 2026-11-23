@@ -35,7 +35,7 @@ dash:
 
 lint:
 	uv run ruff check .
-	uv run mypy src/elegoo_lab scripts --ignore-missing-imports || echo "mypy: reperage seulement (a corriger)"
+	uv run mypy src/elegoo_lab scripts --ignore-missing-imports
 	uv run black --check src/ tests/ scripts/
 	uv run isort --check-only src/ tests/ scripts/
 
