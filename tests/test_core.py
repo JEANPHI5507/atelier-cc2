@@ -6051,3 +6051,36 @@ def test_backup_ui_assets():
         "Sauvegarder la bibliothèque",
     ):
         assert k in en["exact"] and en["exact"][k], k
+
+
+# --- R2.5 : assistant guidé (endpoint workflow + checklist pas à pas dans le chat) ---
+
+
+def test_workflow_endpoint(web):
+    client, lib = web
+    hdrs = {"Origin": "http://testserver"}
+    stl = trimesh.creation.box((20, 20, 20)).export(file_type="stl")
+    r = client.post("/lab/api/models", files={"file": ("cube.stl", stl)}, headers=hdrs)
+    assert r.status_code == 200, r.text
+    r = client.get("/lab/api/models/cube.stl/workflow")
+    assert r.status_code == 200 and r.json() == {"model": "cube.stl", "gcode": None}, r.text
+    (lib / "cube_0.20mm_PLA.gcode").write_text("G28\n")
+    r = client.get("/lab/api/models/cube.stl/workflow")
+    assert r.json()["gcode"] == "cube_0.20mm_PLA.gcode"  # étape « trancher » déjà faite
+    assert client.get("/lab/api/models/zzz.stl/workflow").status_code == 404
+    assert client.get("/lab/api/models/cube_0.20mm_PLA.gcode/workflow").status_code == 400
+
+
+def test_workflow_ui_assets():
+    import json as _json
+
+    web = Path(config.ROOT) / "src" / "elegoo_lab" / "web"
+    html = (web / "index.html").read_text(encoding="utf-8")
+    assert "data-wf" in html and "Workflow guidé" in html
+    js = (web / "js" / "lab.js").read_text(encoding="utf-8")
+    assert "workflowShow" in js and "/workflow" in js and "wf-step" in js
+    css = (web / "css" / "app.css").read_text(encoding="utf-8")
+    assert ".wf .wf-step" in css
+    en = _json.loads((web / "i18n" / "en.json").read_text(encoding="utf-8"))
+    for k in ("Workflow guidé :", "Voir la fiche de la pièce", "Trancher pour la CC2"):
+        assert k in en["exact"] and en["exact"][k], k

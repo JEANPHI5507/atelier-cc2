@@ -860,3 +860,8 @@ body.mode-debutant .advanced { display: none !important; }
 /* R2.3 : filtres par niveau dans la dialog alertes */
 .ev-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 4px; }
 .ev-filters .btn.on { border-color: var(--acc); color: var(--acc); background: var(--acc-soft); }
+
+/* R2.5 : checklist du workflow guidé dans le chat */
+.wf { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.wf .wf-step { text-align: left; width: 100%; }
+.wf .wf-step.done { border-color: var(--ok); color: var(--ok); opacity: .85; }

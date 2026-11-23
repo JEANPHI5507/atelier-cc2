@@ -1493,7 +1493,45 @@ $('chat-go').onclick = chatSend;
 $('chat-in').onkeydown = e => { if (e.key === 'Enter') chatSend(); };
 /* folded by default on a phone, so the piece stays visible */
 $('chat-fold').onclick = () => { const f = $('chat-sec').classList.toggle('folded'); $('chat-fold').textContent = f ? '▴' : '▾'; };
-$('chat-sug').onclick = e => { const b = e.target.closest('[data-q]'); if (b && !chatBusy) { $('chat-in').value = b.dataset.q; chatSend(); } };
+$('chat-sug').onclick = e => {
+  const w = e.target.closest('[data-wf]');
+  if (w && !chatBusy) { workflowShow(); return; }
+  const b = e.target.closest('[data-q]'); if (b && !chatBusy) { $('chat-in').value = b.dataset.q; chatSend(); }
+};
+
+/* R2.5: guided workflow — a step-by-step checklist in the chat; each step calls its own endpoint */
+async function workflowShow() {
+  if (!sel || chatBusy) return;
+  const name = encodeURIComponent(sel.name);
+  const w = await api(`/models/${name}/workflow`).catch(() => null);
+  if (!w) { toast("Choisis un modèle d'abord", 'bad'); return; }
+  const steps = [
+    { id: 'fiche', label: 'Voir la fiche de la pièce',
+      run: async () => { const i = await api(`/models/${name}/info`); return Array.isArray(i.size_mm) ? i.size_mm.join(' × ') + ' mm' : ''; } },
+    { id: 'pose', label: 'Choisir la meilleure pose',
+      run: async () => { const o = await api(`/models/${name}/orientations`); const b = (o || []).find(x => x.recommandee) || (o || [])[0]; return b ? b.label : ''; } },
+    { id: 'bobines', label: 'Associer les bobines CANVAS',
+      run: async () => { const m = await api(`/models/${name}/match-spools`); return Object.keys(m.mapping || {}).length + ' couleur(s)'; } },
+    { id: 'tranche', label: 'Trancher pour la CC2',
+      run: async () => { const r = await api(`/models/${name}/prepare-print`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }); return r.gcode && r.gcode[0] ? nice(r.gcode[0]) : 'tranché'; } },
+    { id: 'lance', label: "Lancer l'impression sur la CC2",
+      run: async () => { if (!w.gcode) throw new Error("tranche d'abord"); await api('/print/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filename: w.gcode }) }); return "envoyé à l'imprimante"; } },
+  ];
+  const box = chatAdd('assistant', `<b>Workflow guidé : ${esc(nice(sel.name))}</b><div class="wf"></div>`);
+  const wf = box.querySelector('.wf');
+  for (const s of steps) {
+    const b = document.createElement('button');
+    b.className = 'btn wf-step'; b.textContent = s.label;
+    if (s.id === 'tranche' && w.gcode) { b.classList.add('done'); b.textContent = '✔ ' + s.label + ` — ${esc(w.gcode)}`; }
+    b.onclick = async () => {
+      if (b.classList.contains('done')) return;
+      b.disabled = true; b.textContent = s.label + '…';
+      try { const out = await s.run(); b.classList.add('done'); b.textContent = '✔ ' + s.label + (out ? ` — ${esc(out)}` : ''); }
+      catch (e) { b.disabled = false; b.textContent = s.label; toast(e.message, 'bad'); }
+    };
+    wf.appendChild(b);
+  }
+}
 if (matchMedia('(max-width: 600px)').matches) { $('chat-sec').classList.add('folded'); $('chat-fold').textContent = '▴'; }
 
 /* plate, orientation, copies, advanced settings */
