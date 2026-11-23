@@ -6138,3 +6138,41 @@ def test_theme_auto_assets():
     assert "cc2-theme" in js
     en = _json.loads((web / "i18n" / "en.json").read_text(encoding="utf-8"))
     assert en["exact"].get("Auto (système)") == "Auto (system)"
+
+
+# --- R2.9 : maquette UI moderne autonome (maquette/, hors chemins lintés par la CI) ---
+
+
+def test_maquette_ui_moderne_assets():
+    root = Path(config.ROOT) / "maquette"
+    html = (root / "index.html").read_text(encoding="utf-8")
+    css = (root / "style.css").read_text(encoding="utf-8")
+    js = (root / "app.js").read_text(encoding="utf-8")
+    for bad in ('src="http', "src='http", 'href="http', "@import", "url(http", "fonts.googleapis"):
+        assert (
+            bad not in html and bad not in css and bad not in js
+        ), bad  # 100 % autonome, aucune ressource externe
+    assert 'href="style.css"' in html and 'src="app.js"' in html
+    assert 'name="viewport"' in html and 'lang="fr"' in html
+    for frag in (
+        'class="side"',
+        'class="top"',
+        'data-tab="dash"',
+        'class="kpis"',
+        'class="card view3d"',
+        'class="card cam"',
+        'class="card queue"',
+        'class="card feed"',
+        'class="spool"',
+        'id="ring-fg"',
+    ):
+        assert frag in html, frag
+    assert 'data-theme="sombre"' in html  # thème sombre par défaut
+    assert ':root[data-theme="sombre"]' in css and ':root[data-theme="clair"]' in css
+    assert "--bg: #000000" in css  # noir OLED pur
+    assert "@media (prefers-reduced-motion: no-preference)" in css
+    assert "@keyframes mq-spin" in css and "@keyframes mq-scan" in css
+    assert (
+        "@media (max-width: 900px)" in css and "@media (max-width: 600px)" in css
+    )  # responsive tablette / téléphone
+    assert "dataset.tab" in js and "maquette-theme" in js and "toast" in js and "localStorage" in js
