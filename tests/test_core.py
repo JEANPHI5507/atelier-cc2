@@ -5368,3 +5368,455 @@ def test_web_app_against_live_simulator(tmp_path, monkeypatch):
         loop.call_soon_threadsafe(loop.stop)
         th.join(timeout=5)
         loop.close()
+
+
+# --- INF.3 bloc 5 : vision.detect (réseau factice), colors (sidecars/preview/plate),
+#     alerts (Watcher.observe + ntfy), threemf.split_plates, comfy (client HTTP factice),
+#     firmware_integration, assistant (trancher/percer_ou_ajouter), cli (garde --upload),
+#     app web contre Sim vivant (print/start, bobines, models) ---
+
+
+def test_vision_detect_with_fake_net(monkeypatch):
+    import io
+
+    import numpy as np
+    from PIL import Image
+
+    from elegoo_lab import vision
+
+    class FakeInput:
+        name = "input"
+        shape = [1, 3, 8, 8]
+
+    class FakeNet:
+        def get_inputs(self):
+            return [FakeInput()]
+
+        def run(self, _o, feed):
+            assert feed["input"].shape == (1, 3, 8, 8)
+            boxes = np.zeros((1, 3, 1, 4), np.float32)
+            boxes[0, 0, 0] = [0.1, 0.1, 0.5, 0.5]
+            boxes[0, 1, 0] = [0.6, 0.6, 0.9, 0.9]  # loin de la 1re : les deux passent le NMS
+            boxes[0, 2, 0] = [0.12, 0.12, 0.52, 0.52]  # chevauche la 1re et faible confiance
+            confs = np.array([[[0.9], [0.8], [0.05]]], np.float32)
+            return boxes, confs
+
+    monkeypatch.setattr(vision, "_session", lambda: FakeNet())
+    img = Image.new("RGB", (16, 16), (30, 30, 30))
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG")
+    dets = vision.detect(buf.getvalue())
+    assert len(dets) == 2  # la 3e est sous BOX_THRESH
+    assert all(0.0 <= c <= 1.0 for c, _ in dets)
+    assert dets[0][0] == pytest.approx(0.9)  # triées par confiance décroissante
+
+
+def test_colors_sidecar_and_helpers(tmp_path):
+    import numpy as np
+
+    from elegoo_lab import colors, threemf
+
+    box = trimesh.creation.box((20, 20, 10))
+    p = threemf.Part(
+        "p",
+        np.asarray(box.vertices, float),
+        np.asarray(box.faces),
+        1,
+        [colors.encode_state(1)] * len(box.faces),
+    )
+    src = tmp_path / "m.3mf"
+    threemf.write(
+        threemf.Project([threemf.Object("m", [p])], ["#FF0000", "#00FF00"]),
+        src,
+        filaments=2,
+        colours=["#FF0000", "#00FF00"],
+    )
+    # sidecars : retouches puis marques
+    assert colors.save_retouch(src, {"#00FF00": [0, 1]}) == 2
+    assert colors.load_retouch(src) == {"#00FF00": [0, 1]}
+    assert colors.save_retouch(src, {}, clear=True) == 0 and colors.load_retouch(src) == {}
+    assert colors.save_marks(src, {"support": [0]}) == {"support": 1}
+    assert colors.load_marks(src)["support"] == [0]
+    with pytest.raises(ValueError, match="marque inconnue"):
+        colors.save_marks(src, {"inconnue": [0]})
+    with pytest.raises(ValueError, match="hors du modèle"):
+        colors.save_marks(src, {"support": [99999]})
+    assert colors.save_marks(src, {}, clear=True) == {} and colors.load_marks(src) == {}
+    # codage des états de peinture
+    code = colors.encode_state(2)
+    assert 2 in colors.paint_states(code)
+    assert colors.remap_paint(code, {2: 1}) == colors.encode_state(1)
+    assert colors._hex((255, 0, 0)) == "#FF0000" and tuple(colors._rgb("#FF0000")) == (255, 0, 0)
+    # analyse + prévisualisation + découpe en plaques
+    a = colors.analyze(src)
+    assert a["detected"] >= 1
+    assert colors.piece_ranges(src)[0]["count"] == len(box.faces)
+    assert colors.preview_glb_bytes(src)[:4] == b"glTF"
+    spot = colors.tower_spot(np.array([100.0, 100.0, 0.0]), np.array([140.0, 140.0, 10.0]))
+    assert spot is not None and spot[0] < 100.0  # tour d'essuyage à gauche de la pièce
+    centres = np.array([[255, 0, 0], [255, 1, 1], [0, 0, 255]], float)
+    c2, _l2 = colors._merge_close(centres, np.array([0, 1, 2]), np.array([10.0, 10.0, 1.0]))
+    assert len(c2) <= 2  # les deux rouges fusionnent (ou la paillette saute)
+    # write_plate : deux petites pièces sur un plateau
+    items = [
+        ("a", np.asarray(box.vertices, float), np.asarray(box.faces), None),
+        ("b", np.asarray(box.vertices, float), np.asarray(box.faces), None),
+    ]
+    out = tmp_path / "plate.3mf"
+    colors.write_plate(items, ["#FF0000"], out)
+    assert out.exists() and threemf.plate_count(out) == 1
+
+
+def test_alerts_watcher_observe_flow(tmp_path, monkeypatch):
+    from elegoo_lab import alerts
+
+    monkeypatch.setattr(alerts, "events_file", lambda: tmp_path / "events.json")
+    monkeypatch.setattr(alerts, "photos_dir", lambda: tmp_path / "photos")
+    (tmp_path / "photos").mkdir()
+    w = alerts.Watcher(status=lambda: None)
+    w.observe(0, 0, "", {})  # première lecture : on apprend, on n'alerte pas
+    w.observe(1, 5, "cube.gcode", {})  # début d'impression
+    assert "debut" in [e["kind"] for e in w.events]
+    w.observe(1, 50, "cube.gcode", {"exception_status": [1201]})  # code anomalie
+    w.observe(5, 50, "cube.gcode", {"filament_detect_enable": 1, "filament_detected": 0})  # pause
+    w.observe(1, 50, "cube.gcode", {})  # reprise
+    w.observe(9, 100, "cube.gcode", {})  # fin
+    kinds = [e["kind"] for e in w.events]
+    for k in ("anomalie", "filament", "reprise", "fin"):
+        assert k in kinds, kinds
+    w.say("bonjour le terminal")
+    assert "bonjour" in str(w.term[-1])
+    w.narrate({"PrintInfo": {"Filename": "cube.gcode", "CurrentLayer": 3, "TotalLayer": 100}}, 1)
+    assert w.term
+    # caméra : figée -> alerte unique, puis OK -> réarmement
+    w.camera_frozen()
+    w.camera_frozen()
+    assert [e["kind"] for e in w.events].count("camera") == 1
+    w.camera_ok()
+    w.camera_frozen()
+    assert [e["kind"] for e in w.events].count("camera") == 2
+
+
+async def test_alerts_send_ntfy_mocked(monkeypatch):
+    from types import SimpleNamespace
+
+    from elegoo_lab import alerts
+
+    assert await alerts.send_ntfy({"title": "t", "detail": "d", "level": "info"}) is False
+    monkeypatch.setattr(alerts, "ntfy_url", lambda: "https://ntfy.sh/atelier")
+    calls = []
+
+    class FakeClient:
+        def __init__(self, **kw):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def post(self, url, **kw):
+            calls.append((url, kw))
+            return SimpleNamespace(is_success=True)
+
+    monkeypatch.setattr(httpx, "AsyncClient", FakeClient)
+    ok = await alerts.send_ntfy({"title": "Fin", "detail": "terminée", "level": "ok"})
+    assert ok is True and calls[0][0] == "https://ntfy.sh/atelier"
+
+
+def test_threemf_split_plates(tmp_path):
+    import zipfile
+
+    from elegoo_lab import threemf
+
+    def make_3mf(path, n_plates):
+        cfg_objs = "\n".join(f'  <object id="{i}">\n  </object>' for i in range(1, n_plates + 1))
+        plates = "\n".join(
+            f'  <plate>\n    <metadata key="object_id" value="{i}"/>\n  </plate>'
+            for i in range(1, n_plates + 1)
+        )
+        cfg = f'<?xml version="1.0" encoding="UTF-8"?>\n<config>\n{cfg_objs}\n{plates}\n</config>'
+        objs = "\n".join(
+            f'<object id="{i}"><mesh><vertices><vertex x="0" y="0" z="0"/></vertices>'
+            f'<triangles><triangle v1="0" v2="0" v3="0"/></triangles></mesh></object>'
+            for i in range(1, n_plates + 1)
+        )
+        items = "\n".join(
+            f'  <item objectid="{i}" transform="1 0 0 0 1 0 0 0 1 {100 * i} 200 0"/>'
+            for i in range(1, n_plates + 1)
+        )
+        model = (
+            '<?xml version="1.0" encoding="UTF-8"?>\n<model unit="millimeter">\n'
+            f"<resources>\n{objs}\n </resources>\n <build>\n{items}\n </build>\n</model>\n"
+        )
+        with zipfile.ZipFile(path, "w") as z:
+            z.writestr("Metadata/model_settings.config", cfg)
+            z.writestr("Metadata/project_settings.config", '{"printable_area": ["0x0", "256x256"]}')
+            z.writestr("3D/3dmodel.model", model)
+
+    two = tmp_path / "deux.3mf"
+    make_3mf(two, 2)
+    assert threemf.plate_count(two) == 2
+    (tmp_path / "out").mkdir()
+    out = threemf.split_plates(two, tmp_path / "out")
+    assert len(out) == 2
+    for f in out:
+        with zipfile.ZipFile(f) as z:
+            assert "3D/3dmodel.model" in z.namelist()
+    one = tmp_path / "un.3mf"
+    make_3mf(one, 1)
+    assert threemf.split_plates(one) == []  # un seul plateau : rien à découper
+
+
+def test_comfy_client_mocked(tmp_path, monkeypatch):
+    from elegoo_lab import comfy as comfy_mod
+
+    class FakeResp:
+        status_code = 200
+
+        def __init__(self, payload, content=b"GLB"):
+            self._p = payload
+            self.content = content
+
+        def json(self):
+            return self._p
+
+        @property
+        def text(self):
+            return json.dumps(self._p)
+
+        def raise_for_status(self):
+            return None
+
+    class FakeClient:
+        def __init__(self, base_url=None, timeout=None):
+            pass
+
+        def get(self, url, **_kw):
+            if "system_stats" in url:
+                return FakeResp({"devices": [{"name": "GPU"}]})
+            if "history" in url:
+                return FakeResp({"p1": {"outputs": {"9": {"gables": [{"filename": "m.glb"}]}}}})
+            return FakeResp({})
+
+        def post(self, url, **_kw):
+            if url.endswith("/prompt"):
+                return FakeResp({"prompt_id": "p1"})
+            if "/upload" in url:
+                return FakeResp({"name": "img.png", "subfolder": "", "type": "input"})
+            return FakeResp({})
+
+        def delete(self, _url, **_kw):
+            return FakeResp({})
+
+    monkeypatch.setattr(comfy_mod.httpx, "Client", FakeClient)
+    c = comfy_mod.Comfy("http://comfy:8188")
+    assert c.stats()["devices"][0]["name"] == "GPU"
+    assert c.known("p1") and not c.known("inconnu")
+    c.free()
+    img = tmp_path / "i.png"
+    img.write_bytes(b"x")
+    assert c.upload_image(img) == "img.png"
+    assert c.queue({"wf": 1}) == "p1"
+    out = c.wait("p1", poll=0.01, timeout=5)  # wait renvoie déjà le bloc "outputs"
+    files = c.download_outputs(out, tmp_path, "t")
+    assert files and files[0].exists() and files[0].suffix == ".glb"
+    # workflows : chargement + generate de bout en bout
+    wf_dir = tmp_path / "workflows"
+    wf_dir.mkdir()
+    (wf_dir / "w.json").write_text('{"3": {"class_type": "CLIP", "inputs": {"text": ""}}}')
+    (wf_dir / "w.map.json").write_text('{"prompt": ["3", "text"]}')
+    monkeypatch.setattr(comfy_mod, "WORKFLOWS", wf_dir)
+    wf, mp = comfy_mod.load_workflow("w")
+    assert wf["3"]["class_type"] == "CLIP" and mp["prompt"] == ["3", "text"]
+    with pytest.raises(comfy_mod.ComfyError, match="introuvable"):
+        comfy_mod.load_workflow("inconnu")
+    dest = tmp_path / "gen"
+    dest.mkdir()
+    files = comfy_mod.generate(c, "w", dest, prompt="un cube", seed=42)
+    assert files and files[0].exists()
+
+
+def test_firmware_integration_helpers():
+    from types import SimpleNamespace
+
+    from elegoo_lab import firmware_integration as fi
+
+    mgr = fi.firmware_manager
+    try:
+        info = fi.check_firmware_on_connection(SimpleNamespace(firmware_version="02.01.00.00"))
+        assert info["safe_mode"] is False
+        ok, msg = fi.can_execute_printer_command("M104")
+        assert ok is True and msg == ""
+        info = fi.check_firmware_on_connection(SimpleNamespace(firmware_version="00.00.00.00"))
+        assert info["safe_mode"] is True
+        from elegoo_lab import firmware
+
+        blocked_cmd = next(iter(firmware.BLOCKED_COMMANDS_IN_SAFE_MODE))
+        ok, msg = fi.can_execute_printer_command(blocked_cmd)
+        assert ok is False and msg
+        lst = fi.get_blocked_commands_list()
+        assert lst and all(set(d) >= {"command", "reason", "action"} for d in lst)
+        status = fi.get_firmware_status_for_ui()
+        assert "mode s" in status["user_message"]
+        info = fi.check_firmware_on_connection(SimpleNamespace(firmware_version=None))
+        assert "safe_mode" in info
+    finally:
+        mgr.set_detected_version("02.01.00.00")  # état global : on remet un firmware supporté
+
+
+def test_assistant_trancher_and_forme_tools(tmp_path, monkeypatch):
+    from elegoo_lab import assistant, config, printprep
+
+    lib = tmp_path / "models"
+    lib.mkdir()
+    monkeypatch.setattr(config, "MODELS_DIR", lib)
+    monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "config.toml")
+    trimesh.creation.box((20, 20, 20)).export(lib / "cube.stl")
+    usage = next(iter(printprep.USAGES))
+
+    def fake_prep(src, **kw):
+        return {
+            "gcode": ["cube.gcode"],
+            "time": "1 h",
+            "total_m": 12.5,
+            "warnings": ["w1"],
+            "slots": [{"slot": 1, "filament": "PLA", "metres": 12.5}],
+            "temps": {"nozzle": [220], "bed": 60},
+        }
+
+    monkeypatch.setattr(printprep, "prepare_and_slice", fake_prep)
+    r = assistant.run_tool(
+        "trancher", {"usage": usage, "supports": "arbre", "remplissage": 30}, "cube.stl"
+    )
+    assert "erreur" not in r and r["usage"] == usage
+    assert r["slots"][0]["bobine"] == 1 and "buse 220" in r["temperatures"]
+
+    def boom(src, **kw):
+        raise ValueError("nope")
+
+    monkeypatch.setattr(printprep, "prepare_and_slice", boom)
+    r2 = assistant.run_tool("trancher", {}, "cube.stl")
+    assert "nope" in r2["erreur"]
+    r3 = assistant.run_tool(
+        "percer_ou_ajouter",
+        {
+            "forme": "cylindre",
+            "operation": "percer",
+            "taille": [6, 6, 30],
+            "position": [10, 10, 5],
+            "couleur": 1,
+        },
+        "cube.stl",
+    )
+    assert "erreur" not in r3, r3
+    r4 = assistant.run_tool(
+        "percer_ou_ajouter",
+        {"forme": "zzz", "operation": "percer", "taille": [1, 1, 1]},
+        "cube.stl",
+    )
+    assert "erreur" in r4
+
+
+def test_cli_slice_upload_guard(tmp_path, monkeypatch):
+    from typer.testing import CliRunner
+
+    from elegoo_lab import cli, config, printprep
+
+    lib = config.MODELS_DIR
+    trimesh.creation.box((10, 10, 10)).export(lib / "cube.stl")
+
+    def fake_prepare(src, **kw):
+        (lib / "cube.gcode").write_text("G28\n")
+        return {
+            "gcode": ["cube.gcode"],
+            "layers": 5,
+            "time": "10 min",
+            "filament_m": 3.0,
+            "total_m": 3.0,
+            "purge_m": [],
+            "slots": [],
+            "warnings": [],
+            "colour_changes": 0,
+            "split": False,
+            "temps": {},
+        }
+
+    monkeypatch.setattr(printprep, "prepare_and_slice", fake_prepare)
+    monkeypatch.delenv("PYCENTAURI_ENABLE_CONTROL", raising=False)
+    r = CliRunner().invoke(cli.app, ["slice", "cube.stl", "--upload"])
+    assert r.exit_code == 2 and "control" in r.output  # --upload sans --control : refusé
+    sent = []
+    monkeypatch.setattr(cli, "_send", lambda path, start: sent.append((path, start)))
+    monkeypatch.setenv("PYCENTAURI_ENABLE_CONTROL", "1")
+    r = CliRunner().invoke(cli.app, ["slice", "cube.stl", "--upload", "--start"])
+    assert r.exit_code == 0 and sent and sent[0][1] is True
+
+
+def test_web_live_sim_more_endpoints(tmp_path, monkeypatch):
+    import threading
+
+    import pycentauri.camera as camera_mod
+    import pycentauri.cc2 as cc2
+    import pycentauri.upload as upload_mod
+    from fastapi.testclient import TestClient
+
+    from elegoo_lab import app as app_mod, config, slicer
+
+    monkeypatch.setattr(slicer, "filaments", lambda: ["PLA"])  # pas d'OrcaSlicer en test
+    monkeypatch.setattr(slicer, "nozzles", lambda: ["0.4"])
+    monkeypatch.setattr(slicer, "qualities", lambda nozzle="0.4": ["0.20 mm"])
+    s = sim.Sim(port=18842, http_port=18852, print_seconds=30)
+    loop = asyncio.new_event_loop()
+    sim_task = None
+
+    def run_sim():
+        nonlocal sim_task
+        asyncio.set_event_loop(loop)
+        sim_task = loop.create_task(s.serve())
+        loop.run_forever()
+
+    th = threading.Thread(target=run_sim, daemon=True)
+    th.start()
+    time.sleep(0.5)
+    monkeypatch.setenv("CC2_HOST", sim.SIM_HOST)
+    monkeypatch.setenv("CC2_ACCESS_CODE", sim.SIM_CODE)
+    monkeypatch.setenv("CC2_SERIAL", sim.SIM_SERIAL)
+    sim.patch_pycentauri()
+    monkeypatch.setattr(cc2, "MQTT_PORT", 18842)
+    monkeypatch.setattr(upload_mod, "UPLOAD_PORT", 18852)
+    monkeypatch.setattr(camera_mod, "CAMERA_PORT_CC2", 18852)
+    lib = tmp_path / "models"
+    lib.mkdir()
+    monkeypatch.setattr(config, "MODELS_DIR", lib)
+    monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "config.toml")
+    monkeypatch.setattr(app_mod, "JOBS_FILE", lib / ".jobs.json")
+    hdrs = {"Origin": "http://testserver"}
+    try:
+        app = app_mod.create_app(enable_control=True)
+        with TestClient(app) as client:
+            stl = trimesh.creation.box((20, 20, 20)).export(file_type="stl")
+            r = client.post("/lab/api/models", files={"file": ("cube.stl", stl)}, headers=hdrs)
+            assert r.status_code == 200, r.text
+            r = client.get("/lab/api/models/cube.stl/info")
+            assert r.status_code == 200 and "size_mm" in r.json(), r.text
+            r = client.post(
+                "/lab/api/bobines/0",
+                json={"restant_g": 500, "poids_g": 1000, "prix_kg": 20, "nouvelle": False},
+                headers=hdrs,
+            )
+            assert r.status_code == 200, r.text
+            assert client.get("/lab/api/bobines/check/cube.stl").status_code == 200
+            r = client.post(
+                "/lab/api/print/start", json={"filename": "cube_20mm.gcode"}, headers=hdrs
+            )
+            assert r.status_code == 200 and r.json().get("ok"), r.text
+            r = client.get("/status")
+            assert r.status_code == 200 and "cube_20mm.gcode" in r.text, r.text[:300]
+    finally:
+        if sim_task is not None:
+            loop.call_soon_threadsafe(sim_task.cancel)
+        loop.call_soon_threadsafe(loop.stop)
+        th.join(timeout=5)
+        loop.close()
