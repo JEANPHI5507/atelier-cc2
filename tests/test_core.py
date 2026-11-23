@@ -6119,3 +6119,22 @@ def test_help_tutos_assets():
         "Tous les guides détaillés sur GitHub",
     ):
         assert k in en["exact"] and en["exact"][k], k
+
+
+# --- R2.7 : thème « Auto » suivant prefers-color-scheme (noir OLED en sombre, sable en clair) ---
+
+
+def test_theme_auto_assets():
+    import json as _json
+
+    web = Path(config.ROOT) / "src" / "elegoo_lab" / "web"
+    html = (web / "index.html").read_text(encoding="utf-8")
+    assert 'data-theme-pick="auto"' in html and 'title="Auto (système)"' in html
+    js = (web / "js" / "app.js").read_text(encoding="utf-8")
+    assert "prefers-color-scheme" in js and "resolveTheme" in js and "'auto'" in js
+    assert (
+        "dataset.theme = resolveTheme(t)" in js
+    )  # « auto » n'est jamais écrit tel quel dans data-theme
+    assert "cc2-theme" in js
+    en = _json.loads((web / "i18n" / "en.json").read_text(encoding="utf-8"))
+    assert en["exact"].get("Auto (système)") == "Auto (system)"
