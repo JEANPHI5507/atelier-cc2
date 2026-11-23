@@ -56,6 +56,55 @@ def overdue() -> str | None:
     return f"Dernière sauvegarde réussie il y a {int((time.time() - last) // 86400)} jours." + why
 
 
+UNIT_DIR = Path.home() / ".config" / "systemd" / "user"
+
+
+def _bin(name: str) -> str:
+    """Full path of a system binary (S607): fall back to the bare name, which then fails as before."""
+    return shutil.which(name) or name
+
+
+def _systemctl(*args: str, check: bool = True) -> subprocess.CompletedProcess:
+    return subprocess.run(  # noqa: S603 — internal tool, binary resolved above
+        [_bin("systemctl"), "--user", *args], capture_output=True, text=True, check=check
+    )
+
+
+def install_auto(vers: str | None = None) -> str:
+    """Automatic backup: a systemd user timer running `cc2 sauvegarde faire --si-besoin` every hour
+    (one copy a day at most, caught up as soon as the disk is plugged back in)."""
+    import sys
+
+    exe = Path(sys.executable).parent / "cc2"
+    UNIT_DIR.mkdir(parents=True, exist_ok=True)
+    (UNIT_DIR / "cc2-sauvegarde.service").write_text(
+        f"[Unit]\nDescription=Atelier CC2 - sauvegarde vers {vers or 'le disque USB'}\n\n"
+        f"[Service]\nType=oneshot\nWorkingDirectory={config.ROOT}\n"
+        f"ExecStart={exe} sauvegarde faire{f' --vers {vers}' if vers else ''} --si-besoin\n"
+        "SuccessExitStatus=1\n"  # an unplugged disk is not a failure of the service: the status file keeps the reason
+        "Nice=10\nIOSchedulingClass=idle\n"
+    )
+    (UNIT_DIR / "cc2-sauvegarde.timer").write_text(
+        "[Unit]\nDescription=Atelier CC2 - sauvegarde toutes les heures si besoin\n\n"
+        "[Timer]\nOnBootSec=10min\nOnUnitActiveSec=1h\nPersistent=true\n\n[Install]\nWantedBy=timers.target\n"
+    )
+    _systemctl("daemon-reload")
+    _systemctl("enable", "--now", "cc2-sauvegarde.timer")
+    return (
+        f"Sauvegarde automatique installée vers {vers or 'le disque USB branché (dossier atelier-cc2)'}. "
+        "Suivi : `cc2 sauvegarde etat`."
+    )
+
+
+def remove_auto() -> str:
+    """Stop and remove the hourly automatic backup."""
+    _systemctl("disable", "--now", "cc2-sauvegarde.timer", check=False)
+    (UNIT_DIR / "cc2-sauvegarde.service").unlink(missing_ok=True)
+    (UNIT_DIR / "cc2-sauvegarde.timer").unlink(missing_ok=True)
+    _systemctl("daemon-reload")
+    return "Sauvegarde automatique retirée."
+
+
 def _same_disk(a: Path, b: Path) -> bool:
     return a.stat().st_dev == b.stat().st_dev
 

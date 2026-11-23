@@ -747,3 +747,17 @@ def test_alerts_filters_and_history(page):
     page.wait_for_timeout(600)
     assert page.eval_on_selector("#ev-hist", "b => b.classList.contains('on')")
     assert page.errors == []
+
+
+def test_backup_card(page):
+    page.click("#t-start")
+    page.wait_for_selector("#bk-status")
+    page.wait_for_function(
+        "document.getElementById('bk-status').textContent.trim() !== '\u2026' && document.getElementById('bk-status').textContent.trim() !== ''"
+    )
+    assert "Dernière sauvegarde" in page.inner_text("#bk-status")
+    assert (
+        page.query_selector("#bk-now") is not None and page.query_selector("#bk-auto") is not None
+    )
+    # le comportement des POST /sauvegarde/* est couvert par les tests core (409 sans disque, etc.)
+    assert page.errors == []
