@@ -333,6 +333,9 @@ def test_add_a_piece_then_resize_it_on_the_plate(page, site):
     page.reload()
     page.click("#files .file[data-n='cube.stl']")
     page.wait_for_selector("#vtools [data-vt='add']:not([hidden])", timeout=30000)
+    page.evaluate(
+        "document.getElementById('chat-sec').hidden = true"
+    )  # the chat floats over the tools
     page.click("#vtools [data-vt='add']")
     page.click("#addp-list [data-addp='pion.stl']")
     page.wait_for_selector("#files .file.sel[data-n='cube + pion.3mf']", timeout=30000)
@@ -620,7 +623,7 @@ def test_make_preview_follows_the_sizes(page, site):
 def test_make_dialog_fits_a_phone(browser, site):
     """The phone bug of 2026-11-11: the made-to-measure dialog was twice the screen's width."""
     ctx = browser.new_context(
-        viewport={"width": 412, "height": 915}, is_mobile=True, has_touch=True
+        locale="fr-FR", viewport={"width": 412, "height": 915}, is_mobile=True, has_touch=True
     )
     pg = ctx.new_page()
     pg.goto(site["base"] + "/lab/")
