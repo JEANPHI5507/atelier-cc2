@@ -4447,7 +4447,11 @@ def test_assistant_config_helpers(tmp_path, monkeypatch):
     assert assistant.api_key() == "sk-test"
     assert assistant.model_name() == "gros"
     assert assistant.moteur() == "cli"
-    assert assistant.cli_bin() and assistant.cli_bin().endswith("vibe")  # résolu via which
+    monkeypatch.setattr(assistant.shutil, "which", lambda c: "/usr/bin/" + c)
+    assert assistant.cli_bin() == "/usr/bin/vibe"
+    monkeypatch.setattr(assistant.shutil, "which", lambda c: None)
+    monkeypatch.setattr(assistant.Path, "home", lambda: tmp_path)  # aucun binaire en local/bin
+    assert assistant.cli_bin() is None
 
 
 def test_cli_help_and_slice_without_slicer(tmp_path, monkeypatch):
