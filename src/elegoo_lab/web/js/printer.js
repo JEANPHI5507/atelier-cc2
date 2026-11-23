@@ -311,7 +311,7 @@ async function fwLoad() {
   const [st, lim] = await Promise.all([api('/firmware/status').catch(() => null), api('/firmware/limits').catch(() => null)]);
   if (lim?.blocked_commands) $('fw-blocked').innerHTML = Object.entries(lim.blocked_commands).map(([c, r]) => `<li><b>${esc(c)}</b> : ${esc(r)}</li>`).join('');
   if (!st) return;
-  const bad = st.safe_mode || st.is_supported === false;
+  const bad = st.safe_mode || (st.detected_version != null && st.is_supported === false);
   const w = $('firmware-warning');
   if (bad) { $('fw-message').textContent = st.warning || 'Firmware non reconnu : mode safe actif, les commandes listées ci-dessous sont bloquées.'; w.hidden = false; }
   else w.hidden = true;
