@@ -1101,8 +1101,7 @@ def web(tmp_path, monkeypatch, fake_printer_env):
     """The workshop API on a throw-away library (no printer connection: lifespan not started)."""
     from fastapi.testclient import TestClient
 
-    from elegoo_lab import app as app_mod
-    from elegoo_lab import config
+    from elegoo_lab import app as app_mod, config
 
     lib = tmp_path / "models"
     lib.mkdir()
@@ -1524,8 +1523,7 @@ def test_parametric_parts_are_closed_and_validated(tmp_path, monkeypatch):
 def test_phone_access_needs_the_code(web, monkeypatch):
     from fastapi.testclient import TestClient
 
-    from elegoo_lab import access
-    from elegoo_lab import app as app_mod
+    from elegoo_lab import access, app as app_mod
 
     client, lib = web
     code = access.ensure_code()
@@ -1778,9 +1776,7 @@ def test_pwa_and_https_for_the_phone(web, monkeypatch, tmp_path):
     from cryptography import x509
     from fastapi.testclient import TestClient
 
-    from elegoo_lab import access
-    from elegoo_lab import app as app_mod
-    from elegoo_lab import certs
+    from elegoo_lab import access, app as app_mod, certs
 
     client, lib = web
     monkeypatch.setattr(config, "ROOT", tmp_path)

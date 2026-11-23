@@ -36,3 +36,7 @@ ignore = [
 quote-style = "double"
 indent-style = "space"
 line-ending = "auto"
+
+[lint.isort]
+combine-as-imports = true
+known-first-party = ["elegoo_lab"]

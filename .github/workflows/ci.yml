@@ -80,7 +80,7 @@ jobs:
 
       - name:  Run Ruff (Linting)
         run: |
-          uv run ruff check src/ tests/
+          uv run ruff check src/ tests/ scripts/
 
       - name:  Run Mypy (Type Checking)
         run: |
@@ -88,11 +88,11 @@ jobs:
 
       - name:  Check Python Formatting (Black)
         run: |
-          uv run black --check src/ tests/
+          uv run black --check src/ tests/ scripts/
 
       - name:  Check Imports (isort)
         run: |
-          uv run isort --check-only src/ tests/
+          uv run isort --check-only src/ tests/ scripts/
 
   #  Job 2: Excution des tests unitaires (sans slicing)
   test-unit:
