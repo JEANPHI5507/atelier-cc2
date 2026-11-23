@@ -169,7 +169,15 @@ jobs:
 
       - name:  Run Slicing Tests
         run: |
-          uv run pytest tests/test_core.py -v --tb=short -m "slicing"
+          uv run pytest tests/test_core.py -v --tb=short -m "slicing" --cov=src/elegoo_lab --cov-report=xml
+
+      - name:  Upload Coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: ./coverage.xml
+          flags: slicingtests
+        continue-on-error: true
 
   #  Job 4: Vrification du JavaScript
   lint-js:
