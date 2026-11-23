@@ -756,6 +756,8 @@ def test_backup_card(page):
         "document.getElementById('bk-status').textContent.trim() !== '\u2026' && document.getElementById('bk-status').textContent.trim() !== ''"
     )
     assert "Dernière sauvegarde" in page.inner_text("#bk-status")
-    page.click("#bk-now")  # pas de disque USB dans le simulateur -> toast d'erreur propre
-    page.wait_for_timeout(800)
+    assert (
+        page.query_selector("#bk-now") is not None and page.query_selector("#bk-auto") is not None
+    )
+    # le comportement des POST /sauvegarde/* est couvert par les tests core (409 sans disque, etc.)
     assert page.errors == []
