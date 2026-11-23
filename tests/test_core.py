@@ -6232,3 +6232,31 @@ def test_maquette_design_in_app_assets():
     assert "linear-gradient(90deg, var(--acc)" in css  # barres de chauffe premium
     en = _json.loads((web / "i18n" / "en.json").read_text(encoding="utf-8"))
     assert en["exact"].get("Maquette UI") == "UI mockup"
+
+
+# --- R2.12 : design maquette sur toutes les pages et onglets (tokens premium globaux) ---
+
+
+def test_design_maquette_all_tabs_assets():
+    web = Path(config.ROOT) / "src" / "elegoo_lab" / "web"
+    html = (web / "index.html").read_text(encoding="utf-8")
+    for sec in ('id="lab"', 'id="pv"', 'id="gal"', 'id="start"'):
+        assert sec in html, sec  # les 4 onglets de l'app
+    css = (web / "css" / "app.css").read_text(encoding="utf-8")
+    assert (
+        ".card:hover { transform: translateY(-2px)" in css and "border-radius: 16px" in css
+    )  # cartes premium partout
+    assert (
+        ".btn:hover:not(:disabled) { border-color: var(--faint); transform: translateY(-1px); }"
+        in css
+    )
+    assert (
+        ".file:hover { background: var(--raised); transform: translateX(3px); }" in css
+    )  # bibliothèque #lab
+    assert (
+        ".gcard:hover { transform: translateY(-3px)" in css and ".gcard:hover .gthumb img" in css
+    )  # galerie #gal
+    assert "border-radius: 16px; padding: 0; width: min(520px" in css  # dialogs premium
+    tab = (web / "tableau.html").read_text(encoding="utf-8")
+    assert ".card:hover { transform: translateY(-3px)" in tab  # page tableau.html
+    assert ".btn:hover:not(:disabled) { transform: translateY(-1px); }" in tab

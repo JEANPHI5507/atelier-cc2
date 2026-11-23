@@ -833,3 +833,33 @@ def test_printer_dashboard_maquette_style(page, site):
     off = page.eval_on_selector("#pv-ring", "c => parseFloat(c.style.strokeDashoffset || '100')")
     assert 0 <= off <= 100
     assert page.errors == []
+
+
+def test_all_tabs_premium_design(page, site):
+    for tab in (
+        "t-lab",
+        "t-ui",
+        "t-gal",
+        "t-start",
+    ):  # tous les onglets répondent avec les tokens premium
+        page.click("#" + tab)
+        page.wait_for_timeout(350)
+        assert (
+            page.eval_on_selector("header .btn", "b => getComputedStyle(b).borderRadius") == "10px"
+        )
+    page.click("#t-ui")
+    page.wait_for_selector("#pv-job")
+    assert (
+        page.eval_on_selector("#pv-job", "c => getComputedStyle(c).borderRadius") == "16px"
+    )  # carte premium
+    page.click("#t-start")
+    page.wait_for_selector("#start .card")
+    assert page.eval_on_selector("#start .card", "c => getComputedStyle(c).borderRadius") == "16px"
+    page.click("#t-lab")
+    page.wait_for_selector("#files .file")
+    assert (
+        page.eval_on_selector("#files .file", "f => getComputedStyle(f).borderRadius") == "10px"
+    )  # bibliothèque
+    page.click("#t-gal")
+    page.wait_for_selector("#gal:not([hidden])")
+    assert page.errors == []

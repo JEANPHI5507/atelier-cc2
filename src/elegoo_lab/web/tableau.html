@@ -59,7 +59,8 @@
   .pill i { width: 9px; height: 9px; border-radius: 50%; background: var(--ok); }
   .pill.busy i { background: var(--acc); } .pill.warn i { background: var(--warn); } .pill.bad i { background: var(--bad); }
   .side { display: flex; flex-direction: column; gap: 14px; min-height: 0; overflow: auto; }
-  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 16px 18px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 16px 18px; box-shadow: 0 14px 34px rgba(0,0,0,.45); transition: transform .15s, border-color .15s; }
+  .card:hover { transform: translateY(-3px); border-color: var(--dim); }
   .card h3 { margin: 0 0 10px; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); font-weight: 600; display: flex; justify-content: space-between; }
   .job { display: grid; grid-template-columns: 120px 1fr; gap: 16px; align-items: center; }
   .ring { width: 120px; height: 120px; position: relative; }
@@ -89,7 +90,9 @@
   .spd .btn { height: 44px; font-size: 13.5px; } .spd .btn small { font-size: 11.5px; opacity: .75; font-weight: 500; }
   button { font: inherit; color: inherit; }
   .btn { height: 54px; border-radius: 14px; border: 1px solid var(--line); background: var(--raised); font-weight: 600; font-size: 14px;
-         display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; touch-action: manipulation; }
+         display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; touch-action: manipulation;
+         transition: transform .12s, background .15s, border-color .15s; }
+  .btn:hover:not(:disabled) { transform: translateY(-1px); }
   .btn svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   .btn.on { background: var(--acc); color: #2a1404; border-color: var(--acc); }
   .btn.stop { position: relative; overflow: hidden; } .btn.stop .fill { position: absolute; left: 0; bottom: 0; top: 0; width: 0; background: var(--bad); opacity: .45; }
