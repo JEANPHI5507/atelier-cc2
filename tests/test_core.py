@@ -6144,10 +6144,13 @@ def test_theme_auto_assets():
 
 
 def test_maquette_ui_moderne_assets():
-    root = Path(config.ROOT) / "maquette"
+    root = (
+        Path(config.ROOT) / "src" / "elegoo_lab" / "web" / "maquette"
+    )  # servie par l'app en /lab/maquette/
     html = (root / "index.html").read_text(encoding="utf-8")
     css = (root / "style.css").read_text(encoding="utf-8")
     js = (root / "app.js").read_text(encoding="utf-8")
+    assert (root / "favicon.svg").exists()  # favicon vectoriel dédié (haute définition)
     for bad in ('src="http', "src='http", 'href="http', "@import", "url(http", "fonts.googleapis"):
         assert (
             bad not in html and bad not in css and bad not in js
@@ -6176,3 +6179,31 @@ def test_maquette_ui_moderne_assets():
         "@media (max-width: 900px)" in css and "@media (max-width: 600px)" in css
     )  # responsive tablette / téléphone
     assert "dataset.tab" in js and "maquette-theme" in js and "toast" in js and "localStorage" in js
+    # R2.10 finition premium : métadonnées prod, thème auto (prefers-color-scheme), sparkline KPI
+    assert 'name="theme-color"' in html and 'content="#000000"' in html
+    assert 'name="description"' in html and 'rel="icon" href="favicon.svg"' in html
+    assert "prefers-color-scheme" in js  # thème par défaut auto, comme R2.7
+    assert 'class="spark"' in html and "@keyframes mq-draw" in css
+
+
+# --- R2.10 : maquette servie par l'app en /lab/maquette/ + lien depuis le dialog aide ---
+
+
+def test_maquette_served_by_app(web):
+    import json as _json
+
+    client, _lib = web
+    r = client.get("/lab/maquette/")
+    assert r.status_code == 200 and 'data-tab="dash"' in r.text, r.status_code
+    assert client.get("/lab/maquette/index.html").status_code == 200
+    for asset in ("style.css", "app.js", "favicon.svg"):
+        ra = client.get(f"/lab/maquette/{asset}")
+        assert ra.status_code == 200 and ra.text, asset
+    webdir = Path(config.ROOT) / "src" / "elegoo_lab" / "web"
+    html = (webdir / "index.html").read_text(encoding="utf-8")
+    assert 'href="maquette/"' in html and "Ouvrir la maquette UI (design premium)" in html
+    en = _json.loads((webdir / "i18n" / "en.json").read_text(encoding="utf-8"))
+    assert (
+        en["exact"].get("Ouvrir la maquette UI (design premium)")
+        == "Open the UI mockup (premium design)"
+    )
