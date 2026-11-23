@@ -43,6 +43,7 @@
   <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15L6 16Z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></symbol>
   <symbol id="i-power" viewBox="0 0 24 24"><path d="M12 3v8"/><path d="M6.3 6.8a8 8 0 1 0 11.4 0"/></symbol>
   <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></symbol>
+  <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.2a2.6 2.6 0 1 1 3.7 2.4c-.9.45-1.3 1-1.3 2"/><path d="M12 17.2h.01"/></symbol>
 </svg>
 
 <header>
@@ -57,6 +58,7 @@
   <button class="btn ghost" id="lang" data-cap="Langue" title="Langue · Language" translate="no" onclick="I18N.set(I18N.lang === 'en' ? 'fr' : 'en')"><b id="lang-t">EN</b></button>
 <script>document.getElementById('lang-t').textContent = I18N.lang === 'en' ? 'FR' : 'EN';</script>
   <button class="btn ghost" id="mode" data-cap="Mode" title="Mode Débutant / Avancé" onclick="UI_MODE.toggle()"><b id="mode-t">Débutant</b></button>
+  <button class="btn ghost" id="help-open" data-cap="Aide" title="Aide et tutoriels" aria-label="Aide"><svg class="i"><use href="#i-help"/></svg><span>Aide</span></button>
   <div class="themes" role="radiogroup" aria-label="Thème" data-cap="Thème"><button data-theme-pick="noir" title="Noir" style="background:#000;border-color:#48484a"></button><button data-theme-pick="ardoise" title="Ardoise" style="background:#465060"></button><button data-theme-pick="sauge" title="Sauge" style="background:#4a5751"></button><button data-theme-pick="sable" title="Sable" style="background:#dad0c0"></button></div>
   <span class="pill" id="printer" title="État de l'imprimante"><span class="led"></span><span id="printer-txt">Connexion…</span><span id="printer-temp"></span></span>
 </header>
@@ -642,6 +644,62 @@
   <div class="dlg-h">Faire le ménage<button class="btn ghost" data-close aria-label="Fermer"><svg class="i"><use href="#i-x"/></svg></button></div>
   <div class="dlg-b"><p class="note">Fichiers que l'atelier peut supprimer sans perdre tes modèles. Décoche ce que tu veux garder.</p><div id="clean-list"></div></div>
   <div class="dlg-f"><span class="note" id="clean-sum" style="margin:0 auto 0 0"></span><button class="btn" data-close>Annuler</button><button class="btn primary" id="clean-go"><svg class="i"><use href="#i-trash"/></svg>Supprimer</button></div>
+</dialog>
+
+<dialog id="help" class="wide-dlg">
+  <div class="dlg-h">Aide et tutoriels<button class="btn ghost" data-close aria-label="Fermer"><svg class="i"><use href="#i-x"/></svg></button></div>
+  <div class="dlg-b">
+    <p class="note" style="margin-top:0">Trois tutos animés pour prendre en main l'atelier.</p>
+    <div class="tutos">
+      <article class="tuto">
+        <svg class="tuto-v" viewBox="0 0 120 56" aria-hidden="true">
+          <circle class="tr" cx="18" cy="28" r="13"/><circle class="tf" style="--i:0" cx="18" cy="28" r="9" fill="#E9E9E7"/><circle class="th" cx="18" cy="28" r="2.5"/>
+          <circle class="tr" cx="46" cy="28" r="13"/><circle class="tf" style="--i:1" cx="46" cy="28" r="9" fill="#F2A900"/><circle class="th" cx="46" cy="28" r="2.5"/>
+          <circle class="tr" cx="74" cy="28" r="13"/><circle class="tf" style="--i:2" cx="74" cy="28" r="9" fill="#D22630"/><circle class="th" cx="74" cy="28" r="2.5"/>
+          <circle class="tr" cx="102" cy="28" r="13"/><circle class="tf" style="--i:3" cx="102" cy="28" r="9" fill="#008755"/><circle class="th" cx="102" cy="28" r="2.5"/>
+        </svg>
+        <h3>Charger le CANVAS</h3>
+        <ol class="howto">
+          <li>Mets jusqu'à 4 bobines dans le CANVAS, à gauche de l'imprimante.</li>
+          <li>Dans l'onglet Imprimante, clique une bobine pour régler son stock et sa couleur.</li>
+          <li>Pendant l'impression, la bobine en cours est entourée.</li>
+        </ol>
+        <a href="https://github.com/JEANPHI5507/atelier-cc2/blob/main/guide/cc2.md" target="_blank" rel="noopener">Guide : ce qu'il faut savoir sur la CC2</a>
+      </article>
+      <article class="tuto">
+        <svg class="tuto-v" viewBox="0 0 120 56" aria-hidden="true">
+          <rect class="tr" x="10" y="8" width="100" height="24" rx="4"/>
+          <rect class="tc" x="18" y="14" width="42" height="12" rx="2"/>
+          <path class="tp" d="M78 14v12l10-6z"/>
+          <line class="t-track" x1="10" y1="44" x2="110" y2="44"/>
+          <line class="t-prog" x1="10" y1="44" x2="110" y2="44" pathLength="100"/>
+        </svg>
+        <h3>Préparer et lancer une impression</h3>
+        <ol class="howto">
+          <li>Choisis un modèle dans l'Atelier, ou importe un fichier STL / 3MF.</li>
+          <li>Règle les couleurs et la taille, puis clique « Trancher ».</li>
+          <li>« Lancer » envoie le fichier à la CC2 et démarre l'impression.</li>
+        </ol>
+        <a href="https://github.com/JEANPHI5507/atelier-cc2/blob/main/guide/preparer-et-imprimer.md" target="_blank" rel="noopener">Guide : préparer et imprimer</a>
+      </article>
+      <article class="tuto">
+        <svg class="tuto-v" viewBox="0 0 120 56" aria-hidden="true">
+          <rect class="tr" x="28" y="12" width="64" height="32" rx="6"/>
+          <circle class="t-eye" cx="60" cy="28" r="10"/>
+          <circle class="t-pupil" cx="60" cy="28" r="3.5"/>
+          <line class="t-scan" x1="28" y1="18" x2="92" y2="18"/>
+        </svg>
+        <h3>Surveiller l'impression</h3>
+        <ol class="howto">
+          <li>L'onglet Imprimante montre la caméra, la température et la progression.</li>
+          <li>La cloche en haut de page te prévient si quelque chose bloque.</li>
+          <li>En fin d'impression, le bilan te dit quoi améliorer.</li>
+        </ol>
+        <a href="https://github.com/JEANPHI5507/atelier-cc2/blob/main/guide/suivre.md" target="_blank" rel="noopener">Guide : suivre une impression</a>
+      </article>
+    </div>
+    <p style="margin:14px 0 0"><a href="https://github.com/JEANPHI5507/atelier-cc2/tree/main/guide" target="_blank" rel="noopener">Tous les guides détaillés sur GitHub</a></p>
+  </div>
 </dialog>
 
 <div class="toasts" id="toasts" role="status"></div>

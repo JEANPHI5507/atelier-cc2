@@ -6084,3 +6084,38 @@ def test_workflow_ui_assets():
     en = _json.loads((web / "i18n" / "en.json").read_text(encoding="utf-8"))
     for k in ("Workflow guidé :", "Voir la fiche de la pièce", "Trancher pour la CC2"):
         assert k in en["exact"] and en["exact"][k], k
+
+
+# --- R2.6 : aide intégrée — dialog #help, 3 tutos animés SVG/CSS, i18n ---
+
+
+def test_help_tutos_assets():
+    import json as _json
+
+    web = Path(config.ROOT) / "src" / "elegoo_lab" / "web"
+    html = (web / "index.html").read_text(encoding="utf-8")
+    assert 'id="help-open"' in html and '<dialog id="help"' in html and 'id="i-help"' in html
+    assert html.count('<article class="tuto">') == 3  # 3 tutos
+    assert html.count('class="tuto-v"') == 3  # 3 SVG animés, markup pur (pas de vidéo)
+    assert "github.com/JEANPHI5507/atelier-cc2/tree/main/guide" in html  # lien vers les guides
+    js = (web / "js" / "app.js").read_text(encoding="utf-8")
+    assert "$('help-open')" in js and "$('help').showModal()" in js
+    css = (web / "css" / "app.css").read_text(encoding="utf-8")
+    assert ".tutos" in css and ".tuto-v" in css
+    assert "@media (prefers-reduced-motion: no-preference)" in css  # animations coupables
+    for kf in (
+        "@keyframes tuto-spool",
+        "@keyframes tuto-prog",
+        "@keyframes tuto-eye",
+        "@keyframes tuto-scan",
+    ):
+        assert kf in css, kf
+    en = _json.loads((web / "i18n" / "en.json").read_text(encoding="utf-8"))
+    for k in (
+        "Aide et tutoriels",
+        "Charger le CANVAS",
+        "Préparer et lancer une impression",
+        "Surveiller l'impression",
+        "Tous les guides détaillés sur GitHub",
+    ):
+        assert k in en["exact"] and en["exact"][k], k

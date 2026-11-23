@@ -865,3 +865,33 @@ body.mode-debutant .advanced { display: none !important; }
 .wf { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
 .wf .wf-step { text-align: left; width: 100%; }
 .wf .wf-step.done { border-color: var(--ok); color: var(--ok); opacity: .85; }
+
+/* R2.6 : aide intégrée — 3 tutos animés en SVG/CSS pur (pas de vidéo) */
+.tutos { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
+.tuto { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; background: var(--bg); }
+.tuto a { color: var(--acc); margin-top: auto; font-size: 13.5px; }
+.tuto h3 { margin: 0; font-size: 15.5px; }
+.tuto-v { width: 100%; height: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.howto { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; font-size: 13.5px; }
+.tuto .tr { fill: none; stroke: var(--line-strong); stroke-width: 2; }
+.tuto .th { fill: var(--surface); stroke: var(--line-strong); stroke-width: 1.5; }
+.tuto .tf { opacity: .95; }
+.tuto .tc { fill: var(--acc); opacity: .85; }
+.tuto .tp { fill: var(--ok); }
+.tuto .t-track { stroke: var(--line); stroke-width: 4; stroke-linecap: round; }
+.tuto .t-prog { stroke: var(--acc); stroke-width: 4; stroke-linecap: round; stroke-dasharray: 100; stroke-dashoffset: 0; }
+.tuto .t-eye { fill: none; stroke: var(--acc); stroke-width: 2.5; }
+.tuto .t-pupil { fill: var(--acc); }
+.tuto .t-scan { stroke: var(--warn); stroke-width: 2; opacity: .85; }
+@media (prefers-reduced-motion: no-preference) {
+  .tuto .tf { animation: tuto-spool 3.2s ease-in-out infinite; animation-delay: calc(var(--i, 0) * .8s); }
+  .tuto .t-prog { animation: tuto-prog 4s ease-in-out infinite; }
+  .tuto .tc { animation: tuto-cube 4s ease-in-out infinite; }
+  .tuto .t-eye { animation: tuto-eye 2.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+  .tuto .t-scan { animation: tuto-scan 3s linear infinite; }
+  @keyframes tuto-spool { 0% { opacity: .08; } 30%, 100% { opacity: .95; } }
+  @keyframes tuto-prog { 0% { stroke-dashoffset: 100; } 75%, 100% { stroke-dashoffset: 0; } }
+  @keyframes tuto-cube { 0%, 20% { opacity: .2; } 60%, 100% { opacity: .85; } }
+  @keyframes tuto-eye { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.18); } }
+  @keyframes tuto-scan { 0% { transform: translateY(0); opacity: 0; } 15% { opacity: .85; } 85% { opacity: .85; } 100% { transform: translateY(20px); opacity: 0; } }
+}
