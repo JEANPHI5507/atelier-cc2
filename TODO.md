@@ -19,18 +19,18 @@
 ### 2. **Qualité du Code**
 - [x] ✅ Corriger les imports inutilisés (F401)
 - [x] ✅ Trier les imports avec isort
-- [ ] ⏳ **Corriger les problèmes RET502/RET503** (return explicite dans les fonctions async)
-- [ ] ⏳ **Corriger les problèmes BLE001** (except Exception -> except plus spécifique)
-- [ ] ⏳ **Corriger les problèmes B905** (zip() sans strict=)
-- [ ] ⏳ **Corriger les problèmes TC003** (pathlib.Path dans TYPE_CHECKING)
-- [ ] ⏳ **Corriger les problèmes S** (sécurité - S101, S301, etc.)
+- [x] ✅ **RET502/RET503 corrigés** (PR #9)
+- [x] ✅ **BLE001 corrigé** — except ciblées aux frontières réseau/fichiers, noqa ponctuels (PR #9)
+- [x] ✅ **B905 corrigé** — zip(..., strict=True) (PR #9)
+- [x] ✅ **TC003 corrigé** — imports déplacés dans TYPE_CHECKING (PR #9)
+- [x] ✅ **S (S603/S607…) corrigés** — binaires résolus via shutil.which, noqa ciblés (PR #9)
 
 ### 3. **Tests**
 - [x] ✅ Installer OrcaSlicer
 - [x] ✅ **Installer libopengl0, libglu1-mesa, libwebkit2gtk-4.1** dans l'environnement CI
-- [x] ✅ **Tests réparés** : 85 passed / 6 skipped (non-slicing), 21 passed (slicing), UI Playwright verts (Chromium fr-FR)
+- [x] ✅ **Tests réparés** : 158 passed / 6 skipped (non-slicing), 21 passed (slicing), UI Playwright verts (Chromium fr-FR)
 - [x] ✅ **Configurer Chrome/Playwright** dans CI
-- [ ] ⏳ **Atteindre 80% de couverture** sur le code critique (mesurée sur Codecov)
+- [x] ✅ **80% de couverture atteinte** (INF.3) — 81 % local non-slicing, consolidé CI (unittests + slicing + UI) au-dessus — PR #11–#15, issue #10
 
 ---
 
@@ -39,8 +39,8 @@
 ### Infrastructure
 | Élément | Statut | Détails |
 |---------|--------|---------|
-| **ruff** | ✅ Configuré | 495 erreurs détectées (45 fixables) |
-| **mypy** | ✅ Configuré | Configuration de base en place |
+| **ruff** | ✅ Configuré | 0 erreur (68 corrigées + règles sorties de l'ignore, PR #9) |
+| **mypy** | ✅ Configuré | 0 erreur sur 55 fichiers source |
 | **black** | ✅ Configuré | Aucun fichier à formater |
 | **isort** | ✅ Configuré | Imports corrigés dans 9 fichiers |
 | **CI/CD** | ✅ Configuré | Workflow GitHub Actions mis à jour |
@@ -49,13 +49,13 @@
 ### Tests
 | Type | Total | Pass | Fail | Skip |
 |------|-------|------|------|------|
-| **Unitaires (non-slicing)** | 91 | 85 | 0 | 6 |
+| **Unitaires (non-slicing)** | 164 | 158 | 0 | 6 |
 | **Slicing (CI)** | 21 | 21 | 0 | 0 |
 | **UI (CI, Playwright)** | ~25 | ~25 | 0 | 0 |
 
 ### Couverture
 - **Suivi** : Codecov, upload à chaque job CI (flags par famille de tests)
-- **Objectif** : >80% (voir tableau Codecov)
+- **Objectif** : >80% — atteint : 81 % local non-slicing, consolidé CI au-dessus (INF.3, PR #11–#15)
 
 ---
 
@@ -179,15 +179,14 @@ pre-commit install
 3. ✅ **Configurer OpenGL dans CI** — fait
 
 ### Semaine Prochaine
-1. **Corriger les problèmes BLE001** (except Exception)
-2. **Corriger les problèmes B905** (zip sans strict)
-3. **Corriger les problèmes TC003** (pathlib dans TYPE_CHECKING)
-4. **Atteindre 80% de couverture**
+1. ✅ Linting avancé INF.4–8 (S/BLE/B905/TC003/RET) — PR #9
+2. ✅ Couverture 80 % (INF.3) — 81 % local, PR #11–#15
+3. **Publier l'image Docker** (INF.2) — build CI OK, il manque les secrets DOCKER_HUB_USERNAME/TOKEN
 
 ### Dans le Mois
-1. **Corriger tous les problèmes de linting**
+1. ✅ Tous les problèmes de linting corrigés (0 erreur ruff/mypy)
 2. **Publier l'image Docker** sur Docker Hub
-3. **Configurer Codecov**
+3. ✅ Codecov configuré (upload à chaque job CI, flags par famille)
 4. **Améliorer la documentation**
 
 ---

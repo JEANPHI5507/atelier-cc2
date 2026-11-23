@@ -63,7 +63,7 @@
 | R1.5 | Documentation des limites CC2 | ✅ **Terminé** | Vibe Code | [#4](https://github.com/JEANPHI5507/atelier-cc2/pull/4) | 2026-11-23 | 2026-11-23 |
 | R1.6 | Gestion des erreurs caméra | ✅ **Terminé** | Vibe Code | [#7](https://github.com/JEANPHI5507/atelier-cc2/pull/7) | 2026-11-23 | 2026-11-23 |
 
-**Prochaine Tâche Prioritaire** : Phase 2 (INF.1 Codecov, INF.2 Docker Hub, INF.3 couverture 80%, INF.4-8 linting avancé)
+**Prochaine Tâche Prioritaire** : Phase 2 restante (INF.2 Docker Hub — secrets DOCKER_HUB_* à configurer), puis Phase 3. INF.3 couverture 80 % ✅ et INF.4–8 linting avancé ✅ faits (PR #9, #11–#15)
 
 ---
 
@@ -108,6 +108,8 @@
 | A0.1-A0.5 | Phase 0 : CI bloquante (ruff/mypy/black/isort sans \|\| true, OpenGL, Chrome, tests slicing/UI) | Vibe Code | 2026-11-23 | #2, #3 |
 | R1.5 | Section UI des limites CC2 (commandes bloquées dynamiques, bandeau firmware, guides FR/EN, i18n) | Vibe Code | 2026-11-23 | [#4](https://github.com/JEANPHI5507/atelier-cc2/pull/4) |
 | R1.6 | Détection caméra figée hors impression + redémarrage auto du flux + alerte unique réarmable | Vibe Code | 2026-11-23 | [#7](https://github.com/JEANPHI5507/atelier-cc2/pull/7) |
+| INF.4–8 | Linting avancé ruff (S603/S607/BLE001/B905/TC003/RET502/503) — 0 erreur, codecov.yml (patch informationnel) | Vibe Code | 2026-11-23 | [#9](https://github.com/JEANPHI5507/atelier-cc2/pull/9) |
+| INF.3 (Phase 2) | Couverture 80 % atteinte : 81 % local non-slicing (158 tests), consolidé CI au-dessus — +2 bugs `cc2 doctor` corrigés (#14) | Vibe Code | 2026-11-23 | [#11](https://github.com/JEANPHI5507/atelier-cc2/pull/11), [#12](https://github.com/JEANPHI5507/atelier-cc2/pull/12), [#13](https://github.com/JEANPHI5507/atelier-cc2/pull/13), [#14](https://github.com/JEANPHI5507/atelier-cc2/pull/14), [#15](https://github.com/JEANPHI5507/atelier-cc2/pull/15) |
 
 ---
 
@@ -116,7 +118,7 @@
 | Contributeur | Tâches Assignées | PR Ouvertes | PR Mergées | Dernière Contribution |
 |--------------|------------------|-------------|------------|----------------------|
 | JEANPHI5507 | 4 | 1 | 4 | 2024-11-22 |
-| Vibe Code | 8 | 0 | 8 | 2024-11-22 |
+| Vibe Code | 12 | 0 | 10 | 2026-11-23 |
 
 ---
 

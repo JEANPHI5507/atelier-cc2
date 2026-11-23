@@ -88,19 +88,19 @@
 |----|-------|-------------|------------|--------|-------------|
 | **INF.1** | Configurer Codecov | Ajouter le token et configurer le suivi de couverture | ⭐⭐ | ⏳ À faire | Phase 0 |
 | **INF.2** | Publier l'image Docker | Configurer et publier sur Docker Hub | ⭐⭐⭐ | ⏳ À faire | Phase 0 |
-| **INF.3** | Atteindre 80% de couverture | Ajouter des tests pour atteindre l'objectif | ⭐⭐⭐⭐ | ⏳ À faire | INF.1 |
-| **INF.4** | Corriger problèmes S* (sécurité) | Corriger S101, S301, S307, S603, S607 | ⭐⭐⭐ | ⏳ À faire | Aucune |
-| **INF.5** | Corriger RET502/RET503 | Ajouter return None explicite dans les fonctions async | ⭐⭐ | ⏳ À faire | Aucune |
-| **INF.6** | Corriger BLE001 | Remplacer except Exception par des exceptions spécifiques | ⭐⭐⭐ | ⏳ À faire | Aucune |
-| **INF.7** | Corriger B905 | Ajouter strict=False aux appels de zip() | ⭐ | ⏳ À faire | Aucune |
-| **INF.8** | Corriger TC003 | Déplacer pathlib dans TYPE_CHECKING | ⭐⭐ | ⏳ À faire | Aucune |
+| **INF.3** | Atteindre 80% de couverture | Ajouter des tests pour atteindre l'objectif | ⭐⭐⭐⭐ | ✅ Terminé (#11–#15, #10) — 81 % local non-slicing | INF.1 |
+| **INF.4** | Corriger problèmes S* (sécurité) | Corriger S101, S301, S307, S603, S607 | ⭐⭐⭐ | ✅ Terminé (#9) | Aucune |
+| **INF.5** | Corriger RET502/RET503 | Ajouter return None explicite dans les fonctions async | ⭐⭐ | ✅ Terminé (#9) | Aucune |
+| **INF.6** | Corriger BLE001 | Remplacer except Exception par des exceptions spécifiques | ⭐⭐⭐ | ✅ Terminé (#9) | Aucune |
+| **INF.7** | Corriger B905 | Ajouter strict=False aux appels de zip() | ⭐ | ✅ Terminé (#9) | Aucune |
+| **INF.8** | Corriger TC003 | Déplacer pathlib dans TYPE_CHECKING | ⭐⭐ | ✅ Terminé (#9) | Aucune |
 
 **Livrables Phase 2 :**
-- [ ] Codecov configuré et fonctionnel
-- [ ] Image Docker publiée sur Docker Hub
-- [ ] 80% de couverture de code
-- [ ] Tous les problèmes de linting corrigés
-- [ ] Code plus sécurisé et maintenable
+- [x] Codecov configuré et fonctionnel (upload à chaque job CI, codecov.yml)
+- [ ] Image Docker publiée sur Docker Hub (INF.2 : secrets DOCKER_HUB_* à configurer)
+- [x] 80% de couverture de code (81 % local non-slicing, PR #11–#15)
+- [x] Tous les problèmes de linting corrigés (ruff/mypy 0 erreur, PR #9)
+- [x] Code plus sécurisé et maintenable (PR #9)
 
 ---
 
@@ -180,9 +180,9 @@
 - [ ] Configurer OpenGL dans CI (A0.2)
 - [ ] Configurer Chrome pour Playwright (A0.3)
 - [ ] Corriger les 11 tests échoués (A0.4)
-- [ ] Configurer Codecov (INF.1)
-- [ ] Publier l'image Docker (INF.2)
-- [ ] Corriger les problèmes de sécurité (INF.4)
+- [x] Configurer Codecov (INF.1)
+- [ ] Publier l'image Docker (INF.2 — secrets à ajouter)
+- [x] Corriger les problèmes de sécurité (INF.4, PR #9)
 
 ### **Pour JEANPHI5507 (Mainteneur)**
 - [ ] Revoir et merger les PR
@@ -211,10 +211,10 @@
 - [ ] Phase 1 à 100%
 
 ### **Phase 2 (Qualité)**
-- [ ] Codecov configuré et fonctionnel
-- [ ] Image Docker publiée
-- [ ] 80% de couverture de code
-- [ ] Tous les problèmes de linting corrigés
+- [x] Codecov configuré et fonctionnel
+- [ ] Image Docker publiée (INF.2 : secrets DOCKER_HUB_* requis)
+- [x] 80% de couverture de code (81 % local, PR #11–#15)
+- [x] Tous les problèmes de linting corrigés (PR #9)
 
 ---
 
