@@ -28,6 +28,7 @@ from types import SimpleNamespace
 from typing import Any, cast
 
 import httpx
+import numpy as np
 
 from . import colors, config, forme, mesh, orient, printprep, repair, slicer
 
@@ -118,7 +119,9 @@ def _baked(src: Path, rotate=None, scale=None, height=None, tag: str = "modifie"
     m = mesh.load(src)
     rot = colors.rotation(tuple(rotate)) if rotate else None
     if rot is not None:
-        m.apply_transform(rot)
+        m4 = np.eye(4)  # colors.rotation gives the 3x3; trimesh wants a 4x4
+        m4[:3, :3] = rot
+        m.apply_transform(m4)
         m.faces = colors.flip_if_mirrored(rot, m.faces)  # a mirror turns the surface inside out
     if scale:
         if len(scale) != 3:
