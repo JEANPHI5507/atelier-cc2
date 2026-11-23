@@ -77,7 +77,7 @@
 
 | ID | Tâche | Description | Complexité | Statut | Issue GitHub | PR | Contributeur |
 |----|-------|-------------|------------|--------|--------------|----|--------------|
-| **R2.1** | 466 **Mode Débutant** | Masquer les options avancées pour les nouveaux utilisateurs. | ⭐⭐⭐ | 53D4CA **À faire** | [#7](https://github.com/JEANPHI5507/atelier-cc2/issues/7) | - | - |
+| **R2.1** | 👶 **Mode Débutant** | Bascule Débutant/Avancé persistée (config.toml [interface] mode), options .advanced masquées en mode débutant, endpoints /lab/api/mode, i18n EN. | ⭐⭐⭐ | ✅ **Terminé** | [#16](https://github.com/JEANPHI5507/atelier-cc2/issues/16) | [#17](https://github.com/JEANPHI5507/atelier-cc2/pull/17) | 2026-11-23 |
 | **R2.2** | 3A8 **Visualisation CANVAS 3D** | Schéma interactif des 4 bobines avec couleurs actuelles. | ⭐⭐⭐ | 53D4CA **À faire** | [#8](https://github.com/JEANPHI5507/atelier-cc2/issues/8) | - | - |
 | **R2.3** | 514 **Notifications Intelligentes** | Niveaux de priorité (Critique/Avertissement/Info) + historique. | ⭐⭐ | 53D4CA **À faire** | [#9](https://github.com/JEANPHI5507/atelier-cc2/issues/9) | - | - |
 | **R2.4** | 4BE **Backup Automatique** | Sauvegarde de `config.toml` et bibliothèque avec versioning. | ⭐⭐ | 53D4CA **À faire** | [#10](https://github.com/JEANPHI5507/atelier-cc2/issues/10) | - | - |
