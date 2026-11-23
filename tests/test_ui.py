@@ -803,3 +803,20 @@ def test_theme_auto_follows_system_scheme(browser, site):
         assert pg.eval_on_selector('[data-theme-pick="auto"]', "b => b.classList.contains('on')")
         assert errors == []
         ctx.close()
+
+
+def test_maquette_page_in_app(page, site):
+    page.goto(site["base"] + "/lab/maquette/")
+    page.wait_for_selector(".nav-i")
+    assert len(page.query_selector_all(".nav-i")) == 6
+    page.click(".spool")  # sur le tableau de bord : toast avec le stock de la bobine
+    page.wait_for_selector(".toast.show")
+    page.click('[data-tab="ui"]')
+    page.wait_for_selector('.tab[data-tab="ui"].on')
+    assert page.eval_on_selector(".tab.on", "t => t.dataset.tab") == "ui"
+    th0 = page.evaluate("document.documentElement.dataset.theme")
+    page.click("#theme-t")
+    assert (
+        page.evaluate("document.documentElement.dataset.theme") != th0
+    )  # bascule sombre/clair persistée
+    assert page.errors == []

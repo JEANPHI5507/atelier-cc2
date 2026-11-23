@@ -7,9 +7,11 @@ $$('.nav-i').forEach(b => b.onclick = () => {
 });
 
 const root = document.documentElement;
-let theme = 'sombre';
-try { theme = localStorage.getItem('maquette-theme') || 'sombre'; } catch {}
+let theme = null;
+try { theme = localStorage.getItem('maquette-theme'); } catch {}
+if (!theme) theme = matchMedia('(prefers-color-scheme: light)').matches ? 'clair' : 'sombre';
 root.dataset.theme = theme;
+$('#theme-t use').setAttribute('href', theme === 'sombre' ? '#i-sun' : '#i-moon');
 $('#theme-t').onclick = () => {
   theme = theme === 'sombre' ? 'clair' : 'sombre';
   root.dataset.theme = theme;
