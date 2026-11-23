@@ -856,3 +856,7 @@
 
 /* R2.1 mode Débutant : les options avancées disparaissent ; le bouton Mode de l'en-tête les ramène */
 body.mode-debutant .advanced { display: none !important; }
+
+/* R2.3 : filtres par niveau dans la dialog alertes */
+.ev-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 4px; }
+.ev-filters .btn.on { border-color: var(--acc); color: var(--acc); background: var(--acc-soft); }

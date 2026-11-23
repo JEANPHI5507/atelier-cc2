@@ -5888,3 +5888,71 @@ def test_canvas_spools_schema_assets():
     en = _json.loads((web / "i18n" / "en.json").read_text(encoding="utf-8"))
     assert en["exact"].get("Vide") == "Empty"
     assert any(p[0] == "Modifier le stock de la bobine {}" for p in en["patterns"])
+
+
+# --- R2.3 : notifications intelligentes (filtres par niveau, historique des alertes) ---
+
+
+def test_events_historique_endpoint(tmp_path, monkeypatch, fake_printer_env):
+    from fastapi.testclient import TestClient
+
+    from elegoo_lab import app as app_mod, config
+
+    lib = tmp_path / "models"
+    lib.mkdir()
+    monkeypatch.setattr(config, "MODELS_DIR", lib)
+    monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "config.toml")
+    monkeypatch.setattr(app_mod, "JOBS_FILE", lib / ".jobs.json")
+    events = [
+        {
+            "id": "1",
+            "t": 1000,
+            "kind": "debut",
+            "level": "info",
+            "title": "Impression lancée",
+            "detail": "a.gcode",
+        },
+        {
+            "id": "2",
+            "t": 2000,
+            "kind": "filament",
+            "level": "bad",
+            "title": "Plus de filament",
+            "detail": "",
+        },
+        {
+            "id": "3",
+            "t": 3000,
+            "kind": "fin",
+            "level": "ok",
+            "title": "Impression terminée",
+            "detail": "b.gcode",
+            "bilan": "x",
+        },
+    ]
+    (lib / ".events.json").write_text(json.dumps(events))
+    app = app_mod.create_app(enable_control=True)
+    with TestClient(app) as client:
+        r = client.get("/lab/api/events/historique")  # fichier persisté, récent d'abord
+        assert r.status_code == 200, r.text
+        hist = r.json()
+        assert [e["kind"] for e in hist] == ["fin", "filament", "debut"]
+        assert hist[0]["level"] == "ok" and hist[1]["level"] == "bad"
+        r2 = client.get("/lab/api/events")  # 50 dernières en mémoire
+        assert r2.status_code == 200 and len(r2.json()) == 3
+
+
+def test_notifications_filters_assets():
+    import json as _json
+
+    web = Path(config.ROOT) / "src" / "elegoo_lab" / "web"
+    html = (web / "index.html").read_text(encoding="utf-8")
+    assert 'id="ev-filters"' in html and 'data-lvl="bad"' in html and 'data-lvl="warn"' in html
+    assert 'id="ev-hist"' in html
+    js = (web / "js" / "alerts.js").read_text(encoding="utf-8")
+    assert "/events/historique" in js and "evFilter" in js and "cc2-ev-filter" in js
+    css = (web / "css" / "app.css").read_text(encoding="utf-8")
+    assert ".ev-filters" in css
+    en = _json.loads((web / "i18n" / "en.json").read_text(encoding="utf-8"))
+    for k in ("Toutes", "Critiques", "Avertissements", "Historique", "Aucune alerte de ce niveau."):
+        assert k in en["exact"] and en["exact"][k], k
