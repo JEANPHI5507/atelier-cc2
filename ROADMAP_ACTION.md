@@ -113,14 +113,14 @@
 |----|-------|-------------|------------|--------|-------------|
 | **R2.1** | Mode Débutant | Masquer les options avancées pour les nouveaux utilisateurs | ⭐⭐⭐ | ✅ Terminé (#17, #16) | Phase 1 |
 | **R2.2** | Visualisation CANVAS 3D | Schéma interactif des 4 bobines avec couleurs actuelles | ⭐⭐⭐⭐ | ✅ Terminé (#19, #18) | Phase 1 |
-| **R2.3** | Notifications Intelligentes | Niveaux de priorité (Critique/Avertissement/Info) + historique | ⭐⭐⭐ | ⏳ À faire | Phase 1 |
+| **R2.3** | Notifications Intelligentes | Niveaux de priorité (Critique/Avertissement/Info) + historique | ⭐⭐⭐ | ✅ Terminé (#21, #20) | Phase 1 |
 | **R2.4** | Backup Automatique | Sauvegarde de config.toml et bibliothèque avec versioning | ⭐⭐ | ⏳ À faire | Phase 1 |
 | **R2.5** | Assistant Guidé | Étendre le chat pour proposer des workflows pas à pas | ⭐⭐⭐⭐ | ⏳ À faire | Phase 1 |
 
 **Livrables Phase 3 :**
 - [x] Interface simplifiée pour les débutants (mode Débutant, PR #17)
 - [x] Visualisation interactive du CANVAS (schéma des 4 bobines SVG, PR #19)
-- [ ] Système de notifications amélioré
+- [x] Système de notifications amélioré (filtres par niveau + historique, PR #21)
 - [ ] Système de backup automatique
 - [ ] Assistant guidé étendu
 
