@@ -38,10 +38,39 @@ function startAlerts() {
     evUnread++; evBadge(); if ($('ev').open) evLoad();
   });
 }
-async function evLoad() {
-  const list = await api('/events').catch(() => []);
-  $('ev-list').innerHTML = list.length ? list.map(evRow).join('') : '<div class="empty">Rien pour l\'instant. Lance une impression : chaque étape importante apparaîtra ici.</div>';
+/* R2.3: level filters (bad = critique, warn = avertissement, info/ok = info), kept in localStorage,
+   and a history view over the persisted alert log */
+let evFilter = 'all', evHist = false;
+try { evFilter = localStorage.getItem('cc2-ev-filter') || 'all'; } catch {}
+const LEVEL_OF = e => e.level === 'bad' ? 'bad' : e.level === 'warn' ? 'warn' : 'info';
+function evRender(list) {
+  const rows = list.filter(e => evFilter === 'all' || LEVEL_OF(e) === evFilter);
+  $('ev-list').innerHTML = rows.length ? rows.map(evRow).join('')
+    : '<div class="empty">' + (evFilter === 'all'
+        ? 'Rien pour l\'instant. Lance une impression : chaque étape importante apparaîtra ici.'
+        : 'Aucune alerte de ce niveau.') + '</div>';
 }
+async function evLoad() {
+  const list = await api(evHist ? '/events/historique' : '/events').catch(() => []);
+  evRender(list);
+}
+$('ev-filters').addEventListener('click', e => {
+  const b = e.target.closest('[data-lvl]'); if (!b) return;
+  evFilter = b.dataset.lvl;
+  try { localStorage.setItem('cc2-ev-filter', evFilter); } catch {}
+  document.querySelectorAll('#ev-filters [data-lvl]').forEach(x => x.classList.toggle('on', x === b));
+  evLoad();
+});
+$('ev-hist').onclick = () => {
+  evHist = !evHist;
+  $('ev-hist').classList.toggle('on', evHist);
+  $('ev-hist').textContent = evHist ? 'Récentes' : 'Historique';
+  evLoad();
+};
+function evFiltersInit() {
+  document.querySelectorAll('#ev-filters [data-lvl]').forEach(x => x.classList.toggle('on', x.dataset.lvl === evFilter));
+}
+if (document.readyState !== 'loading') evFiltersInit(); else document.addEventListener('DOMContentLoaded', evFiltersInit);
 $('ev-open').onclick = () => {
   evUnread = 0; evBadge(); $('ev-sound').checked = evSound;
   $('ev-notif').hidden = !(window.isSecureContext && window.Notification && Notification.permission === 'default');

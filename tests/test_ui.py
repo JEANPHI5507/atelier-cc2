@@ -731,3 +731,19 @@ def test_canvas_spools_schema(page, site):
     assert "Bobine 1" in page.inner_text("#tray-t")
     page.click("#tray-dlg [data-close]")
     assert page.errors == []
+
+
+def test_alerts_filters_and_history(page):
+    page.click("#ev-open")
+    page.wait_for_selector("#ev[open]")
+    page.wait_for_selector("#ev-filters [data-lvl]")
+    btns = page.query_selector_all("#ev-filters [data-lvl]")
+    assert len(btns) == 4  # Toutes / Critiques / Avertissements / Info
+    page.click('[data-lvl="bad"]')
+    assert page.eval_on_selector('[data-lvl="bad"]', "b => b.classList.contains('on')")
+    page.click('[data-lvl="all"]')
+    assert page.eval_on_selector('[data-lvl="all"]', "b => b.classList.contains('on')")
+    page.click("#ev-hist")  # bascule vers l'historique persisté
+    page.wait_for_timeout(600)
+    assert page.eval_on_selector("#ev-hist", "b => b.classList.contains('on')")
+    assert page.errors == []

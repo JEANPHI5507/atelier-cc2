@@ -1902,6 +1902,18 @@ def _add_alerts(app: FastAPI) -> None:
     def events(request: Request) -> list[dict[str, Any]]:
         return list(reversed(watcher(request).events[-50:]))
 
+    @app.get("/lab/api/events/historique", include_in_schema=False)
+    def events_history() -> list[dict[str, Any]]:
+        """The persisted alert log (the events file, up to 200 entries), most recent first — the dialog's
+        history view, beyond the 50 kept in memory."""
+        from . import alerts
+
+        try:
+            data = json.loads(alerts.events_file().read_text())
+        except (OSError, ValueError):
+            return []
+        return list(reversed(data[-200:]))
+
     @app.get("/lab/api/events/stream", include_in_schema=False)
     async def events_stream(request: Request) -> EventSourceResponse:
         w = watcher(request)
