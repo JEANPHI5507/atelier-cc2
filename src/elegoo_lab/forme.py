@@ -7,14 +7,16 @@ triangle comes from: painted faces keep their paint code, coloured faces their c
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import manifold3d as mf
 import numpy as np
 import trimesh
 
 from . import colorize, colors, threemf
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 SHAPES = {"cylindre": "Cylindre", "cube": "Pavé", "sphere": "Boule"}
 OPS = {"percer": "Percer", "ajouter": "Ajouter", "garder": "Garder seulement le commun"}

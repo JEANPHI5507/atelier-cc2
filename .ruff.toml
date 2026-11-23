@@ -7,17 +7,10 @@ ignore = [
     "E501",      # line too long (handled by black)
     "B008",      # do not perform function calls in argument defaults
     "C901",      # too complex
-    "S101",      # assert used
+    "S101",      # assert used (tests: per-file-ignored)
     "S301",      # pickle
     "S307",      # eval
-    "S603",      # subprocess without shell=True
-    "S607",      # start_process_with_partial_path
     "UP007",     # non-pep604-annotation
-    "RET502",    # implicit return None (will fix gradually)
-    "RET503",    # missing explicit return None (will fix gradually)
-    "BLE001",    # blind exception (will fix gradually)
-    "B905",      # zip without strict (will fix gradually)
-    "TC003",     # pathlib in type-checking block (will fix gradually)
     "F401",      # unused import (some are intentional for availability checks)
     "F811",      # redefined name (some are intentional)
     "FBT001",    # boolean-typed positional argument (will fix gradually)
@@ -28,7 +21,7 @@ ignore = [
 ]
 
 [lint.per-file-ignores]
-"tests/*" = ["S101", "ARG001", "PLR0913", "PLR0915", "PT018", "E702", "PT011", "ARG005", "S310", "S108", "E731", "N814", "E741", "SIM115", "N802", "E402"]
+"tests/*" = ["S101", "ARG001", "PLR0913", "PLR0915", "PT018", "E702", "PT011", "ARG005", "S310", "S108", "S603", "BLE001", "E731", "N814", "E741", "SIM115", "N802", "E402"]
 "src/elegoo_lab/web/*" = ["ALL"]
 "src/elegoo_lab/threemf.py" = ["N817"]
 

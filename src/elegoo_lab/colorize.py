@@ -11,12 +11,15 @@ from __future__ import annotations
 
 import json
 import zipfile
-from pathlib import Path
+from typing import TYPE_CHECKING
 from xml.sax.saxutils import quoteattr
 
 import numpy as np
 
 from . import mesh
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 BED_CENTER = mesh.BED_MM / 2
 MAX_SLOTS = 4

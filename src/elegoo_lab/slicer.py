@@ -426,7 +426,7 @@ def slice_model(
             str(model.resolve()),
         ]  # cwd is tmp
         try:
-            run = subprocess.run(
+            run = subprocess.run(  # noqa: S603 — OrcaSlicer binary from the local config
                 cmd, capture_output=True, text=True, timeout=timeout, cwd=tmp
             )  # its log lands in tmp
         except subprocess.TimeoutExpired as err:

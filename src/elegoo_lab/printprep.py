@@ -471,7 +471,8 @@ def prepare_and_slice(
         real = sum(stock.grams(mm + p, f) for mm, p, f in zip(per, purge, fil, strict=False))
         try:
             stock.calibrate_fill(usage, est, real)
-        except Exception as e:  # a failed estimate correction must never fail a slice
+        # a failed estimate correction must never fail a slice
+        except Exception as e:  # noqa: BLE001
             import logging
 
             logging.getLogger(__name__).debug("calibrate_fill failed: %s", e)
@@ -742,7 +743,7 @@ def _thumb(
         png = thumbnail.render(v, f, rgb)
         for g in gcodes:
             thumbnail.inject(g, png)
-    except Exception as err:  # noqa: BLE001
+    except Exception as err:  # noqa: BLE001 — — noqa: BLE001
         warnings.append(f"Vignette d'écran non générée ({type(err).__name__}).")
 
 

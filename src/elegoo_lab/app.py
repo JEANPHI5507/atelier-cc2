@@ -118,7 +118,7 @@ def _split_plates(dest: Path) -> dict[str, list[str]]:
 
     try:
         return {"plates": [p.name for p in threemf.split_plates(dest)]}
-    except Exception:  # an odd file stays as uploaded
+    except Exception:  # noqa: BLE001 — an odd file stays as uploaded
         return {"plates": []}
 
 
@@ -324,7 +324,8 @@ def lab_router(cfg: config.Config) -> APIRouter:
         _model_path(name)
         try:
             png = await asyncio.to_thread(library.thumbnail, name)
-        except Exception:  # a mesh that cannot be read still lists, just without a picture
+        # a mesh that cannot be read still lists, just without a picture
+        except Exception:  # noqa: BLE001
             png = None
         if not png:
             raise HTTPException(404, "pas de vignette")
@@ -439,7 +440,7 @@ def lab_router(cfg: config.Config) -> APIRouter:
             got = await importlink.fetch(body.url)
         except importlink.LinkError as e:
             raise HTTPException(422, str(e)) from None
-        except Exception as e:  # network trouble: say it plainly
+        except (OSError, httpx.HTTPError) as e:  # network trouble: say it plainly
             raise HTTPException(502, f"Téléchargement impossible : {type(e).__name__}") from None
         names = []
         for name, data in got:
@@ -475,7 +476,7 @@ def lab_router(cfg: config.Config) -> APIRouter:
                 "usage": printprep.suggest_usage(p),
                 "retour": library.load_index().get(p.name, {}).get("retour"),
             }
-        except Exception as err:
+        except Exception as err:  # noqa: BLE001
             raise HTTPException(422, str(err)) from err
 
     @r.get("/slicer")
@@ -500,7 +501,7 @@ def lab_router(cfg: config.Config) -> APIRouter:
     def model_colors(name: str) -> dict[str, Any]:
         try:
             return colors.analyze(_model_path(name))
-        except Exception as err:
+        except Exception as err:  # noqa: BLE001
             raise HTTPException(422, f"analyse des couleurs impossible: {err}") from err
 
     @r.get("/models/{name}/marks")
@@ -543,7 +544,7 @@ def lab_router(cfg: config.Config) -> APIRouter:
         """The objects of a model and the face range of each in preview.glb (to move them one by one)."""
         try:
             return await asyncio.to_thread(colors.piece_ranges, _model_path(name))
-        except Exception as err:
+        except Exception as err:  # noqa: BLE001
             raise HTTPException(422, f"lecture impossible: {err}") from err
 
     @r.post("/composer")
@@ -600,7 +601,7 @@ def lab_router(cfg: config.Config) -> APIRouter:
         if key not in preview_cache:
             try:
                 glb = await asyncio.to_thread(colors.preview_glb_bytes, src, mapping, palette)
-            except Exception as err:
+            except Exception as err:  # noqa: BLE001
                 raise HTTPException(422, f"aperçu impossible: {err}") from err
             preview_cache.clear() if len(preview_cache) > 32 else None
             preview_cache[key] = glb
@@ -740,7 +741,7 @@ def lab_router(cfg: config.Config) -> APIRouter:
         src = _model_path(name)
         try:
             canvas = await request.app.state.manager.printer.canvas_status()
-        except Exception as err:
+        except Exception as err:  # noqa: BLE001
             raise HTTPException(
                 503, f"CANVAS illisible (imprimante injoignable ?) : {str(err)[:120]}"
             ) from err
@@ -1133,7 +1134,8 @@ def lab_router(cfg: config.Config) -> APIRouter:
 
         try:
             jpeg = await _plate_photo(request)
-        except Exception as err:  # printer or camera away: the check is only advice
+        # printer or camera away: the check is only advice
+        except Exception as err:  # noqa: BLE001
             return {"etat": "inconnu", "raison": f"caméra indisponible ({type(err).__name__})"}
         return {
             **bedcheck.check(jpeg),
@@ -1149,7 +1151,7 @@ def lab_router(cfg: config.Config) -> APIRouter:
             return bedcheck.save_reference(await _plate_photo(request))
         except ValueError as err:
             raise HTTPException(422, str(err)) from err
-        except Exception as err:
+        except Exception as err:  # noqa: BLE001
             raise HTTPException(503, f"caméra indisponible ({type(err).__name__})") from err
 
     @r.post("/models/{name}/optimize")
@@ -1353,7 +1355,7 @@ def lab_router(cfg: config.Config) -> APIRouter:
                 "dict[str, Any]",
                 (await asyncio.wait_for(request.app.state.manager.printer.canvas_status(), 15)).raw,
             )
-        except Exception:
+        except (OSError, RuntimeError, TimeoutError, httpx.HTTPError):
             return None
 
     @r.get("/entretien")
@@ -1510,7 +1512,7 @@ def lab_router(cfg: config.Config) -> APIRouter:
             try:
                 printprep.compare(src, base, on_row=lambda rows: job.update(rows=list(rows)))
                 job["state"] = "done"
-            except Exception as err:
+            except Exception as err:  # noqa: BLE001
                 job.update(state="error", error=str(err)[:200])
             while len(compares) > 10:
                 compares.pop(next(iter(compares)))
@@ -1621,7 +1623,7 @@ def lab_router(cfg: config.Config) -> APIRouter:
                     on_queued=queued(jid),
                 )
                 finished(jid, files)
-            except Exception as err:  # surfaced to the UI
+            except Exception as err:  # noqa: BLE001 — — surfaced to the UI
                 jobs[jid].update(state="error", error=str(err))
                 save_jobs()
             finally:
@@ -1675,7 +1677,7 @@ def lab_router(cfg: config.Config) -> APIRouter:
                         on_queued=queued(j["id"]),
                     )
                     finished(j["id"], files)
-                except Exception as err:
+                except Exception as err:  # noqa: BLE001
                     j.update(state="error", error=str(err))
                     save_jobs()
 
@@ -2009,7 +2011,7 @@ def _add_alerts(app: FastAPI) -> None:
             try:
                 vision.download_model(lambda d, t: model_dl.update(done=d, total=t))
                 model_dl["state"] = "done"
-            except Exception as err:
+            except Exception as err:  # noqa: BLE001
                 model_dl.update(state="error", error=str(err)[:200])
 
         threading.Thread(target=work, daemon=True).start()

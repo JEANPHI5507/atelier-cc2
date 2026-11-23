@@ -92,7 +92,15 @@ def run(dest: str | None = None, *, if_needed: bool = False) -> str:
     stamp = time.strftime("%Y-%m-%d_%H%M")
 
     def sh(cmd: list[str], **kw: Any) -> None:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=3600, **kw)
+        import shutil
+
+        r = subprocess.run(  # noqa: S603 — internal tool, binary resolved with which()
+            [shutil.which(cmd[0]) or cmd[0], *cmd[1:]],
+            capture_output=True,
+            text=True,
+            timeout=3600,
+            **kw,
+        )
         if r.returncode:
             raise RuntimeError(
                 (r.stderr or r.stdout).strip().splitlines()[-1]

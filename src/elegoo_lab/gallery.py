@@ -97,11 +97,12 @@ class Recorder:
         self.meta.update(facts)
         self.meta["duree_s"] = self.meta["fin"] - self.meta["debut"]
         frames = self.dir / "frames"
-        if self.frames >= 8 and shutil.which("ffmpeg"):
+        ffmpeg = shutil.which("ffmpeg")
+        if self.frames >= 8 and ffmpeg:
             out = self.dir / "timelapse.mp4"
-            r = subprocess.run(
+            r = subprocess.run(  # noqa: S603 — internal tool, ffmpeg resolved above
                 [
-                    "ffmpeg",
+                    ffmpeg,
                     "-y",
                     "-loglevel",
                     "error",

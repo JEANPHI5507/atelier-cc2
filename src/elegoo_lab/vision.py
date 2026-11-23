@@ -16,13 +16,15 @@ import hashlib
 import io
 import threading
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from PIL import Image, ImageDraw
 
 from . import config
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 MODEL_URL = "https://www.obico.io/static_pub/ml-models/model-weights-5a6b1be1fa.onnx"
 MODEL_SHA256 = "0a6ebd8e30dbf6a450c50f9c0a5406f04ba7eb1c99fd5996e888c78bb383b9aa"

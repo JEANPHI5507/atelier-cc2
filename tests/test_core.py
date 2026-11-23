@@ -232,7 +232,7 @@ def _std_3mf(path):
     v = "".join(f'<vertex x="{x}" y="{y}" z="{z}"/>' for x, y, z in m.vertices)
     t = "".join(
         f'<triangle v1="{a}" v2="{b}" v3="{c}"' + (' pid="2" p1="1"' if zc > 10 else "") + "/>"
-        for (a, b, c), zc in zip(m.faces, m.triangles_center[:, 2])
+        for (a, b, c), zc in zip(m.faces, m.triangles_center[:, 2], strict=True)
     )
     with zipfile.ZipFile(path, "w") as z:
         z.writestr("3D/3dmodel.model", STD_3MF.format(v=v, t=t))
@@ -353,7 +353,7 @@ def test_variable_layer_height_follows_the_slopes(tmp_path):
     assert any("couches de plus" in w for w in var["warnings"])
     g = (tmp_path / "b" / var["gcode"][0]).read_text(errors="ignore")
     zs = [float(z) for z in re.findall(r"^;Z:([\d.]+)", g, re.M)]
-    assert min(round(b - a, 2) for a, b in zip(zs, zs[1:])) < 0.2
+    assert min(round(b - a, 2) for a, b in zip(zs, zs[1:], strict=False)) < 0.2
 
 
 @pytest.mark.slicing
@@ -370,7 +370,7 @@ def test_painted_supports_and_seam_reach_the_slicer():
     pv = colors.preview_glb(src)
     under = [
         i
-        for i, (c, n) in enumerate(zip(pv.triangles_center, pv.face_normals))
+        for i, (c, n) in enumerate(zip(pv.triangles_center, pv.face_normals, strict=True))
         if n[2] < -0.9 and c[1] > 19
     ]  # Y-up
     assert colors.save_marks(src, {"support": under, "couture": [0]}) == {
@@ -3252,7 +3252,7 @@ def _piece_plate(tmp_path, name, gap_mm=10.0, extruders=(1, 2), heights=(20, 20)
     from elegoo_lab import colorize, colors, threemf
 
     objs, x = [], 0.0
-    for k, (e, h) in enumerate(zip(extruders, heights)):
+    for k, (e, h) in enumerate(zip(extruders, heights, strict=True)):
         m = trimesh.creation.box((20, 20, h))
         src = tmp_path / f"cube{k}_{name}.stl"
         m.export(src)

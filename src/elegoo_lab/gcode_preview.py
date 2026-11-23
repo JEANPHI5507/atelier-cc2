@@ -9,10 +9,12 @@ from __future__ import annotations
 import base64
 import math
 import re
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 KINDS = {"model": 0, "support": 1, "tower": 2}
 SCALE = 50  # int16 units per mm (±655 mm range)

@@ -9,11 +9,14 @@ height): its command line ignores the ``layer_heights_profile`` a 3MF can carry,
 from __future__ import annotations
 
 import zipfile
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 
 from . import threemf
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 MIN_MM, MAX_MM = 0.08, 0.28  # the CC2 0.4 nozzle profile's min_layer_height / max_layer_height
 BAND_MM = 0.4  # heights are decided per band of this thickness

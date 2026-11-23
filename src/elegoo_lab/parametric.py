@@ -9,10 +9,9 @@ colour from the CANVAS.
 from __future__ import annotations
 
 import re
-from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import manifold3d as mf
 import numpy as np
@@ -20,6 +19,9 @@ from fontTools.pens.basePen import BasePen
 from fontTools.ttLib import TTFont
 
 from . import colorize, config, mesh, threemf
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 FONT = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
 SCRIPT_FONT = Path(

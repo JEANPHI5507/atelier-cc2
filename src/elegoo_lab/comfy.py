@@ -16,13 +16,15 @@ import contextlib
 import json
 import random
 import time
-from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
 
 from .config import ROOT
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 WORKFLOWS = ROOT / "workflows"
 MESH_EXT = {".glb", ".gltf", ".obj", ".stl", ".ply", ".3mf"}

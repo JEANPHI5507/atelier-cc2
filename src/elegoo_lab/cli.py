@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -238,9 +239,14 @@ UNIT_DIR = Path.home() / ".config" / "systemd" / "user"
 UNITS = ("cc2-atelier",)
 
 
+def _bin(name: str) -> str:
+    """Full path of a system binary (S607): fall back to the bare name, which then fails as before."""
+    return shutil.which(name) or name
+
+
 def _systemctl(*args: str, check: bool = True) -> subprocess.CompletedProcess:
-    return subprocess.run(
-        ["systemctl", "--user", *args], capture_output=True, text=True, check=check
+    return subprocess.run(  # noqa: S603 — internal tool, binary resolved above
+        [_bin("systemctl"), "--user", *args], capture_output=True, text=True, check=check
     )
 
 
@@ -287,7 +293,9 @@ def service_install(
     for u in UNITS:
         _systemctl("enable", f"{u}.service")
         _systemctl("restart", f"{u}.service")
-    linger = subprocess.run(["loginctl", "enable-linger"], capture_output=True, text=True)
+    linger = subprocess.run(  # noqa: S603 — internal tool, binary resolved
+        [_bin("loginctl"), "enable-linger"], capture_output=True, text=True
+    )
     typer.echo(
         f"Service installé : contrôle {'activé' if control else 'lecture seule'}"
         f", {'ouvert au téléphone' if reseau else 'ce PC seulement'}."
@@ -328,9 +336,9 @@ def service_status() -> None:
 @service.command("journal")
 def service_logs(lignes: Annotated[int, typer.Option(help="Nombre de lignes.")] = 40) -> None:
     """Dernières lignes écrites par l'atelier (pour comprendre un souci)."""
-    subprocess.run(
+    subprocess.run(  # noqa: S603 — internal tool, binary resolved
         [
-            "journalctl",
+            _bin("journalctl"),
             "--user",
             "-u",
             "cc2-atelier",
@@ -768,7 +776,7 @@ def doctor() -> None:
         typer.echo(f"{ok(model_ok)}Modèle IA {'chargé' if model_ok else 'NON chargé'}")
         if not model_ok:
             typer.echo("    → Exécute 'make ia' pour l'installer")
-    except Exception:
+    except (OSError, ValueError, RuntimeError):
         typer.echo(f"{ok(False)}Modèle IA non disponible")
 
     # 5. Imprimante

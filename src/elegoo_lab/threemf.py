@@ -16,13 +16,16 @@ import itertools
 import json
 import re
 import zipfile
-from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 from xml.sax.saxutils import quoteattr
 
 import numpy as np
 from defusedxml import ElementTree as ET
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 CORE = "http://schemas.microsoft.com/3dmanufacturing/core/2015/02"
 MAT = "http://schemas.microsoft.com/3dmanufacturing/material/2015/02"

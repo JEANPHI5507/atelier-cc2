@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import trimesh
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 BED_MM = 256.0  # Centauri Carbon 2 build volume is 256 x 256 x 256 mm
 
@@ -26,7 +28,7 @@ def step_to_glb(src: Path) -> Path:
         import cascadio
 
         cascadio.step_to_glb(str(src), str(out))
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         out.unlink(missing_ok=True)
         raise ValueError(f"{src.name} : fichier CAD illisible ({type(e).__name__})") from None
     if not out.is_file() or out.stat().st_size == 0:

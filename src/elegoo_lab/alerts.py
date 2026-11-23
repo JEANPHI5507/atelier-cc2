@@ -16,13 +16,14 @@ import re
 import threading
 import time
 from collections import deque
-from collections.abc import AsyncIterator, Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from . import config
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator, Callable
+
     from . import gallery
 
 log = logging.getLogger(__name__)
@@ -785,7 +786,7 @@ class Watcher:
             return
         try:
             jpeg = await asyncio.wait_for(self.snapshot(), timeout=10)
-        except Exception:
+        except Exception:  # noqa: BLE001
             self._camera_health(None)
             return
         self._camera_health(jpeg)
@@ -799,7 +800,7 @@ class Watcher:
         self.last_ai = time.time()
         try:
             dets = await asyncio.to_thread(vision.detect, jpeg)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             log.warning("vision: %s", e)
             return
         self.pred.update(sum(c for c, _ in dets))
@@ -853,7 +854,7 @@ class Watcher:
             return
         try:
             low = stock.consume(Path(name).name, fraction, ref)
-        except Exception as e:  # stock is a bonus: never break the alerts for it
+        except Exception as e:  # noqa: BLE001 — stock is a bonus: never break the alerts for it
             log.warning("stock: %s", e)
             return
         for t in low:
@@ -868,7 +869,7 @@ class Watcher:
 
         try:
             raw = (await asyncio.wait_for(self.canvas(), timeout=15)).raw
-        except Exception:
+        except Exception:  # noqa: BLE001
             return
         for t in await asyncio.to_thread(stock.sync, spools.loaded(raw)):
             if t["remise"]:
@@ -887,7 +888,7 @@ class Watcher:
     async def _photo(self, ev: dict[str, Any]) -> None:
         try:
             jpeg = await asyncio.wait_for(self.snapshot(), timeout=15)
-        except Exception:
+        except Exception:  # noqa: BLE001
             return  # no camera or it did not answer: the alert stands without a photo
         photos = photos_dir()
         photos.mkdir(parents=True, exist_ok=True)
@@ -935,7 +936,7 @@ class Watcher:
                 self.ticks += 1
             except asyncio.CancelledError:
                 raise
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 msg = f"Imprimante muette : {type(e).__name__} {e}".strip()
                 if not self.term or self.term[-1]["text"] != msg:
                     self.say(msg, "warn")
