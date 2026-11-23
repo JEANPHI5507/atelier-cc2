@@ -4629,3 +4629,742 @@ def test_cli_slice_with_mocked_prepare(tmp_path, monkeypatch):
     monkeypatch.setattr(printprep, "prepare_and_slice", boom)
     r = CliRunner().invoke(cli.app, ["slice", "cube.stl"])
     assert r.exit_code == 1 and "illisible" in r.output
+
+
+# --- INF.3 bloc 4 : cli (doctor, service, sauvegarde, models/multicolor/gen, erreurs slice),
+#     assistant (chat_cli avec faux binaire, slice_brain, chat_api mocke, chat_events),
+#     vision (Prediction/annotate/grab), spools, importlink, sauvegarde.run,
+#     couches (apply/remove/bandes pentues), optimize (corrections), addtext (erreurs),
+#     simulateur vivant (commandes de controle + app web contre le Sim) ---
+
+
+def test_cli_doctor():
+    from typer.testing import CliRunner
+
+    from elegoo_lab import cli
+
+    r = CliRunner().invoke(cli.app, ["doctor"])
+    assert r.exit_code == 0, r.output
+    for section in (
+        "Configuration",
+        "OrcaSlicer",
+        "Modèle IA",
+        "Imprimante",
+        "Caméra",
+        "Espace disque",
+        "ComfyUI",
+    ):
+        assert section in r.output, section
+
+
+def test_cli_service_lifecycle(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from typer.testing import CliRunner
+
+    from elegoo_lab import cli, config
+
+    units = tmp_path / "units"
+    monkeypatch.setattr(cli, "UNIT_DIR", units)
+    monkeypatch.setattr(
+        cli,
+        "_systemctl",
+        lambda *a, check=True: SimpleNamespace(
+            stdout=("active\n" if a[0] == "is-active" else "enabled\n"), returncode=0
+        ),
+    )
+    monkeypatch.setattr(
+        cli.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=0, stderr="", stdout="")
+    )
+    runner = CliRunner()
+    r = runner.invoke(cli.app, ["service", "installer"])
+    assert r.exit_code != 0 and "non configur" in r.output  # pas d'imprimante en config de test
+    config.CONFIG_FILE.write_text('[printer]\nhost = "1.2.3.4"\naccess_code = "123456"\n')
+    r = runner.invoke(cli.app, ["service", "installer", "--local"])
+    assert r.exit_code == 0, r.output
+    unit = units / "cc2-atelier.service"
+    assert unit.exists() and "ExecStart=" in unit.read_text()
+    r = runner.invoke(cli.app, ["service", "etat"])
+    assert r.exit_code == 0 and "en marche" in r.output
+    r = runner.invoke(cli.app, ["service", "journal", "--lignes", "5"])
+    assert r.exit_code == 0, r.output
+    r = runner.invoke(cli.app, ["service", "retirer"])
+    assert r.exit_code == 0 and not unit.exists()
+
+
+def test_cli_sauvegarde_commands(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from typer.testing import CliRunner
+
+    from elegoo_lab import cli, sauvegarde
+
+    monkeypatch.setattr(cli, "UNIT_DIR", tmp_path / "units")
+    monkeypatch.setattr(
+        cli, "_systemctl", lambda *a, check=True: SimpleNamespace(stdout="", returncode=0)
+    )
+    runner = CliRunner()
+    monkeypatch.setattr(sauvegarde, "run", lambda *a, **k: "sauvegarde faite vers /usb")
+    r = runner.invoke(cli.app, ["sauvegarde", "faire"])
+    assert r.exit_code == 0 and "sauvegarde faite" in r.output
+
+    def boom(*a, **k):
+        raise RuntimeError("disque non branche")
+
+    monkeypatch.setattr(sauvegarde, "run", boom)
+    r = runner.invoke(cli.app, ["sauvegarde", "faire", "--si-besoin"])
+    assert r.exit_code == 1 and "impossible" in r.output
+    monkeypatch.setattr(
+        sauvegarde,
+        "status",
+        lambda: {"ok": 1700000000, "vers": "/usb", "essai": 1700000100, "erreur": "boom"},
+    )
+    r = runner.invoke(cli.app, ["sauvegarde", "etat"])
+    assert r.exit_code == 0 and "/usb" in r.output and "boom" in r.output
+    r = runner.invoke(cli.app, ["sauvegarde", "installer", "--vers", "/mnt/usb"])
+    assert r.exit_code == 0 and (tmp_path / "units" / "cc2-sauvegarde.timer").exists()
+
+
+def test_cli_models_prepare_and_multicolor(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from typer.testing import CliRunner
+
+    from elegoo_lab import cli, config, slicer
+
+    lib = config.MODELS_DIR
+    trimesh.creation.box((10, 10, 10)).export(lib / "a.stl")
+    trimesh.creation.box((5, 5, 5)).export(lib / "b.stl")
+    runner = CliRunner()
+    r = runner.invoke(cli.app, ["models", "prepare", "a.stl"])
+    assert r.exit_code == 0, r.output
+    assert (lib / "a_print.stl").exists()
+    r = runner.invoke(cli.app, ["multicolor", "a.stl"])  # pas de :emplacement
+    assert r.exit_code == 1
+    monkeypatch.setattr(
+        slicer,
+        "slice_model",
+        lambda *a, **k: SimpleNamespace(
+            gcode=["multi.gcode"], layers=10, time="1 h", filament_m=3.0
+        ),
+    )
+    r = runner.invoke(cli.app, ["multicolor", "a.stl:1", "b.stl:2", "--name", "multi"])
+    assert r.exit_code == 0, r.output
+    assert (lib / "multi.3mf").exists()
+    assert "bobine 1 = PLA" in r.output
+
+
+def test_cli_gen_and_slice_option_errors(tmp_path, monkeypatch):
+    from typer.testing import CliRunner
+
+    from elegoo_lab import cli, comfy as comfy_mod, config
+
+    runner = CliRunner()
+    lib = config.MODELS_DIR
+    trimesh.creation.box((10, 10, 10)).export(lib / "a.stl")
+
+    def boom(*a, **k):
+        raise comfy_mod.ComfyError("ko comfy")
+
+    monkeypatch.setattr(comfy_mod, "generate", boom)
+    r = runner.invoke(cli.app, ["gen", "texte3d"])
+    assert r.exit_code == 1 and "ko comfy" in r.output
+    monkeypatch.setattr(comfy_mod, "generate", lambda *a, **k: [lib / "x.glb"])
+    r = runner.invoke(cli.app, ["gen", "texte3d", "--prompt", "un cube"])
+    assert r.exit_code == 0 and "x.glb" in r.output
+    r = runner.invoke(cli.app, ["slice", "a.stl", "--slot", "x:y"])  # couleur non numérique
+    assert r.exit_code == 1
+    r = runner.invoke(cli.app, ["slice", "a.stl", "--nozzle", "0.8"])  # buse perso -> SliceError
+    assert r.exit_code == 1
+
+
+def _fake_cli_script(tmp_path, body: str) -> Path:
+    script = tmp_path / "fakevibe"
+    script.write_text("#!/bin/sh\n" + body)
+    script.chmod(0o755)
+    return script
+
+
+def test_assistant_chat_cli_with_fake_bin(tmp_path, monkeypatch):
+    from elegoo_lab import assistant, config
+
+    lib = tmp_path / "models"
+    lib.mkdir()
+    monkeypatch.setattr(config, "MODELS_DIR", lib)
+    monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "config.toml")
+    trimesh.creation.box((10, 10, 10)).export(lib / "cube.stl")
+    state = tmp_path / "n"
+    first = json.dumps(
+        [
+            {
+                "role": "assistant",
+                "type": "message",
+                "sessionId": "s1",
+                "content": [
+                    {"text": json.dumps({"outils": [{"outil": "fiche", "arguments": {}}]})}
+                ],
+            }
+        ]
+    )
+    second = json.dumps(
+        [
+            {
+                "role": "assistant",
+                "type": "message",
+                "sessionId": "s1",
+                "content": [{"text": json.dumps({"reponse": "voila la fiche"})}],
+            }
+        ]
+    )
+    assert "'" not in first + second
+    _fake_cli_script(
+        tmp_path,
+        f'n=0\n[ -f "{state}" ] && read n < "{state}"\nn=$((n+1))\necho "$n" > "{state}"\n'
+        f"if [ \"$n\" -eq 1 ]; then printf '%s' '{first}'\n"
+        f"else printf '%s' '{second}'\nfi\n",
+    )
+    monkeypatch.setattr(assistant, "cli_bin", lambda: str(tmp_path / "fakevibe"))
+    res = assistant.chat("cube.stl", "donne la fiche")
+    assert res["reply"] == "voila la fiche"
+    assert res["outils"] == ["fiche"] and res["file"] == "cube.stl"
+    # mode streaming (emit) : lignes JSON + événement d'outil CLI
+    line1 = json.dumps({"type": "effect", "detail": {"toolName": "blender_cao"}})
+    line2 = json.dumps(
+        {
+            "role": "assistant",
+            "type": "message",
+            "sessionId": "s2",
+            "content": [{"text": json.dumps({"reponse": "ok stream"})}],
+        }
+    )
+    assert "'" not in line1 + line2
+    _fake_cli_script(tmp_path, f"printf '%s\\n' '{line1}' '{line2}'\n")
+    events = []
+    res2 = assistant.chat("cube.stl", "salut", emit=events.append)
+    assert res2["reply"] == "ok stream"
+    assert {"type": "cli", "cible": "blender_cao"} in events
+    # moteur cli sans binaire -> ValueError
+    monkeypatch.setattr(assistant, "cli_bin", lambda: None)
+    (tmp_path / "config.toml").write_text('[assistant]\nmoteur = "cli"\n')
+    with pytest.raises(ValueError, match="introuvable"):
+        assistant.chat("cube.stl", "x")
+
+
+def test_assistant_slice_brain_with_fake_bin(tmp_path, monkeypatch):
+    from elegoo_lab import assistant, config
+
+    lib = tmp_path / "models"
+    lib.mkdir()
+    monkeypatch.setattr(config, "MODELS_DIR", lib)
+    monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "config.toml")
+    trimesh.creation.box((20, 20, 20)).export(lib / "cube.stl")
+    payload = json.dumps(
+        [
+            {
+                "role": "assistant",
+                "type": "message",
+                "content": [
+                    {
+                        "text": json.dumps(
+                            {
+                                "reponse": {
+                                    "qualite": "0.20 mm",
+                                    "remplissage": 25,
+                                    "supports": "arbre",
+                                    "usage": "fonctionnel",
+                                    "reglages": {"wall_loops": "4"},
+                                    "rotate": [0, 0, 90],
+                                    "explication": "test",
+                                }
+                            }
+                        )
+                    }
+                ],
+            }
+        ]
+    )
+    assert "'" not in payload
+    _fake_cli_script(tmp_path, f"printf '%s' '{payload}'\n")
+    monkeypatch.setattr(assistant, "cli_bin", lambda: str(tmp_path / "fakevibe"))
+    out = assistant.slice_brain(
+        "cube.stl",
+        {"usage": "fonctionnel"},
+        qualities=["0.12 mm", "0.20 mm"],
+        spec={
+            "choices": [{"name": "wall_loops", "options": [{"value": "4"}, {"value": "3"}]}],
+            "numbers": [{"name": "x", "min": 0, "max": 10}],
+            "numbers_fil": [],
+            "temps": [],
+        },
+    )
+    assert out["qualite"] == "0.20 mm"
+    assert out["remplissage"] == 25 and out["supports"] == "arbre"
+    assert out["usage"] == "fonctionnel"
+    assert out["reglages"] == {"wall_loops": "4"}
+    assert out["rotate"] == [0.0, 0.0, 90.0]
+    monkeypatch.setattr(assistant, "cli_bin", lambda: None)
+    with pytest.raises(ValueError, match="introuvable"):
+        assistant.slice_brain("cube.stl", {})
+
+
+def test_assistant_chat_api_mocked(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from elegoo_lab import assistant, config
+
+    lib = tmp_path / "models"
+    lib.mkdir()
+    monkeypatch.setattr(config, "MODELS_DIR", lib)
+    monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "config.toml")
+    trimesh.creation.box((10, 10, 10)).export(lib / "cube.stl")
+    (tmp_path / "config.toml").write_text('[assistant]\napi_key = "sk-test"\nmoteur = "api"\n')
+    real_chat = assistant.chat
+
+    def resp_tool():
+        return SimpleNamespace(
+            status_code=200,
+            text="",
+            json=lambda: {
+                "choices": [
+                    {
+                        "message": {
+                            "role": "assistant",
+                            "content": None,
+                            "tool_calls": [
+                                {"id": "t1", "function": {"name": "fiche", "arguments": "{}"}}
+                            ],
+                        }
+                    }
+                ]
+            },
+        )
+
+    def resp_text():
+        return SimpleNamespace(
+            status_code=200,
+            text="",
+            json=lambda: {
+                "choices": [{"message": {"role": "assistant", "content": "reponse finale"}}]
+            },
+        )
+
+    seq = [resp_tool(), resp_text()]
+    monkeypatch.setattr(assistant.httpx, "post", lambda *a, **k: seq.pop(0))
+    res = assistant.chat("cube.stl", "fiche stp")
+    assert res["reply"] == "reponse finale" and res["outils"] == ["fiche"]
+    monkeypatch.setattr(
+        assistant.httpx,
+        "post",
+        lambda *a, **k: SimpleNamespace(status_code=500, text="boom", json=dict),
+    )
+    with pytest.raises(ValueError, match="500"):
+        assistant.chat("cube.stl", "x")
+    # chat_events : un événement final, ou erreur propre
+    monkeypatch.setattr(
+        assistant, "chat", lambda *a, **k: {"reply": "ok", "file": "f", "outils": []}
+    )
+    evs = list(assistant.chat_events("f", "m"))
+    assert evs[-1]["type"] == "final" and evs[-1]["reply"] == "ok"
+
+    def boom(*a, **k):
+        raise ValueError("ko")
+
+    monkeypatch.setattr(assistant, "chat", boom)
+    evs = list(assistant.chat_events("f", "m"))
+    assert evs[-1]["type"] == "erreur" and "ko" in evs[-1]["texte"]
+    # moteur api sans clé -> ValueError explicite
+    monkeypatch.setattr(assistant, "chat", real_chat)
+    (tmp_path / "config.toml").write_text('[assistant]\nmoteur = "api"\n')
+    monkeypatch.delenv("MISTRAL_API_KEY", raising=False)
+    with pytest.raises(ValueError, match="pas de cl"):
+        assistant.chat("cube.stl", "x")
+
+
+async def test_vision_prediction_annotate_grab():
+    import io
+
+    from PIL import Image
+
+    from elegoo_lab import vision
+
+    p = vision.Prediction()
+    assert not p.failing()  # moins de 30 images : jamais d'alerte
+    for _ in range(40):
+        p.update(0.01)
+    for _ in range(40):
+        p.update(0.99)
+    assert p.failing()
+    assert len(p.history) <= 120 and p.last_p == 0.99
+    p.new_print()
+    assert p.frames == 0 and not p.failing()
+    img = Image.new("RGB", (64, 64), (10, 10, 10))
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG")
+    jpeg = buf.getvalue()
+    out = vision.annotate(jpeg, [(0.9, (0.1, 0.1, 0.5, 0.5)), (0.1, (0.2, 0.2, 0.3, 0.3))])
+    assert out[:2] == b"\xff\xd8"
+    assert not vision.model_ready()  # pas de modèle ONNX dans le repo
+
+    class Chunks:
+        async def __aiter__(self):
+            yield jpeg[:10]
+            yield jpeg[10:]
+
+        async def aclose(self):
+            pass
+
+    class Cam:
+        async def subscribe(self):
+            return None, Chunks()
+
+    class Mgr:
+        camera = Cam()
+
+    data = await vision.grab(Mgr())
+    assert data[:2] == b"\xff\xd8" and data[-2:] == b"\xff\xd9"
+
+
+def test_spools_single_own_and_needs(monkeypatch):
+    from elegoo_lab import slicer, spools
+
+    monkeypatch.setattr(slicer, "filaments", lambda: ["PLA", "PLA Silk", "PETG"])
+    trays = [
+        {
+            "tray_id": i,
+            "pos": i - 1,
+            "color": c,
+            "type": "PLA",
+            "filament_name": n,
+            "profile": "Elegoo PLA",
+            "brand": "Elegoo",
+        }
+        for i, (c, n) in enumerate(
+            [("#FF0000", "Rouge"), ("#00FF00", "Vert"), ("#0000FF", "Bleu"), ("#FFFFFF", "Blanc")],
+            1,
+        )
+    ]
+    r = spools.single({"index": 1, "hex": "#FF1100", "share": 100.0}, trays, coloured=True)
+    assert r["mapping"] == {1: 1} and r["filaments"] and not r["warnings"]
+    r2 = spools.single(
+        {"index": 1, "hex": "#123456", "share": 100.0}, trays, coloured=False, active=3
+    )
+    assert r2["filaments"] == [spools.filament_for(trays[2])]  # bobine active = tray 3
+    with pytest.raises(ValueError, match="aucune bobine"):
+        spools.single({"index": 1, "hex": "#FF0000", "share": 100.0}, [], coloured=True)
+    mine = [{"matiere": "PLA", "couleur": "#FF0002", "profil": "Mon PLA", "nom": "Mon rouge"}]
+    tray = {
+        "color": "#FF0000",
+        "type": "PLA",
+        "filament_name": "Rouge",
+        "profile": "Elegoo PLA",
+        "tray_id": 1,
+        "pos": 0,
+    }
+    out = spools.own(tray, mine)  # bobine perso proche -> profil repris
+    assert out["color"] == "#FF0002" and out["profile"] == "Mon PLA"
+    out2 = spools.own({**tray, "filament_name": "PLA Matte rouge"}, mine)  # variante -> inchangé
+    assert out2["color"] == "#FF0000"
+    assert spools.needs(100.0, [{"index": 1, "share": 100.0}], usage="decoratif")[1] >= 5
+    assert spools.needs(None, [{"index": 1, "share": 100.0}]) == {}  # volume inconnu -> {}
+    assert (
+        spools.filament_for({"type": "PLA", "filament_name": "Silk", "profile": "zzz"})
+        == "PLA Silk"
+    )
+    assert spools.filament_for({"type": "PETG", "filament_name": "", "profile": "zzz"}) == "PETG"
+
+
+async def test_importlink_get_and_fetch(monkeypatch):
+    from elegoo_lab import importlink
+
+    monkeypatch.setattr(importlink, "_check_host", lambda url: None)  # pas de DNS en test
+
+    class Resp:
+        def __init__(self, status=200, headers=None, body=b"", redirect=False):
+            self.status_code = status
+            self.headers = headers or {}
+            self._body = body
+            self.is_redirect = redirect
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def aiter_bytes(self):
+            yield self._body
+
+    class Client:
+        def __init__(self, routes):
+            self.routes = routes
+
+        def stream(self, _method, url):
+            return self.routes[url]
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+    a, b = "https://a.example/x", "https://b.example/y"
+    loop_client = Client(
+        {
+            a: Resp(redirect=True, headers={"location": b}),
+            b: Resp(redirect=True, headers={"location": a}),
+        }
+    )
+    with pytest.raises(importlink.LinkError, match="Trop de redirections"):
+        await importlink._get(loop_client, a)
+    c404 = Client({a: Resp(status=404)})
+    with pytest.raises(importlink.LinkError, match="répond 404"):
+        await importlink._get(c404, a)
+    c401 = Client({a: Resp(status=401)})
+    with pytest.raises(importlink.LinkError, match="connecté"):
+        await importlink._get(c401, a)
+    cbig = Client({a: Resp(headers={"content-length": str(importlink.MAX_BYTES + 1)})})
+    with pytest.raises(importlink.LinkError, match="trop gros"):
+        await importlink._get(cbig, a)
+    cok = Client(
+        {
+            a: Resp(
+                headers={
+                    "content-type": "application/octet-stream",
+                    "content-disposition": 'attachment; filename="cube.stl"',
+                },
+                body=b"solid",
+            )
+        }
+    )
+    final, data, ctype, disp = await importlink._get(cok, a)
+    assert (final, data) == (a, b"solid") and "cube.stl" in disp
+    # fetch : page HTML -> premier lien suivi, puis fichier direct
+    page = "https://site.example/page"
+    cdn = "https://cdn.example.com/m.stl"
+    monkeypatch.setattr(
+        httpx,
+        "AsyncClient",
+        lambda **kw: Client(
+            {
+                page: Resp(
+                    headers={"content-type": "text/html"},
+                    body=b'<a href="' + cdn.encode() + b'">dl</a>',
+                ),
+                cdn: Resp(headers={"content-type": "model/stl"}, body=b"solid m"),
+                "https://x.example/f.stl": Resp(
+                    headers={"content-type": "model/stl"}, body=b"solid direct"
+                ),
+                "https://x.example/f.txt": Resp(headers={"content-type": "text/plain"}, body=b"hi"),
+            }
+        ),
+    )
+    assert await importlink.fetch(page) == [("m.stl", b"solid m")]
+    assert await importlink.fetch("https://x.example/f.stl") == [("f.stl", b"solid direct")]
+    with pytest.raises(importlink.LinkError, match="ne mène pas"):
+        await importlink.fetch("https://x.example/f.txt")
+
+
+def test_sauvegarde_run_paths(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from elegoo_lab import config, sauvegarde
+
+    (tmp_path / "models").mkdir()
+    monkeypatch.setattr(config, "MODELS_DIR", tmp_path / "models")
+    monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "config.toml")
+    monkeypatch.setattr(sauvegarde, "_file", lambda: tmp_path / ".sauvegarde.json")
+    monkeypatch.setattr(sauvegarde, "status", lambda: {"ok": time.time()})
+    assert sauvegarde.run(if_needed=True) == "sauvegarde du jour déjà faite"
+    monkeypatch.setattr(sauvegarde, "status", lambda: {"ok": 0})
+    with pytest.raises(RuntimeError, match="non branché"):
+        sauvegarde.run(str(tmp_path))  # même disque que la bibliothèque -> refus
+    disk = tmp_path / "usb"
+    disk.mkdir()
+    monkeypatch.setattr(sauvegarde, "_same_disk", lambda a, b: False)
+    monkeypatch.setattr(
+        sauvegarde.subprocess,
+        "run",
+        lambda *a, **k: SimpleNamespace(returncode=0, stderr="", stdout=""),
+    )
+    msg = sauvegarde.run(str(disk))
+    assert "sauvegarde faite vers" in msg
+    assert (disk / sauvegarde.LOCAL_DIR / "models").exists()
+    msg2 = sauvegarde.run("maison")  # destination distante
+    assert "maison" in msg2
+    monkeypatch.setattr(sauvegarde, "usb_disk", lambda: None)
+    with pytest.raises(RuntimeError, match="non branché"):
+        sauvegarde.run()
+    monkeypatch.setattr("getpass.getuser", lambda: "zz_no_such_user_zz")
+    assert sauvegarde.usb_disk() is None  # aucun disque monté sous /media/<user>
+
+
+def test_couches_apply_remove_and_sloped_bands(tmp_path):
+    import zipfile
+
+    import numpy as np
+
+    from elegoo_lab import couches, threemf
+
+    box = trimesh.creation.box((20, 20, 10))
+    p = threemf.Part(
+        "p", np.asarray(box.vertices, float), np.asarray(box.faces), 1, [None] * len(box.faces)
+    )
+    src = tmp_path / "m.3mf"
+    threemf.write(
+        threemf.Project([threemf.Object("m", [p])], ["#FF0000"]),
+        src,
+        filaments=1,
+        colours=["#FF0000"],
+    )
+    assert isinstance(couches.apply(src, 0.2, "pentes"), int)
+    with zipfile.ZipFile(src) as z:
+        assert "Metadata/layer_config_ranges.xml" in z.namelist()
+    couches.remove(src)
+    with zipfile.ZipFile(src) as z:
+        assert "Metadata/layer_config_ranges.xml" not in z.namelist()
+    with pytest.raises(ValueError, match="inconnu"):
+        couches.apply(src, 0.2, "inconnu")
+    m = trimesh.creation.box((20, 20, 0.5))
+    m.apply_transform(trimesh.transformations.rotation_matrix(np.pi / 6, [1, 0, 0]))
+    bands = couches.bands(np.asarray(m.vertices), np.asarray(m.faces), 0.2, "pentes")
+    assert bands and all(0.08 <= h <= 0.28 for _, _, h in bands)
+
+
+def test_optimize_plan_applies_fixes(tmp_path):
+    from elegoo_lab import optimize
+
+    stem = trimesh.creation.cylinder(radius=3, height=20)
+    cap = trimesh.creation.icosphere(subdivisions=2, radius=12)
+    cap.apply_translation([0, 0, 20])
+    src = tmp_path / "champi.stl"
+    trimesh.util.concatenate([stem, cap]).export(src)
+    r = optimize.plan(src)
+    titles = [s["title"] for s in r["steps"]]
+    assert "Supports en arbre" in titles and any("Bordure" in t for t in titles)
+    assert r["supports"] == "arbre"
+
+
+def test_addtext_error_paths(tmp_path, monkeypatch):
+    from elegoo_lab import addtext, parametric
+
+    repo_font = Path(parametric.__file__).parent / "fonts" / "Sacramento-Regular.ttf"
+    monkeypatch.setattr(parametric, "FONT", repo_font)
+    monkeypatch.setattr(parametric, "SCRIPT_FONT", repo_font)
+    monkeypatch.setattr(parametric.text_section, "__defaults__", (repo_font,))
+    monkeypatch.setitem(addtext.FONTS, "manuscrite", repo_font)
+    monkeypatch.setitem(addtext.FONTS, "droite", repo_font)
+    src = tmp_path / "m.stl"
+    trimesh.creation.box((30, 30, 5)).export(src)
+    open_m = trimesh.creation.box((30, 30, 5))
+    open_m.faces = open_m.faces[:-2]  # plaque mais maillage ouvert
+    bad = tmp_path / "bad.stl"
+    open_m.export(bad)
+    with pytest.raises(ValueError, match="non fermé"):
+        addtext.add(bad, "ABC", size_mm=8, out=tmp_path / "o.3mf")
+    out = tmp_path / "out.3mf"
+    addtext.add(src, "ABC", size_mm=8, out=out)
+    addtext.add(src, "ABC", size_mm=8, out=out)  # nom déjà pris -> suffixe (2)
+    assert (tmp_path / "m_ABC (2).3mf").exists()
+    with pytest.raises(ValueError, match="plateau"):
+        addtext.add(src, "ABC", size_mm=300, out=tmp_path / "big.3mf")  # trop grand pour le plateau
+
+
+async def test_sim_control_commands(printer, tmp_path, monkeypatch):
+    import pycentauri.upload as upload_mod
+
+    monkeypatch.setattr(upload_mod, "UPLOAD_PORT", 18850)  # le HTTP du Sim du fixture printer
+    await printer.set_light(True)
+    light = (await printer.status()).light
+    assert (light.get("SecondLight") if isinstance(light, dict) else light) == 1
+    await printer.set_fan_speed(model=60, auxiliary=30, chamber=10)
+    await printer.set_temperatures(nozzle=205.0, bed=55.0)
+    st = await printer.status()
+    assert st.temp_nozzle_target == 205.0 and st.temp_bed_target == 55.0
+    assert (await printer.print_history()) is not None
+
+    def _names(resp):
+        files = resp.get("file_list", []) if isinstance(resp, dict) else resp
+        return [
+            f if isinstance(f, str) else f.get("filename", getattr(f, "filename", None))
+            for f in files
+        ]
+
+    assert "cube_20mm.gcode" in _names(await printer.list_files())
+    info = await printer.disk_info()
+    total = (
+        info.get("total_bytes", 0) if isinstance(info, dict) else getattr(info, "total_bytes", 0)
+    )
+    assert total > 0
+    await printer.set_auto_refill(True)
+    g = tmp_path / "up.gcode"
+    g.write_text("G28\n;LAYER_CHANGE\n")
+    name = await printer.upload_file(g)
+    assert name in _names(await printer.list_files())
+    await printer.delete_files([name])
+    assert name not in _names(await printer.list_files())
+    await printer.start_print("cube_20mm.gcode")
+    await asyncio.sleep(1.0)
+    await printer.pause()
+    await printer.resume()
+    await printer.set_print_speed(2)
+    await printer.stop()
+
+
+def test_web_app_against_live_simulator(tmp_path, monkeypatch):
+    import threading
+
+    import pycentauri.camera as camera_mod
+    import pycentauri.cc2 as cc2
+    import pycentauri.upload as upload_mod
+    from fastapi.testclient import TestClient
+
+    # le simulateur tourne dans son propre thread : le TestClient bloque la boucle du test
+    from elegoo_lab import app as app_mod, config, slicer
+
+    monkeypatch.setattr(slicer, "filaments", lambda: ["PLA"])  # pas d'OrcaSlicer en test
+    monkeypatch.setattr(slicer, "nozzles", lambda: ["0.4"])
+    monkeypatch.setattr(slicer, "qualities", lambda nozzle="0.4": ["0.20 mm"])
+    s = sim.Sim(port=18841, http_port=18851, print_seconds=5)
+    loop = asyncio.new_event_loop()
+    sim_task = None
+
+    def run_sim():
+        nonlocal sim_task
+        asyncio.set_event_loop(loop)
+        sim_task = loop.create_task(s.serve())
+        loop.run_forever()
+
+    th = threading.Thread(target=run_sim, daemon=True)
+    th.start()
+    time.sleep(0.5)
+    monkeypatch.setenv("CC2_HOST", sim.SIM_HOST)
+    monkeypatch.setenv("CC2_ACCESS_CODE", sim.SIM_CODE)
+    monkeypatch.setenv("CC2_SERIAL", sim.SIM_SERIAL)
+    sim.patch_pycentauri()
+    monkeypatch.setattr(cc2, "MQTT_PORT", 18841)
+    monkeypatch.setattr(upload_mod, "UPLOAD_PORT", 18851)
+    monkeypatch.setattr(camera_mod, "CAMERA_PORT_CC2", 18851)
+    lib = tmp_path / "models"
+    lib.mkdir()
+    monkeypatch.setattr(config, "MODELS_DIR", lib)
+    monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "config.toml")
+    monkeypatch.setattr(app_mod, "JOBS_FILE", lib / ".jobs.json")
+    try:
+        app = app_mod.create_app(enable_control=True)
+        with TestClient(app) as client:
+            for p in (
+                "/status",
+                "/lab/api/plateau",
+                "/lab/api/bobines",
+                "/lab/api/canvas/bobines",
+                "/lab/api/events",
+                "/lab/api/models",
+            ):
+                r = client.get(p)
+                assert r.status_code == 200, (p, r.status_code, r.text[:200])
+    finally:
+        if sim_task is not None:
+            loop.call_soon_threadsafe(sim_task.cancel)
+        loop.call_soon_threadsafe(loop.stop)
+        th.join(timeout=5)
+        loop.close()
