@@ -63,7 +63,7 @@
 | R1.5 | Documentation des limites CC2 | ✅ **Terminé** | Vibe Code | [#4](https://github.com/JEANPHI5507/atelier-cc2/pull/4) | 2026-11-23 | 2026-11-23 |
 | R1.6 | Gestion des erreurs caméra | ✅ **Terminé** | Vibe Code | [#7](https://github.com/JEANPHI5507/atelier-cc2/pull/7) | 2026-11-23 | 2026-11-23 |
 
-**Prochaine Tâche Prioritaire** : Phase 2 restante (INF.2 Docker Hub — secrets DOCKER_HUB_* à configurer), puis Phase 3 (R2.8 accessibilité clavier/WCAG en attente de décision ; R2.1–R2.7, R2.9, R2.10 ✅ #17/#19/#21/#23/#25/#27/#29/#31/#33)
+**Prochaine Tâche Prioritaire** : Phase 2 restante (INF.2 Docker Hub — secrets DOCKER_HUB_* à configurer), puis Phase 3 (R2.8 accessibilité clavier/WCAG en attente de décision ; R2.1–R2.7, R2.9–R2.12 ✅ #17/#19/#21/#23/#25/#27/#29/#31/#33/#35/#37)
 
 ---
 
@@ -83,6 +83,8 @@
 | R2.7 | Thème « Auto » suivant prefers-color-scheme : noir OLED en sombre, sable en clair, suivi en direct | Vibe Code | 2026-11-23 | [#29](https://github.com/JEANPHI5507/atelier-cc2/pull/29) |
 | R2.9 | Maquette UI moderne autonome (vanilla) : dashboard sombre OLED, KPI live, vue 3D animée, caméra, responsive tablette/mobile | Vibe Code | 2026-11-23 | [#31](https://github.com/JEANPHI5507/atelier-cc2/pull/31) |
 | R2.10 | Maquette en prod : servie par l'app en /lab/maquette/ + lien dialog Aide + finition premium HD (theme-color OLED, favicon SVG, thème auto prefers-color-scheme, sparkline KPI) | Vibe Code | 2026-11-23 | [#33](https://github.com/JEANPHI5507/atelier-cc2/pull/33) |
+| R2.11 | Design maquette dans l'app réelle : carte Impression (onglet Imprimante) avec anneau de progression SVG live, 4 KPI premium, lien maquette/ | Vibe Code | 2026-11-23 | [#35](https://github.com/JEANPHI5507/atelier-cc2/pull/35) |
+| R2.12 | Design premium sur toutes les pages/onglets (Atelier, Imprimante, Galerie, Démarrage, dialogs, tableau.html) : cartes 16px + ombre + hover lift, boutons 10px + hover, galerie zoom | Vibe Code | 2026-11-23 | [#37](https://github.com/JEANPHI5507/atelier-cc2/pull/37) |
 | R2.2 | Visualisation CANVAS 3D | ⏳ **À faire** | - | - | - | - |
 | R2.3 | Notifications Intelligentes | ⏳ **À faire** | - | - | - | - |
 | R2.4 | Backup Automatique | ⏳ **À faire** | - | - | - | - |
@@ -127,7 +129,7 @@
 | Contributeur | Tâches Assignées | PR Ouvertes | PR Mergées | Dernière Contribution |
 |--------------|------------------|-------------|------------|----------------------|
 | JEANPHI5507 | 4 | 1 | 4 | 2024-11-22 |
-| Vibe Code | 21 | 0 | 19 | 2026-11-23 |
+| Vibe Code | 23 | 0 | 21 | 2026-11-23 |
 
 ---
 

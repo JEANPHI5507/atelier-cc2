@@ -120,6 +120,8 @@
 | **R2.7** | Thème Sombre pour Tablette | 5e thème « Auto » suivant prefers-color-scheme (noir OLED en sombre, sable en clair) | ⭐ | ✅ Terminé (#29, #28) | Phase 1 |
 | **R2.9** | Maquette UI Moderne | Dashboard autonome vanilla servi en /lab/maquette/ : sidebar, KPI live, vue 3D, caméra, responsive | ⭐⭐ | ✅ Terminé (#31, #30) | Phase 1 |
 | **R2.10** | Maquette en prod | Servie par l'app en /lab/maquette/ + lien Aide + finition premium HD (favicon SVG, thème auto, sparkline) | ⭐⭐ | ✅ Terminé (#33, #32) | Phase 1 |
+| **R2.11** | Design maquette dans l'app | Carte Impression (onglet Imprimante) : anneau SVG live, KPI premium, lien maquette/ | ⭐⭐ | ✅ Terminé (#35, #34) | Phase 1 |
+| **R2.12** | Design premium partout | Tokens maquette sur tous les onglets/pages (index.html + tableau.html) : cartes 16px + hover lift, boutons 10px | ⭐⭐ | ✅ Terminé (#37, #36) | Phase 1 |
 
 **Livrables Phase 3 :**
 - [x] Interface simplifiée pour les débutants (mode Débutant, PR #17)
@@ -131,6 +133,8 @@
 - [x] Thème « Auto » réactif au système (noir OLED / sable, PR #29)
 - [x] Maquette UI moderne autonome (dashboard sombre OLED, vanilla, PR #31)
 - [x] Maquette servie par l'app en /lab/maquette/ + finition premium HD (PR #33)
+- [x] Design maquette dans l'app réelle : anneau live + KPI premium sur l'onglet Imprimante (PR #35)
+- [x] Design premium sur toutes les pages/onglets (cartes 16px + hover lift, PR #37)
 
 ---
 
