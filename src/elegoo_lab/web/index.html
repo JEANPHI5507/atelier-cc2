@@ -317,9 +317,11 @@
       <div class="banner" id="pv-ro" hidden>Lecture seule : relance avec <code>cc2 --control dash</code> pour piloter l'imprimante.</div>
       <div class="col c1">
         <div class="card idle" id="pv-job">
-          <div class="card-h"><h3>Impression</h3><span class="pill" id="pv-pill"><span class="led"></span><span id="pv-pill-t">…</span></span></div>
-          <div class="job-state" id="pv-state">…</div>
-          <div class="job-file" id="pv-file">Aucune impression en cours</div>
+          <div class="card-h"><h3>Impression</h3><div style="display:flex;gap:8px;align-items:center"><a class="btn ghost" href="maquette/" title="Ouvrir la maquette UI (design premium)" aria-label="Maquette UI"><svg class="i"><use href="#i-layers"/></svg></a><span class="pill" id="pv-pill"><span class="led"></span><span id="pv-pill-t">…</span></span></div></div>
+          <div class="job-top">
+            <div class="ring-wrap"><svg class="ring" viewBox="0 0 72 72" aria-hidden="true"><circle class="ring-bg" cx="36" cy="36" r="30"/><circle class="ring-fg" id="pv-ring" cx="36" cy="36" r="30" pathLength="100"/></svg><b id="pv-ring-t">0%</b></div>
+            <div class="job-top-t"><div class="job-state" id="pv-state">…</div><div class="job-file" id="pv-file">Aucune impression en cours</div></div>
+          </div>
           <div class="prog"><i id="pv-prog" style="width:0"></i></div>
           <div class="kpis">
             <div class="kpi"><div class="v" id="pv-pct">0 %</div><div class="k">progression</div></div>

@@ -6207,3 +6207,28 @@ def test_maquette_served_by_app(web):
         en["exact"].get("Ouvrir la maquette UI (design premium)")
         == "Open the UI mockup (premium design)"
     )
+
+
+# --- R2.11 : design maquette dans l'app réelle (onglet Imprimante : anneau live, KPI premium, lien maquette) ---
+
+
+def test_maquette_design_in_app_assets():
+    import json as _json
+
+    web = Path(config.ROOT) / "src" / "elegoo_lab" / "web"
+    html = (web / "index.html").read_text(encoding="utf-8")
+    assert 'id="pv-ring"' in html and 'class="ring-wrap"' in html and 'id="pv-ring-t"' in html
+    assert 'class="job-top"' in html
+    assert (
+        'href="maquette/"' in html and 'aria-label="Maquette UI"' in html
+    )  # lien vers la maquette servie par l'app
+    js = (web / "js" / "printer.js").read_text(encoding="utf-8")
+    assert (
+        "pv-ring" in js and "strokeDashoffset" in js and "pv-ring-t" in js
+    )  # anneau mis à jour en live
+    css = (web / "css" / "app.css").read_text(encoding="utf-8")
+    assert ".ring .ring-fg" in css and ".ring-wrap b" in css and ".job-top" in css
+    assert ".kpi:hover" in css and ".kpi .v" in css  # KPI premium façon maquette
+    assert "linear-gradient(90deg, var(--acc)" in css  # barres de chauffe premium
+    en = _json.loads((web / "i18n" / "en.json").read_text(encoding="utf-8"))
+    assert en["exact"].get("Maquette UI") == "UI mockup"

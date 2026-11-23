@@ -124,6 +124,7 @@ async function pvStatus() {
     $('pv-pill').className = 'pill ' + (busy ? 'busy' : 'ok'); $('pv-pill-t').textContent = busy ? (STATE[ps] || 'En cours') : ps === 9 ? 'Terminée' : 'Disponible';
     $('pv-file').textContent = busy || ps === 9 ? '' : 'Aucune impression en cours';
     $('pv-prog').style.width = prog + '%'; $('pv-cam').style.setProperty('--p', prog + '%'); $('pv-cam').classList.toggle('live', busy); $('pv-pct').textContent = prog + ' %';
+    $('pv-ring').style.strokeDashoffset = String(100 - prog); $('pv-ring-t').textContent = prog + '%';   // anneau façon maquette
     $('pv-layer').textContent = busy && s.layer?.current != null ? `${s.layer.current}${s.layer.total ? ' / ' + s.layer.total : ''}` : '–';
     const left = cc.remaining_time_sec ?? ((info.TotalTicks || 0) - (info.CurrentTicks || 0));
     $('pv-left').textContent = busy ? dur(left) : '–';

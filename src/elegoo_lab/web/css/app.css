@@ -320,12 +320,22 @@
   .banner { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 10px; background: var(--acc-soft); border: 1px solid var(--acc); font-size: 13.5px; }
   .job-state { font-size: 26px; font-weight: 700; letter-spacing: -.02em; line-height: 1.15; }
   .job-file { color: var(--dim); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* R2.11 : anneau de progression façon maquette dans la carte Impression */
+  .job-top { display: flex; align-items: center; gap: 14px; }
+  .job-top-t { min-width: 0; }
+  .ring-wrap { position: relative; width: 64px; height: 64px; flex: none; }
+  .ring { width: 64px; height: 64px; transform: rotate(-90deg); }
+  .ring circle { fill: none; stroke-width: 7; }
+  .ring .ring-bg { stroke: var(--line); }
+  .ring .ring-fg { stroke: var(--acc); stroke-linecap: round; stroke-dasharray: 100; stroke-dashoffset: 100; transition: stroke-dashoffset .6s; }
+  .ring-wrap b { position: absolute; inset: 0; display: grid; place-items: center; font-size: 14px; font-weight: 700; }
   .prog { height: 12px; background: var(--raised); border-radius: 99px; overflow: hidden; margin: 18px 0 8px; }
   .prog i { display: block; height: 100%; background: linear-gradient(90deg, var(--acc), #ffb067); border-radius: 99px; transition: width .6s; }
   .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 14px; }
-  .kpi { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; min-width: 0; }
-  .kpi .v { font-size: 18px; font-weight: 650; letter-spacing: -.01em; white-space: nowrap; }
-  .kpi .k { font-size: 11.5px; color: var(--faint); }
+  .kpi { background: var(--raised); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; min-width: 0; transition: transform .15s, border-color .15s; }
+  .kpi:hover { transform: translateY(-2px); border-color: var(--line-strong); }
+  .kpi .v { font-size: 22px; font-weight: 750; letter-spacing: -.01em; white-space: nowrap; }
+  .kpi .k { font-size: 10.5px; font-weight: 650; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); margin-top: 2px; }
   .row-btns { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
   .btn.danger { background: none; border-color: var(--bad); color: var(--bad); }
   /* colours: the one printing now, the ones coming */
@@ -355,8 +365,8 @@
   .temp .lbl { font-size: 13px; color: var(--dim); }
   .temp .now { font-size: 22px; font-weight: 650; letter-spacing: -.02em; }
   .temp .now small { font-size: 13px; color: var(--faint); font-weight: 500; }
-  .temp .heat { display: block; height: 3px; border-radius: 99px; background: var(--raised); margin-top: 6px; overflow: hidden; }
-  .temp .heat i { display: block; height: 100%; background: var(--acc); }
+  .temp .heat { display: block; height: 5px; border-radius: 99px; background: var(--line); margin-top: 6px; overflow: hidden; }
+  .temp .heat i { display: block; height: 100%; background: linear-gradient(90deg, var(--acc), #ffb067); border-radius: 99px; transition: width .6s; }
   .temp input { width: 78px; height: 34px; text-align: right; }
   .presets { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
   .presets .btn { height: 30px; font-size: 12.5px; padding: 0 10px; }
@@ -541,8 +551,8 @@
     /* print card: status and progress first, the two actions as big buttons at the bottom */
     .job-state { font-size: 28px; }
     .kpis { gap: 8px; margin-top: 16px; }
-    .kpi { padding: 12px; border-radius: 8px; }
-    .kpi .v { font-size: 18px; font-weight: 700; } .kpi .k { font-size: 12px; }
+    .kpi { padding: 10px 12px; border-radius: 10px; }
+    .kpi .v { font-size: 18px; font-weight: 700; } .kpi .k { font-size: 10px; }
     .prog { height: 12px; margin: 24px 0 8px; }
     .row-btns { gap: 8px; margin-top: 24px; } .row-btns .btn { flex: 1; min-height: 48px; }
 
