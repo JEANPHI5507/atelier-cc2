@@ -761,3 +761,17 @@ def test_backup_card(page):
     )
     # le comportement des POST /sauvegarde/* est couvert par les tests core (409 sans disque, etc.)
     assert page.errors == []
+
+
+def test_workflow_guide_checklist(page):
+    page.click("#files .file[data-n='cube.stl']")
+    page.wait_for_selector("#chat-sec:not([hidden])")
+    page.click("[data-wf]")
+    page.wait_for_selector(".wf .wf-step")
+    steps = page.query_selector_all(".wf .wf-step")
+    assert len(steps) == 5  # fiche, pose, bobines, trancher, lancer
+    steps[0].click()  # fiche : GET /models/cube.stl/info
+    page.wait_for_function("document.querySelector('.wf .wf-step').classList.contains('done')")
+    assert "✔" in page.inner_text(".wf .wf-step")
+    assert "mm" in page.inner_text(".wf .wf-step")
+    assert page.errors == []

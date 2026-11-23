@@ -474,6 +474,15 @@ def lab_router(cfg: config.Config) -> APIRouter:
         library.delete([_model_path(name).name])
         return {"ok": True}
 
+    @r.get("/models/{name}/workflow")
+    def workflow(name: str) -> dict[str, Any]:
+        """R2.5 guided workflow: the model must exist; report a G-code already sliced for it (step done)."""
+        p = _model_path(name)
+        if p.suffix.lower() == ".gcode":
+            raise HTTPException(400, "déjà tranché : ouvre le G-code")
+        gcode = next((q.name for q in sorted(config.MODELS_DIR.glob(f"{p.stem}*.gcode"))), None)
+        return {"model": p.name, "gcode": gcode}
+
     @r.get("/models/{name}/info")
     def model_info(name: str) -> dict[str, Any]:
         p = _model_path(name)
