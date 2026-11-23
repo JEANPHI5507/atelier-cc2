@@ -18,25 +18,34 @@ import time
 from collections import deque
 from collections.abc import AsyncIterator, Callable
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 from . import config
+
+if TYPE_CHECKING:
+    from . import gallery
 
 log = logging.getLogger(__name__)
 
 
-
 def events_file():
-    return config.MODELS_DIR / ".events.json"   # looked up each time: tests swap the library
+    return config.MODELS_DIR / ".events.json"  # looked up each time: tests swap the library
 
 
 def photos_dir():
     return config.MODELS_DIR / ".photos"
 
+
 KEEP = 200
 POLL_S = 5.0
-LOST_AFTER_S = 60.0          # a print we cannot see for this long is worth telling
-IDLE = {0, 8, 9, 14, 99}   # 99: a machine state pycentauri does not know (seen while the CC2 starts up), not a print
+LOST_AFTER_S = 60.0  # a print we cannot see for this long is worth telling
+IDLE = {
+    0,
+    8,
+    9,
+    14,
+    99,
+}  # 99: a machine state pycentauri does not know (seen while the CC2 starts up), not a print
 PAUSED = {5, 6}
 
 # kind -> (level, title)
@@ -63,21 +72,45 @@ KINDS = {
     "menage": ("info", "Anciens G-code effacés"),
 }
 SURVEILLANCE = {"ia": True, "pause_auto": False, "sensibilite": 1.0, "timelapse": True}
-AI_EVERY_S = 10.0             # one analysed frame every 10 s, like Obico
-SUSPECT_EVERY_S = 600.0       # at most one "suspect" warning per 10 min
-COLD_BED_C = 35               # PLA lets go of the PEI plate by itself below this (same figure as the after-print tips)
-COLD_WAIT_S = 3 * 3600        # stop waiting after this: the printer was switched off or the part already taken
-AI_STOP_PCT = 98              # last moves: the head parks, the finished part's fine details look like spaghetti
-                              # (false alert at 99 % on 2026-11-11), and nothing could be saved that late anyway
-TERM_KEEP = 400               # lines of the live terminal kept in memory (not saved: it is a view of the moment)
+AI_EVERY_S = 10.0  # one analysed frame every 10 s, like Obico
+SUSPECT_EVERY_S = 600.0  # at most one "suspect" warning per 10 min
+COLD_BED_C = (
+    35  # PLA lets go of the PEI plate by itself below this (same figure as the after-print tips)
+)
+COLD_WAIT_S = (
+    3 * 3600
+)  # stop waiting after this: the printer was switched off or the part already taken
+AI_STOP_PCT = 98  # last moves: the head parks, the finished part's fine details look like spaghetti
+# (false alert at 99 % on 2026-11-11), and nothing could be saved that late anyway
+TERM_KEEP = 400  # lines of the live terminal kept in memory (not saved: it is a view of the moment)
 # print_status (pycentauri's CC1 code space, CC2-only 27-29) -> what the terminal says
-STATES = {0: "au repos", 1: "mise en origine des axes", 5: "mise en pause", 6: "en pause", 7: "arrêt en cours",
-          8: "arrêtée", 9: "impression terminée", 12: "reprise", 13: "impression", 14: "erreur",
-          15: "nivellement du plateau", 16: "préchauffage", 27: "changement de filament (CANVAS)",
-          28: "filament chargé", 29: "déchargement du filament"}
-FANS = {"ModelFan": "Ventilateur pièce", "AuxiliaryFan": "Ventilateur auxiliaire", "BoxFan": "Ventilateur caisson"}
-HEATERS = (("Buse", "TempOfNozzle", "TempTargetNozzle"), ("Plateau", "TempOfHotbed", "TempTargetHotbed"),
-           ("Caisson", "TempOfBox", "TempTargetBox"))
+STATES = {
+    0: "au repos",
+    1: "mise en origine des axes",
+    5: "mise en pause",
+    6: "en pause",
+    7: "arrêt en cours",
+    8: "arrêtée",
+    9: "impression terminée",
+    12: "reprise",
+    13: "impression",
+    14: "erreur",
+    15: "nivellement du plateau",
+    16: "préchauffage",
+    27: "changement de filament (CANVAS)",
+    28: "filament chargé",
+    29: "déchargement du filament",
+}
+FANS = {
+    "ModelFan": "Ventilateur pièce",
+    "AuxiliaryFan": "Ventilateur auxiliaire",
+    "BoxFan": "Ventilateur caisson",
+}
+HEATERS = (
+    ("Buse", "TempOfNozzle", "TempTargetNozzle"),
+    ("Plateau", "TempOfHotbed", "TempTargetHotbed"),
+    ("Caisson", "TempOfBox", "TempTargetBox"),
+)
 
 
 def surveillance() -> dict[str, Any]:
@@ -85,8 +118,13 @@ def surveillance() -> dict[str, Any]:
     out = dict(SURVEILLANCE)
     if config.CONFIG_FILE.exists():
         import tomllib
+
         for k, v in tomllib.loads(config.CONFIG_FILE.read_text()).get("surveillance", {}).items():
-            if k in out and isinstance(v, type(out[k])) or (k == "sensibilite" and isinstance(v, (int, float))):
+            if (
+                k in out
+                and isinstance(v, type(out[k]))
+                or (k == "sensibilite" and isinstance(v, (int, float)))
+            ):
                 out[k] = v
     out["sensibilite"] = float(min(2.0, max(0.5, out["sensibilite"])))
     return out
@@ -96,6 +134,7 @@ def ntfy_url() -> str | None:
     if not config.CONFIG_FILE.exists():
         return None
     import tomllib
+
     url = tomllib.loads(config.CONFIG_FILE.read_text()).get("alertes", {}).get("ntfy")
     return url if isinstance(url, str) and url.startswith("https://") else None
 
@@ -115,13 +154,20 @@ _SLICED = re.compile(r"^(.*?)(?:_canvas)?_(\d+(?:\.\d+)?)mm_.*\.gcode$", re.I)
 
 def nice(name: str) -> str:
     """A G-code name to read on a phone: the model and the layer height, like the workshop's pages
-    ("atelier_couleurs_00015_clean_canvas_0.24mm_PLA_Silk_Noel-….gcode" -> "atelier couleurs 00015 clean · 0,24 mm")."""
+    ("atelier_couleurs_00015_clean_canvas_0.24mm_PLA_Silk_Noel-….gcode" -> "atelier couleurs 00015 clean · 0,24 mm").
+    """
     m = _SLICED.match(name)
-    base = re.sub(r"^\d{8}-\d{6}_", "", m.group(1) if m else re.sub(r"\.[^.]+$", "", name)).replace("_", " ").strip()
+    base = (
+        re.sub(r"^\d{8}-\d{6}_", "", m.group(1) if m else re.sub(r"\.[^.]+$", "", name))
+        .replace("_", " ")
+        .strip()
+    )
     return (base or name) + (f" · {m.group(2).replace('.', ',')} mm" if m else "")
 
 
-APP: dict[str, Any] = {}          # set by the app when it is open to the network: {"https": bool, "port": int}
+APP: dict[str, Any] = (
+    {}
+)  # set by the app when it is open to the network: {"https": bool, "port": int}
 _app_url: list[str | None] = []
 
 
@@ -131,32 +177,51 @@ def app_url() -> str | None:
         return None
     if not _app_url:
         from . import access
+
         ts = access.tailscale()
         host = (ts["name"] or ts["ip"]) if ts else access.lan_ip()
-        _app_url.append(f"{'https' if APP.get('https') else 'http'}://{host}:{APP['port']}/lab/" if APP.get("port") else None)
+        _app_url.append(
+            f"{'https' if APP.get('https') else 'http'}://{host}:{APP['port']}/lab/"
+            if APP.get("port")
+            else None
+        )
     return _app_url[0]
 
 
 async def send_ntfy(ev: dict[str, Any]) -> bool:
     """Push one alert to the ntfy topic, if set. Returns whether ntfy accepted it.
-    A finished print carries a "Faire le bilan" button that opens the workshop on that print's review."""
+    A finished print carries a "Faire le bilan" button that opens the workshop on that print's review.
+    """
     url = ntfy_url()
     if not url:
         return False
     from .i18n import tr  # in the language last chosen in the interface
+
     extra: dict[str, str] = {}
-    if (base := app_url()):
+    if base := app_url():
         extra["Click"] = base
         if ev.get("bilan"):
-            extra["Actions"] = f"view, {tr('Faire le bilan')}, {base}#bilan={ev['bilan']}, clear=true"
+            extra["Actions"] = (
+                f"view, {tr('Faire le bilan')}, {base}#bilan={ev['bilan']}, clear=true"
+            )
     import httpx
+
     try:
         async with httpx.AsyncClient(timeout=10) as c:
             # ntfy reads UTF-8 titles from the "Title" header only RFC 2047-encoded: send it as a query param instead
             body = tr(_GCODE.sub(lambda m: nice(m.group(0)), ev["detail"] or ev["title"]))
-            r = await c.post(url, params={"title": tr(ev["title"]) or "CC2"}, content=body.encode(),
-                             headers={**extra, "Priority": "high" if ev["level"] == "bad" else "default",
-                                      "Tags": {"ok": "white_check_mark", "warn": "warning", "bad": "rotating_light"}[ev["level"]]})
+            r = await c.post(
+                url,
+                params={"title": tr(ev["title"]) or "CC2"},
+                content=body.encode(),
+                headers={
+                    **extra,
+                    "Priority": "high" if ev["level"] == "bad" else "default",
+                    "Tags": {"ok": "white_check_mark", "warn": "warning", "bad": "rotating_light"}[
+                        ev["level"]
+                    ],
+                },
+            )
             return r.is_success
     except Exception as e:  # noqa: BLE001 - never let a phone notification break the watcher
         log.warning("ntfy: %s", e)
@@ -172,27 +237,43 @@ class TermHandler(logging.Handler):
 
     def emit(self, record: logging.LogRecord) -> None:
         with contextlib.suppress(Exception):
-            self.watcher.say(f"[{record.name.split('.')[-1]}] {record.getMessage()}",
-                             "bad" if record.levelno >= logging.ERROR else "warn")
+            self.watcher.say(
+                f"[{record.name.split('.')[-1]}] {record.getMessage()}",
+                "bad" if record.levelno >= logging.ERROR else "warn",
+            )
 
 
 class Watcher:
-    def __init__(self, status: Callable[[], Any], snapshot: Callable[[], Any] | None = None,
-                 canvas: Callable[[], Any] | None = None, pause: Callable[[], Any] | None = None,
-                 light: Callable[[], Any] | None = None, history: Callable[[], Any] | None = None) -> None:
+    def __init__(
+        self,
+        status: Callable[[], Any],
+        snapshot: Callable[[], Any] | None = None,
+        canvas: Callable[[], Any] | None = None,
+        pause: Callable[[], Any] | None = None,
+        light: Callable[[], Any] | None = None,
+        history: Callable[[], Any] | None = None,
+    ) -> None:
         """Awaitables: ``status`` -> pycentauri Status, ``snapshot`` -> JPEG bytes, ``canvas`` -> CANVAS payload,
         ``pause`` pauses the print (used when the AI is sure the print failed and auto pause is on),
-        ``history`` -> the printer's print history (method 1036), which says how a print really ended."""
+        ``history`` -> the printer's print history (method 1036), which says how a print really ended.
+        """
         from . import vision
-        self.status, self.snapshot, self.canvas, self.pause, self.light = status, snapshot, canvas, pause, light
+
+        self.status, self.snapshot, self.canvas, self.pause, self.light = (
+            status,
+            snapshot,
+            canvas,
+            pause,
+            light,
+        )
         self.history = history
-        self.codes: set[int] = set()       # error codes already reported for this print
+        self.codes: set[int] = set()  # error codes already reported for this print
         self.cam_fail = 0
         self.cam_same = 0
         self.cam_last: bytes | None = None
         self.cam_warned = False
         self.ticks = 0
-        self.rec = None              # gallery entry of the print in progress
+        self.rec: gallery.Recorder | None = None  # gallery entry of the print in progress
         self.pred = vision.Prediction()
         self.layer: int | None = None
         self.last_ai = self.last_suspect = 0.0
@@ -206,16 +287,18 @@ class Watcher:
         self.started = 0.0
         self.last_seen = time.time()
         self.lost = False
-        self.cooling: dict[str, Any] | None = None   # finished print waiting for a cold plate: {"name", "since", "bilan"}
+        self.cooling: dict[str, Any] | None = (
+            None  # finished print waiting for a cold plate: {"name", "since", "bilan"}
+        )
         self.term: deque[dict[str, Any]] = deque(maxlen=TERM_KEEP)
-        self.seen: dict[str, Any] = {}     # last values the terminal reported
-        self.cleaned = 0.0                 # last daily clean-up of old G-codes
+        self.seen: dict[str, Any] = {}  # last values the terminal reported
+        self.cleaned = 0.0  # last daily clean-up of old G-codes
 
     # --- journal -----------------------------------------------------------
 
     def _load(self) -> list[dict[str, Any]]:
         try:
-            return json.loads(events_file().read_text())[-KEEP:]
+            return cast("list[dict[str, Any]]", json.loads(events_file().read_text()))[-KEEP:]
         except (OSError, ValueError):
             return []
 
@@ -224,8 +307,15 @@ class Watcher:
 
     def emit(self, kind: str, detail: str = "", **extra: Any) -> dict[str, Any]:
         level, title = KINDS[kind]
-        ev = {"id": f"{time.time():.3f}", "t": int(time.time()), "kind": kind, "level": level,
-              "title": title, "detail": detail, **extra}
+        ev = {
+            "id": f"{time.time():.3f}",
+            "t": int(time.time()),
+            "kind": kind,
+            "level": level,
+            "title": title,
+            "detail": detail,
+            **extra,
+        }
         self.events.append(ev)
         self.events = self.events[-KEEP:]
         self._save()
@@ -234,7 +324,7 @@ class Watcher:
                 q.put_nowait(ev)
         self.say(title + (f" : {detail}" if detail else ""), level if level != "info" else "alerte")
         if level != "info":
-            with contextlib.suppress(RuntimeError):   # no event loop (CLI, tests): no phone push
+            with contextlib.suppress(RuntimeError):  # no event loop (CLI, tests): no phone push
                 asyncio.get_running_loop().create_task(self._ntfy(ev))
         return ev
 
@@ -287,13 +377,23 @@ class Watcher:
             except (IndexError, ValueError):
                 where = ""
             left = cc2.get("remaining_time_sec")
-            self.say(f"Couche {layer}{f' / {total}' if total else ''}{where}"
-                     + (f" · reste {left // 3600} h {left % 3600 // 60:02d}" if isinstance(left, int) and left > 0 else ""))
+            self.say(
+                f"Couche {layer}{f' / {total}' if total else ''}{where}"
+                + (
+                    f" · reste {left // 3600} h {left % 3600 // 60:02d}"
+                    if isinstance(left, int) and left > 0
+                    else ""
+                )
+            )
         for label, now_k, target_k in HEATERS:
             now, target = raw.get(now_k), raw.get(target_k)
             if changed(target_k, target) and target is not None:
-                self.say(f"{label} : consigne {round(target)} °C" if target else f"{label} : chauffe coupée")
-                seen[label] = bool(target)     # waiting for the heater to get there
+                self.say(
+                    f"{label} : consigne {round(target)} °C"
+                    if target
+                    else f"{label} : chauffe coupée"
+                )
+                seen[label] = bool(target)  # waiting for the heater to get there
             if seen.get(label) and now is not None and abs(now - target) <= 2:
                 self.say(f"{label} à {round(now)} °C : consigne atteinte", "ok")
                 seen[label] = False
@@ -313,21 +413,32 @@ class Watcher:
         codes = [str(c) for c in cc2.get("exception_status") or []]
         if changed("codes", codes) and codes:
             from . import errors
-            self.say(errors.sentence([int(c) for c in codes if c.isdigit()]) or f"Code {', '.join(codes)}", "bad")
+
+            self.say(
+                errors.sentence([int(c) for c in codes if c.isdigit()])
+                or f"Code {', '.join(codes)}",
+                "bad",
+            )
 
     def _backup_check(self) -> None:
         """Once a day at most: say it when the library has not been copied elsewhere for days."""
         from . import sauvegarde
+
         msg = sauvegarde.overdue()
         last = next((e for e in reversed(self.events) if e["kind"] == "sauvegarde"), None)
         if msg and (not last or time.time() - last["t"] > 86400):
-            self.emit("sauvegarde", msg + " Branche le disque USB de sauvegarde : la copie se fait toute seule dans l'heure.")
+            self.emit(
+                "sauvegarde",
+                msg
+                + " Branche le disque USB de sauvegarde : la copie se fait toute seule dans l'heure.",
+            )
 
     async def _clean_gcodes(self) -> None:
         """Once a day, while nothing prints: delete the G-codes printed more than 30 days ago (library.old_gcodes)."""
         if self.prev not in IDLE or time.time() - self.cleaned < 86400:
             return
         from . import library
+
         self.cleaned = time.time()
         try:
             queue = set(json.loads((config.MODELS_DIR / ".queue.json").read_text()))
@@ -336,36 +447,45 @@ class Watcher:
         try:
             names = await asyncio.to_thread(library.old_gcodes, queue | {self.filename})
             gone = await asyncio.to_thread(library.delete, names) if names else []
-        except Exception as e:   # noqa: BLE001 - housekeeping never stops the watcher
+        except Exception as e:  # noqa: BLE001 - housekeeping never stops the watcher
             log.warning("ménage des G-code : %s", e)
             return
         if gone:
-            self.emit("menage", f"{len(gone)} G-code imprimé{'s' if len(gone) > 1 else ''} il y a plus de "
-                      f"{library.GCODE_KEEP_DAYS} jours : {', '.join(gone)}. Les modèles restent dans la bibliothèque : "
-                      "retranche-les pour les réimprimer.")
+            self.emit(
+                "menage",
+                f"{len(gone)} G-code imprimé{'s' if len(gone) > 1 else ''} il y a plus de "
+                f"{library.GCODE_KEEP_DAYS} jours : {', '.join(gone)}. Les modèles restent dans la bibliothèque : "
+                "retranche-les pour les réimprimer.",
+            )
 
     # --- state machine -----------------------------------------------------
 
     def observe(self, ps: int, progress: int, filename: str, cc2: dict[str, Any]) -> None:
         """Feed one status reading; emits the events that the change from the previous one implies."""
         prev, self.prev = self.prev, ps
-        if prev is None:                      # first reading: learn, don't alert about the past
+        if prev is None:  # first reading: learn, don't alert about the past
             if ps not in IDLE:
                 self.filename = filename
-                self._open(filename, resume=True)   # the workshop restarted mid-print: keep recording from here
+                self._open(
+                    filename, resume=True
+                )  # the workshop restarted mid-print: keep recording from here
                 self.started = self.rec.meta["debut"] if self.rec else time.time()
             self._close_stale()
             last = self.events[-1] if self.events else {}
             if ps in IDLE and last.get("kind") == "fin" and time.time() - last["t"] < COLD_WAIT_S:
                 # the workshop restarted while the part cooled: still say when it is cold
-                self.cooling = {"name": filename, "since": float(last["t"]), **({"bilan": last["bilan"]} if last.get("bilan") else {})}
+                self.cooling = {
+                    "name": filename,
+                    "since": float(last["t"]),
+                    **({"bilan": last["bilan"]} if last.get("bilan") else {}),
+                }
             self.progress = progress
             return
         was_busy, busy = prev not in IDLE, ps not in IDLE
         name = filename or self.filename
         pre = f"{name} : " if name else ""
         if busy and not was_busy:
-            self.cooling = None               # a new print: the last part was taken off
+            self.cooling = None  # a new print: the last part was taken off
             self.started, self.filename = time.time(), filename
             self.emit("debut", filename)
             self._open(filename)
@@ -373,28 +493,51 @@ class Watcher:
             codes = cc2.get("exception_status") or []
             if cc2.get("filament_detect_enable") and cc2.get("filament_detected") == 0:
                 self.emit("filament", f"{pre}recharge une bobine puis reprends l'impression.")
-            elif codes:   # the CC2 reports a CANVAS runout or jam here, not on the tray (Elegoo SDK)
+            elif codes:  # the CC2 reports a CANVAS runout or jam here, not on the tray (Elegoo SDK)
                 from . import errors
+
                 self.codes |= {int(c) for c in codes if str(c).isdigit()}
-                codes = sorted(codes, key=lambda c: not str(c).startswith("12"))   # CANVAS feed problems first
+                codes = sorted(
+                    codes, key=lambda c: not str(c).startswith("12")
+                )  # CANVAS feed problems first
                 known = [c for c in codes if str(c).isdigit() and int(c) in errors.CODES]
-                self.emit("filament" if not known or str(known[0]).startswith("12") else "anomalie",
-                          pre + (errors.sentence(codes) if known else f"pause demandée par l'imprimante (code "
-                                 f"{', '.join(map(str, codes))}), souvent une bobine vide. Regarde l'écran, recharge, puis reprends."))
+                self.emit(
+                    "filament" if not known or str(known[0]).startswith("12") else "anomalie",
+                    pre
+                    + (
+                        errors.sentence(codes)
+                        if known
+                        else f"pause demandée par l'imprimante (code "
+                        f"{', '.join(map(str, codes))}), souvent une bobine vide. Regarde l'écran, recharge, puis reprends."
+                    ),
+                )
             else:
                 self.emit("pause", name)
         elif busy and prev in PAUSED and ps not in PAUSED:
             self.emit("reprise", name)
-            if self.ai_paused:                # the user looked and resumed: start judging afresh
+            if self.ai_paused:  # the user looked and resumed: start judging afresh
                 self.ai_paused = False
                 self.pred.new_print()
         elif was_busy and not busy:
             mins = round((time.time() - self.started) / 60) if self.started else None
-            took = f"terminée en {mins // 60} h {mins % 60:02d}. " if mins and mins >= 60 else (f"terminée en {mins} min. " if mins else "")
+            took = (
+                f"terminée en {mins // 60} h {mins % 60:02d}. "
+                if mins and mins >= 60
+                else (f"terminée en {mins} min. " if mins else "")
+            )
             if ps == 14:
                 from . import errors
+
                 codes = cc2.get("exception_status") or []
-                ev = self.emit("erreur", pre + (errors.sentence(codes) if codes else "arrêt sur erreur. Regarde l'écran de l'imprimante."))
+                ev = self.emit(
+                    "erreur",
+                    pre
+                    + (
+                        errors.sentence(codes)
+                        if codes
+                        else "arrêt sur erreur. Regarde l'écran de l'imprimante."
+                    ),
+                )
                 self._account(name, self.progress / 100, ev["id"])
                 self._close("erreur", ev, self.rec, self.progress)
                 self.rec = None
@@ -405,15 +548,22 @@ class Watcher:
                 # the real CC2 goes from ~97 % straight to idle, without the "completed" state: ask its history
                 rec, self.rec = self.rec, None
                 with contextlib.suppress(RuntimeError):
-                    asyncio.get_running_loop().create_task(self._settle(name, took, self.progress, self.started, rec))
+                    asyncio.get_running_loop().create_task(
+                        self._settle(name, took, self.progress, self.started, rec)
+                    )
             else:
                 self._stopped(name, self.progress, self.rec)
                 self.rec = None
             self.started = 0.0
         if busy and ps not in PAUSED:
-            new = [c for c in (cc2.get("exception_status") or []) if str(c).isdigit() and int(c) not in self.codes]
+            new = [
+                c
+                for c in (cc2.get("exception_status") or [])
+                if str(c).isdigit() and int(c) not in self.codes
+            ]
             if new:
                 from . import errors
+
                 self.codes |= {int(c) for c in new}
                 self.emit("anomalie", pre + errors.sentence(new))
         if busy:
@@ -426,17 +576,21 @@ class Watcher:
         from pathlib import Path
 
         from . import stock
+
         rec = stock.load()["prints"].get(Path(name).name) if name else None
         return bool(rec) and sum(1 for m in rec["per_m"] if m > 0) > 1
 
     def _done(self, name: str, took: str, rec: Any) -> None:
         pre = f"{name} : " if name else ""
         nxt = _queue_head()
-        ev = self.emit("fin", f"{pre}{took}Attends que le plateau refroidisse avant de décoller la pièce : "
-                       f"je te préviens quand il est sous {COLD_BED_C} °C."
-                       + (" Pense à vider le bac de purge." if self._multicolour(name) else "")
-                       + (f" Ensuite, lance la suivante de la file : {nxt}." if nxt else ""),
-                       **({"bilan": rec.id} if rec else {}))   # the phone and the page offer the review of this print
+        ev = self.emit(
+            "fin",
+            f"{pre}{took}Attends que le plateau refroidisse avant de décoller la pièce : "
+            f"je te préviens quand il est sous {COLD_BED_C} °C."
+            + (" Pense à vider le bac de purge." if self._multicolour(name) else "")
+            + (f" Ensuite, lance la suivante de la file : {nxt}." if nxt else ""),
+            **({"bilan": rec.id} if rec else {}),
+        )  # the phone and the page offer the review of this print
         self.cooling = {"name": name, "since": time.time(), **({"bilan": rec.id} if rec else {})}
         if self.snapshot:
             with contextlib.suppress(RuntimeError):
@@ -449,6 +603,7 @@ class Watcher:
     def _warm_review(name: str) -> None:
         """Read the finished G-code now (supports, paths), so its review opens at once: a big figure takes seconds."""
         from . import aftercare, gcode_preview
+
         src = config.MODELS_DIR / Path(name or "").name
         if not (name and src.suffix.lower() == ".gcode" and src.exists()):
             return
@@ -459,6 +614,7 @@ class Watcher:
                 gcode_preview.cached(src, gcode_preview.REVIEW)
             except (OSError, ValueError):
                 log.debug("no paths for %s", src, exc_info=True)
+
         threading.Thread(target=read, daemon=True).start()
 
     def cool(self, bed: float | None) -> None:
@@ -470,9 +626,12 @@ class Watcher:
             self.cooling = None
         elif bed is not None and bed < COLD_BED_C:
             self.cooling = None
-            self.emit("froid", f"{c['name'] + ' : ' if c['name'] else ''}plateau à {round(bed)} °C, la pièce se décolle "
-                      "presque seule. Sinon, retire la plaque et plie-la doucement.",
-                      **({"bilan": c["bilan"]} if c.get("bilan") else {}))
+            self.emit(
+                "froid",
+                f"{c['name'] + ' : ' if c['name'] else ''}plateau à {round(bed)} °C, la pièce se décolle "
+                "presque seule. Sinon, retire la plaque et plie-la doucement.",
+                **({"bilan": c["bilan"]} if c.get("bilan") else {}),
+            )
 
     def _stopped(self, name: str, progress: int, rec: Any) -> None:
         ev = self.emit("arret", f"{name + ' : ' if name else ''}arrêtée à {progress} %")
@@ -482,12 +641,18 @@ class Watcher:
     async def _settle(self, name: str, took: str, progress: int, started: float, rec: Any) -> None:
         """task_status 1 = completed, 2 = stopped (seen on the printer, 2026-11-09)."""
         from pathlib import Path
+
         finished = False
         try:
             h = await asyncio.wait_for(self.history(), timeout=15)
-            tasks = [t for t in (h or {}).get("history_task_list", [])
-                     if t.get("task_name") == Path(name).name and t.get("end_time", 0) >= started - 120]
-            finished = bool(tasks) and max(tasks, key=lambda t: t["end_time"]).get("task_status") == 1
+            tasks = [
+                t
+                for t in (h or {}).get("history_task_list", [])
+                if t.get("task_name") == Path(name).name and t.get("end_time", 0) >= started - 120
+            ]
+            finished = (
+                bool(tasks) and max(tasks, key=lambda t: t["end_time"]).get("task_status") == 1
+            )
         except Exception as e:  # noqa: BLE001 - never break alerts for history errors
             log.warning("historique: %s", e)
         if finished:
@@ -497,23 +662,35 @@ class Watcher:
 
     def _close_stale(self) -> None:
         from . import gallery
-        ids = gallery.stale(self.rec.id if self.rec else None)   # listed now: a print opened later is not one of them
+
+        ids = gallery.stale(
+            self.rec.id if self.rec else None
+        )  # listed now: a print opened later is not one of them
         if ids:
             with contextlib.suppress(RuntimeError):
                 asyncio.get_running_loop().create_task(asyncio.to_thread(gallery.close_stale, ids))
 
     def _open(self, filename: str, resume: bool = False) -> None:
         from . import gallery
+
         self.pred.new_print()
         self.layer, self.ai_paused = None, False
-        self.codes, self.cam_fail, self.cam_same, self.cam_last, self.cam_warned = set(), 0, 0, None, False
+        self.codes, self.cam_fail, self.cam_same, self.cam_last, self.cam_warned = (
+            set(),
+            0,
+            0,
+            None,
+            False,
+        )
         cfg = surveillance()
         if self.light and (cfg["ia"] or cfg["timelapse"]):
             # the camera needs light; owners also report the CC2's own AI erroring when the light goes off
             with contextlib.suppress(RuntimeError):
                 asyncio.get_running_loop().create_task(self._light_on())
         try:
-            self.rec = (gallery.Recorder.resume if resume else gallery.Recorder)(filename or "impression")
+            self.rec = (gallery.Recorder.resume if resume else gallery.Recorder)(
+                filename or "impression"
+            )
         except OSError as e:
             log.warning("galerie: %s", e)
             self.rec = None
@@ -532,9 +709,13 @@ class Watcher:
             self.cam_last = jpeg
         if not self.cam_warned and (self.cam_fail >= 6 or self.cam_same >= 10):
             self.cam_warned = True
-            self.emit("camera", f"{self.filename} : la caméra ne donne plus d'image" + (" nouvelle" if self.cam_same else "")
-                      + ". Défaut connu du firmware : elle revient après un arrêt complet de l'imprimante "
-                        "(à faire après cette impression). Surveillance IA et timelapse en pause d'ici là.")
+            self.emit(
+                "camera",
+                f"{self.filename} : la caméra ne donne plus d'image"
+                + (" nouvelle" if self.cam_same else "")
+                + ". Défaut connu du firmware : elle revient après un arrêt complet de l'imprimante "
+                "(à faire après cette impression). Surveillance IA et timelapse en pause d'ici là.",
+            )
 
     def _close(self, issue: str, ev: dict[str, Any], rec: Any, progress: int) -> None:
         """``rec`` is the gallery entry of the print that ended (taken off ``self.rec`` by the caller)."""
@@ -545,9 +726,12 @@ class Watcher:
 
     async def _finish(self, rec: Any, issue: str, ev: dict[str, Any], progress: int) -> None:
         from . import stock
-        if self.snapshot and rec.frames == 0:   # otherwise the last timelapse frame is the photo
+
+        if self.snapshot and rec.frames == 0:  # otherwise the last timelapse frame is the photo
             with contextlib.suppress(Exception):
-                rec.meta["photo"] = rec.add_image("photo.jpg", await asyncio.wait_for(self.snapshot(), timeout=15))
+                rec.meta["photo"] = rec.add_image(
+                    "photo.jpg", await asyncio.wait_for(self.snapshot(), timeout=15)
+                )
         used = next((h for h in stock.load()["history"] if h.get("ref") == ev["id"]), None)
         facts = {"g": used["g"], "eur": used["eur"]} if used else {}
         try:
@@ -556,22 +740,29 @@ class Watcher:
             log.warning("galerie: %s", e)
             return
         from . import maintenance
-        with contextlib.suppress(Exception):    # printing hours just grew: announce what became due
+
+        with contextlib.suppress(Exception):  # printing hours just grew: announce what became due
             for t in await asyncio.to_thread(maintenance.newly_due):
                 self.emit("entretien", f"{t['titre']} ({t['intervalle']}). {t['geste']}")
-        for q in list(self.subscribers):   # the gallery shows the new entry without a reload
+        for q in list(self.subscribers):  # the gallery shows the new entry without a reload
             with contextlib.suppress(asyncio.QueueFull):
                 q.put_nowait({"kind": "galerie", "update": True, "entry": meta["id"]})
 
     async def _camera(self, layer: int | None) -> None:
         """During a print: one frame per new layer for the timelapse, one every 10 s for the AI."""
         from . import vision
+
         if self.ticks % 12 == 0:
             self.settings = surveillance()
         cfg = self.settings
         want_tl = cfg["timelapse"] and self.rec is not None and layer and layer != self.layer
-        want_ai = (cfg["ia"] and vision.model_ready() and not self.ai_paused and self.prev not in PAUSED
-                   and time.time() - self.last_ai >= AI_EVERY_S)
+        want_ai = (
+            cfg["ia"]
+            and vision.model_ready()
+            and not self.ai_paused
+            and self.prev not in PAUSED
+            and time.time() - self.last_ai >= AI_EVERY_S
+        )
         if not (want_tl or want_ai) or not self.snapshot:
             return
         try:
@@ -581,7 +772,7 @@ class Watcher:
             return
         self._camera_health(jpeg)
         if self.cam_same >= 10:
-            return                       # frozen picture: neither a timelapse frame nor something to judge
+            return  # frozen picture: neither a timelapse frame nor something to judge
         if want_tl:
             self.layer = layer
             await asyncio.to_thread(self.rec.add_frame, jpeg)
@@ -600,16 +791,27 @@ class Watcher:
             with contextlib.suppress(Exception):
                 await self.pause()
             self.ai_paused = True
-            self.emit("rate", f"{self.filename} : l'IA voit un raté (spaghetti ou pièce décollée). Regarde la photo : "
-                              "reprends si tout va bien, sinon arrête.", photo=name)
-        elif (sure or self.pred.failing(cfg["sensibilite"])) and time.time() - self.last_suspect > SUSPECT_EVERY_S:
+            self.emit(
+                "rate",
+                f"{self.filename} : l'IA voit un raté (spaghetti ou pièce décollée). Regarde la photo : "
+                "reprends si tout va bien, sinon arrête.",
+                photo=name,
+            )
+        elif (
+            sure or self.pred.failing(cfg["sensibilite"])
+        ) and time.time() - self.last_suspect > SUSPECT_EVERY_S:
             self.last_suspect = time.time()
             name = await self._alert_image(jpeg, dets)
-            self.emit("suspect", f"{self.filename} : l'IA voit peut-être un raté. Jette un œil à la caméra"
-                                 + ("." if cfg["pause_auto"] else " (pause automatique désactivée)."), photo=name)
+            self.emit(
+                "suspect",
+                f"{self.filename} : l'IA voit peut-être un raté. Jette un œil à la caméra"
+                + ("." if cfg["pause_auto"] else " (pause automatique désactivée)."),
+                photo=name,
+            )
 
     async def _alert_image(self, jpeg: bytes, dets: list) -> str:
         from . import vision
+
         img = await asyncio.to_thread(vision.annotate, jpeg, dets)
         photos = photos_dir()
         photos.mkdir(parents=True, exist_ok=True)
@@ -617,7 +819,9 @@ class Watcher:
         (photos / name).write_bytes(img)
         if self.rec is not None:
             self.rec.add_image(name, img)
-            self.rec.meta["alertes"].append({"t": int(time.time()), "photo": name, "score": round(self.pred.ewm, 2)})
+            self.rec.meta["alertes"].append(
+                {"t": int(time.time()), "photo": name, "score": round(self.pred.ewm, 2)}
+            )
             self.rec.save()
         return name
 
@@ -626,6 +830,7 @@ class Watcher:
         from pathlib import Path
 
         from . import stock
+
         if not name:
             return
         try:
@@ -634,22 +839,32 @@ class Watcher:
             log.warning("stock: %s", e)
             return
         for t in low:
-            self.emit("stock", f"Bobine {t['tray'] + 1} ({t['nom'] or 'sans nom'}) : il reste environ {t['restant_g']:.0f} g. "
-                               "Prévois une bobine de rechange.")
+            self.emit(
+                "stock",
+                f"Bobine {t['tray'] + 1} ({t['nom'] or 'sans nom'}) : il reste environ {t['restant_g']:.0f} g. "
+                "Prévois une bobine de rechange.",
+            )
 
     async def _sync_canvas(self) -> None:
         from . import spools, stock
+
         try:
             raw = (await asyncio.wait_for(self.canvas(), timeout=15)).raw
         except Exception:
             return
         for t in await asyncio.to_thread(stock.sync, spools.loaded(raw)):
             if t["remise"]:
-                self.emit("remise", f"Bobine {t['tray'] + 1} : {t['nom']} reconnue, il reste environ {t['restant_g']} g comme à son retrait. "
-                                    "La même bobine ou une neuve ? Réponds dans l'onglet Imprimante.")
+                self.emit(
+                    "remise",
+                    f"Bobine {t['tray'] + 1} : {t['nom']} reconnue, il reste environ {t['restant_g']} g comme à son retrait. "
+                    "La même bobine ou une neuve ? Réponds dans l'onglet Imprimante.",
+                )
             else:
-                self.emit("bobine", f"Bobine {t['tray'] + 1} : comptée comme une bobine pleine. Neuve ou déjà entamée ? "
-                                    "Réponds dans l'onglet Imprimante.")
+                self.emit(
+                    "bobine",
+                    f"Bobine {t['tray'] + 1} : comptée comme une bobine pleine. Neuve ou déjà entamée ? "
+                    "Réponds dans l'onglet Imprimante.",
+                )
 
     async def _photo(self, ev: dict[str, Any]) -> None:
         try:
@@ -679,15 +894,24 @@ class Watcher:
                 if self.lost:
                     self.lost = False
                     self.emit("retrouvee")
-                with contextlib.suppress(Exception):   # the terminal is a view: it never stops the watcher
+                with contextlib.suppress(
+                    Exception
+                ):  # the terminal is a view: it never stops the watcher
                     self.narrate(st.raw or {}, st.print_status or 0)
-                self.observe(st.print_status or 0, st.progress or 0, st.filename or "", st.raw.get("_cc2", {}))
+                self.observe(
+                    st.print_status or 0,
+                    st.progress or 0,
+                    st.filename or "",
+                    st.raw.get("_cc2", {}),
+                )
                 self.cool(st.temp_bed)
                 if self.prev not in IDLE:
                     await self._camera(st.print_info.current_layer if st.print_info else None)
-                if self.canvas and self.ticks % 12 == 0:   # about once a minute
+                if self.canvas and self.ticks % 12 == 0:  # about once a minute
                     await self._sync_canvas()
-                if self.ticks % 720 == 360:                # about once an hour, the first some 30 min after a start
+                if (
+                    self.ticks % 720 == 360
+                ):  # about once an hour, the first some 30 min after a start
                     self._backup_check()
                     await self._clean_gcodes()
                 self.ticks += 1
@@ -697,7 +921,15 @@ class Watcher:
                 msg = f"Imprimante muette : {type(e).__name__} {e}".strip()
                 if not self.term or self.term[-1]["text"] != msg:
                     self.say(msg, "warn")
-                if not self.lost and self.prev not in (None, *IDLE) and time.time() - self.last_seen > LOST_AFTER_S:
+                if (
+                    not self.lost
+                    and self.prev not in (None, *IDLE)
+                    and time.time() - self.last_seen > LOST_AFTER_S
+                ):
                     self.lost = True
-                    self.emit("perdue", (f"{self.filename} : " if self.filename else "") + "plus de nouvelles depuis 1 min. Vérifie le Wi-Fi et l'alimentation.")
+                    self.emit(
+                        "perdue",
+                        (f"{self.filename} : " if self.filename else "")
+                        + "plus de nouvelles depuis 1 min. Vérifie le Wi-Fi et l'alimentation.",
+                    )
             await asyncio.sleep(POLL_S)

@@ -23,7 +23,7 @@ import numpy as np
 
 from . import colors, config, spools
 
-SAME_DE = 2.0   # under this two colours are the same spool colour
+SAME_DE = 2.0  # under this two colours are the same spool colour
 
 
 def _de(a: str, b: str) -> float:
@@ -31,7 +31,12 @@ def _de(a: str, b: str) -> float:
     return float(np.linalg.norm(lab[0] - lab[1]))
 
 
-DEFAULTS = {"bedlevel_force": False, "printer_check": True, "print_layout": "A", "delay_video": False}
+DEFAULTS = {
+    "bedlevel_force": False,
+    "printer_check": True,
+    "print_layout": "A",
+    "delay_video": False,
+}
 _HEAD, _TAIL = 60_000, 120_000
 
 
@@ -40,6 +45,7 @@ def options() -> dict[str, Any]:
     out = dict(DEFAULTS)
     if config.CONFIG_FILE.exists():
         import tomllib
+
         for k, v in tomllib.loads(config.CONFIG_FILE.read_text()).get("lancement", {}).items():
             if k in out and type(v) is type(out[k]):
                 out[k] = v
@@ -71,12 +77,23 @@ def gcode_colours(path: Path) -> list[dict[str, Any]]:
     def field(name: str) -> list[str]:
         m = re.search(rf"^; {re.escape(name)} = (.*)$", text, re.M)
         return [x.strip() for x in re.split(r"[;,]", m.group(1))] if m else []
-    cols, types, used = field("filament_colour"), field("filament_type"), field("filament used [mm]")
+
+    cols, types, used = (
+        field("filament_colour"),
+        field("filament_type"),
+        field("filament used [mm]"),
+    )
     out = []
     for i, c in enumerate(cols):
         mm = float(used[i]) if i < len(used) and re.fullmatch(r"[\d.]+", used[i]) else None
-        out.append({"t": i, "colour": c.upper() if re.fullmatch(r"#[0-9A-Fa-f]{6}", c) else "#888888",
-                    "type": types[i] if i < len(types) else "PLA", "m": round(mm / 1000, 2) if mm is not None else None})
+        out.append(
+            {
+                "t": i,
+                "colour": c.upper() if re.fullmatch(r"#[0-9A-Fa-f]{6}", c) else "#888888",
+                "type": types[i] if i < len(types) else "PLA",
+                "m": round(mm / 1000, 2) if mm is not None else None,
+            }
+        )
     return [t for t in out if isinstance(t.get("m"), (int, float)) and t["m"] > 0] or out[:1]  # type: ignore[operator]
 
 
@@ -89,17 +106,25 @@ def material_warnings(tools: list[dict[str, Any]], trays: list[dict[str, Any]]) 
     names = " ".join(f"{t.get('type', '')} {t.get('filament_name', '')}" for t in trays).upper()
     types = {str(t["type"]).upper() for t in tools}
     if any("TPU" in t for t in types):
-        out.append("TPU : il ne passe pas par le CANVAS. Utilise le canal 1 avec l'adaptateur TPU, ou alimente la tête "
-                   "directement. Décoche le nivellement : il chauffe le plateau à 60 °C, le TPU en veut 35.")
+        out.append(
+            "TPU : il ne passe pas par le CANVAS. Utilise le canal 1 avec l'adaptateur TPU, ou alimente la tête "
+            "directement. Décoche le nivellement : il chauffe le plateau à 60 °C, le TPU en veut 35."
+        )
     if any(a in t for t in types for a in ABRASIVE) or any(a in names for a in ABRASIVE):
-        out.append("Filament abrasif (carbone, verre, phosphorescent, paillettes) : il use le capteur du CANVAS "
-                   "(≈ 3 à 5 kg). Pour un usage régulier, alimente la tête directement.")
+        out.append(
+            "Filament abrasif (carbone, verre, phosphorescent, paillettes) : il use le capteur du CANVAS "
+            "(≈ 3 à 5 kg). Pour un usage régulier, alimente la tête directement."
+        )
     if any(t.startswith(("PC", "PA", "PET-")) or t in ("PC", "PA", "PET") for t in types):
-        out.append("Matière haute température : le chargement automatique chauffe à 250 °C, trop peu. Purge à la main "
-                   "à la bonne température avant de revenir au PLA (sinon la tête se bouche).")
+        out.append(
+            "Matière haute température : le chargement automatique chauffe à 250 °C, trop peu. Purge à la main "
+            "à la bonne température avant de revenir au PLA (sinon la tête se bouche)."
+        )
     if {"ABS", "ASA"} & types:
-        out.append("ABS / ASA : la CC2 n'a pas de chauffage de caisson (35 à 45 °C) ; les grandes pièces gauchissent. "
-                   "Bordure conseillée, et garde le capot fermé.")
+        out.append(
+            "ABS / ASA : la CC2 n'a pas de chauffage de caisson (35 à 45 °C) ; les grandes pièces gauchissent. "
+            "Bordure conseillée, et garde le capot fermé."
+        )
     return out
 
 
@@ -117,13 +142,35 @@ def plan(path: Path | None, canvas: dict[str, Any] | None) -> dict[str, Any]:
         pos = next((tr for tr in trays if tr["pos"] == tool["t"]), None)
         best = min(trays, key=lambda tr: _de(tool["colour"], tr["color"]))
         # a spool of exactly the file's colour wins (the workshop sliced with that spool's colour)
-        pick = best if _de(tool["colour"], best["color"]) < SAME_DE else pos if pos and _de(tool["colour"], pos["color"]) <= spools.FAR_DE else best
-        suggestion.append({"t": tool["t"], "tray_id": int(pick["tray_id"]),
-                           "far": _de(tool["colour"], pick["color"]) > spools.FAR_DE})
-    return {"tools": tools, "canvas_id": canvas_id, "options": options(), "warnings": material_warnings(tools, trays),
-            "trays": [{"tray_id": int(t["tray_id"]), "pos": t["pos"], "colour": t["color"], "name": t.get("filament_name") or t.get("type"),
-                       "type": t.get("type")} for t in trays],
-            "slot_map": suggestion}
+        pick = (
+            best
+            if _de(tool["colour"], best["color"]) < SAME_DE
+            else pos if pos and _de(tool["colour"], pos["color"]) <= spools.FAR_DE else best
+        )
+        suggestion.append(
+            {
+                "t": tool["t"],
+                "tray_id": int(pick["tray_id"]),
+                "far": _de(tool["colour"], pick["color"]) > spools.FAR_DE,
+            }
+        )
+    return {
+        "tools": tools,
+        "canvas_id": canvas_id,
+        "options": options(),
+        "warnings": material_warnings(tools, trays),
+        "trays": [
+            {
+                "tray_id": int(t["tray_id"]),
+                "pos": t["pos"],
+                "colour": t["color"],
+                "name": t.get("filament_name") or t.get("type"),
+                "type": t.get("type"),
+            }
+            for t in trays
+        ],
+        "slot_map": suggestion,
+    }
 
 
 def printer_name(name: str) -> str:
@@ -136,15 +183,29 @@ def printer_name(name: str) -> str:
         return name
     suffix = Path(name).suffix
     stem = name[: -len(suffix)] if suffix else name
-    slug = re.sub(r"[^A-Za-z0-9._-]+", "_", unicodedata.normalize("NFKD", stem)
-                  .encode("ascii", "ignore").decode()).strip("._")
+    slug = re.sub(
+        r"[^A-Za-z0-9._-]+",
+        "_",
+        unicodedata.normalize("NFKD", stem).encode("ascii", "ignore").decode(),
+    ).strip("._")
     return f"{slug or 'piece'}_{hashlib.sha256(name.encode()).hexdigest()[:6]}{suffix}"
 
 
-def params(filename: str, opts: dict[str, Any], slot_map: list[dict[str, int]] | None, canvas_id: int = 0,
-           storage: str = "local") -> dict[str, Any]:
+def params(
+    filename: str,
+    opts: dict[str, Any],
+    slot_map: list[dict[str, int]] | None,
+    canvas_id: int = 0,
+    storage: str = "local",
+) -> dict[str, Any]:
     """The method-1020 payload."""
     cfg = {**options(), **{k: v for k, v in opts.items() if k in DEFAULTS}}
-    cfg["slot_map"] = [{"t": int(m["t"]), "canvas_id": int(m.get("canvas_id", canvas_id)), "tray_id": int(m["tray_id"])}
-                       for m in (slot_map or [])]
+    cfg["slot_map"] = [
+        {
+            "t": int(m["t"]),
+            "canvas_id": int(m.get("canvas_id", canvas_id)),
+            "tray_id": int(m["tray_id"]),
+        }
+        for m in (slot_map or [])
+    ]
     return {"filename": Path(filename).name, "storage_media": storage, "config": cfg}

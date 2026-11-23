@@ -38,8 +38,11 @@ def _stats(v: np.ndarray, f: np.ndarray) -> dict[str, float]:
     lo = v[:, 2].min()
     on_plate = (cz - lo < 0.3) & (nz < -0.95)
     hanging = (nz < -OVERHANG_COS) & (cz - lo > 0.5)
-    return {"contact": float(area[on_plate].sum()), "surplomb": float(area[hanging].sum()),
-            "hauteur": float(np.ptp(v[:, 2]))}
+    return {
+        "contact": float(area[on_plate].sum()),
+        "surplomb": float(area[hanging].sum()),
+        "hauteur": float(np.ptp(v[:, 2])),
+    }
 
 
 def _solid(v: np.ndarray, f: np.ndarray) -> mf.Manifold | None:
@@ -58,8 +61,15 @@ def _layer_stats(solid: mf.Manifold, rot: np.ndarray | None, scale: float) -> di
     zs = np.arange(min(0.2, h / 2), h, step)
     secs = [turned.slice(float(z)) for z in zs]
     reach = step * np.tan(np.radians(50))
-    over = sum(max(0.0, (cs - below.offset(reach, mf.JoinType.Round)).area()) for below, cs in zip(secs, secs[1:], strict=False))
-    return {"contact": float(secs[0].area()) if secs else 0.0, "surplomb": float(over), "hauteur": float(h)}
+    over = sum(
+        max(0.0, (cs - below.offset(reach, mf.JoinType.Round)).area())
+        for below, cs in zip(secs, secs[1:], strict=False)
+    )
+    return {
+        "contact": float(secs[0].area()) if secs else 0.0,
+        "surplomb": float(over),
+        "hauteur": float(h),
+    }
 
 
 def orientations(path: Path, height_mm: float | None = None, rz: int = 0) -> list[dict[str, Any]]:
@@ -70,12 +80,15 @@ def orientations(path: Path, height_mm: float | None = None, rz: int = 0) -> lis
         return _cache[key]
     if not height_mm and mesh.info(path).get("unitless"):
         height_mm = mesh.DEFAULT_AI_HEIGHT_MM
-    v0, f, slots, slot_hex = colors.solid(path, {})          # loaded once, turned six times
-    rgb = (np.array([colors._rgb(h) for h in slot_hex])[np.asarray(slots, int) - 1] if slot_hex
-           else np.full((len(f), 3), 190.0))
-    tf, trgb = thumbnail.largest(v0, f, rgb)                 # the six pictures draw the same faces
+    v0, f, slots, slot_hex = colors.solid(path, {})  # loaded once, turned six times
+    rgb = (
+        np.array([colors._rgb(h) for h in slot_hex])[np.asarray(slots, int) - 1]
+        if slot_hex
+        else np.full((len(f), 3), 190.0)
+    )
+    tf, trgb = thumbnail.largest(v0, f, rgb)  # the six pictures draw the same faces
     solid = _solid(v0, f)
-    out = []
+    out: list[dict[str, Any]] = []
     # one object, laid six ways: the same scale for every position (height_mm is its height as it comes), so a
     # long part lying flat stays its real size instead of being blown up to the same height (2026-11-11: a gun
     # 60 mm tall as modelled was 620 mm long lying down, so only "standing on its tip" seemed to fit)
@@ -85,18 +98,32 @@ def orientations(path: Path, height_mm: float | None = None, rz: int = 0) -> lis
         v = (v0 @ rot.T if rot is not None else v0.copy()) * scale
         v = v - v.min(axis=0)
         s = _layer_stats(solid, rot, scale) if solid is not None else _stats(v, f)
-        png = thumbnail.render(v, tf, trgb, size=112, most=12000)   # 112 px: about one face a pixel is plenty
-        out.append({"id": key_, "label": label, "rotate": [rx, ry, rz], **{k: round(x, 1) for k, x in s.items()},
-                    "size_mm": [round(float(x), 1) for x in np.ptp(v, axis=0)],
-                    "image": "data:image/png;base64," + base64.b64encode(png).decode()})
+        png = thumbnail.render(
+            v, tf, trgb, size=112, most=12000
+        )  # 112 px: about one face a pixel is plenty
+        out.append(
+            {
+                "id": key_,
+                "label": label,
+                "rotate": [rx, ry, rz],
+                **{k: round(x, 1) for k, x in s.items()},
+                "size_mm": [round(float(x), 1) for x in np.ptp(v, axis=0)],
+                "image": "data:image/png;base64," + base64.b64encode(png).decode(),
+            }
+        )
     # fewest overhangs first; a part standing on a few mm² falls over or comes loose; lower = shorter print
     for o in out:
         # a part standing on a few mm² for hours comes loose and the print is lost, while overhangs get tree supports:
         # standing on its tip (1 mm², 2026-11-11) must lose to lying flat even with 1300 mm² of overhang
         # and a tall thin part sways at the top (the advisor's "pièce haute et fine": over 4 times its base)
         sx, sy, sz = o["size_mm"]
-        o["score"] = (o["surplomb"] + (2000 * (1 - o["contact"] / 30) if o["contact"] < 30 else 0) + 200 / (1 + o["contact"] / 50)
-                      + 0.5 * o["hauteur"] + 300 * max(0.0, sz / max(min(sx, sy), 1.0) - 4))
+        o["score"] = (
+            o["surplomb"]
+            + (2000 * (1 - o["contact"] / 30) if o["contact"] < 30 else 0)
+            + 200 / (1 + o["contact"] / 50)
+            + 0.5 * o["hauteur"]
+            + 300 * max(0.0, sz / max(min(sx, sy), 1.0) - 4)
+        )
         o["tient"] = max(o["size_mm"]) <= mesh.BED_MM
     best = min((o for o in out if o["tient"]), key=lambda o: o["score"], default=out[0])
     for o in out:

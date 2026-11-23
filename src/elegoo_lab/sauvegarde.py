@@ -22,11 +22,11 @@ from typing import Any
 
 from . import config
 
-DEST = "sauvegardes/atelier-cc2"   # on another machine over ssh, from its home folder
-LOCAL_DIR = "atelier-cc2"          # on a USB disk
-EVERY_S = 20 * 3600                # --si-besoin: one copy a day is enough
-WARN_AFTER_S = 3 * 86400           # no good copy for this long: the workshop says so
-KEEP_DAYS = 60                     # old versions in anciens/ are dropped after this
+DEST = "sauvegardes/atelier-cc2"  # on another machine over ssh, from its home folder
+LOCAL_DIR = "atelier-cc2"  # on a USB disk
+EVERY_S = 20 * 3600  # --si-besoin: one copy a day is enough
+WARN_AFTER_S = 3 * 86400  # no good copy for this long: the workshop says so
+KEEP_DAYS = 60  # old versions in anciens/ are dropped after this
 
 
 def _file() -> Path:
@@ -62,17 +62,25 @@ def _same_disk(a: Path, b: Path) -> bool:
 
 def usb_disk() -> Path | None:
     """The plugged backup disk: a disk mounted under /media/<user> (or /run/media/<user>), not the system disk.
-    One already holding an ``atelier-cc2`` folder wins; otherwise the only plugged disk becomes the backup disk."""
+    One already holding an ``atelier-cc2`` folder wins; otherwise the only plugged disk becomes the backup disk.
+    """
     import getpass
+
     user = getpass.getuser()
     disks = []
     for root in (Path("/media") / user, Path("/run/media") / user):
         with contextlib.suppress(OSError):
-            disks += [d for d in sorted(root.iterdir()) if d.is_dir() and os.path.ismount(d) and not _same_disk(d, config.MODELS_DIR)]
+            disks += [
+                d
+                for d in sorted(root.iterdir())
+                if d.is_dir() and os.path.ismount(d) and not _same_disk(d, config.MODELS_DIR)
+            ]
     marked = [d for d in disks if (d / LOCAL_DIR).is_dir()]
     if marked:
         return marked[0]
-    return disks[0] if len(disks) == 1 else None   # several unknown disks: don't guess which one to fill
+    return (
+        disks[0] if len(disks) == 1 else None
+    )  # several unknown disks: don't guess which one to fill
 
 
 def run(dest: str | None = None, *, if_needed: bool = False) -> str:
@@ -86,8 +94,11 @@ def run(dest: str | None = None, *, if_needed: bool = False) -> str:
     def sh(cmd: list[str], **kw: Any) -> None:
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=3600, **kw)
         if r.returncode:
-            raise RuntimeError((r.stderr or r.stdout).strip().splitlines()[-1] if (r.stderr or r.stdout).strip()
-                               else f"{cmd[0]} a échoué ({r.returncode})")
+            raise RuntimeError(
+                (r.stderr or r.stdout).strip().splitlines()[-1]
+                if (r.stderr or r.stdout).strip()
+                else f"{cmd[0]} a échoué ({r.returncode})"
+            )
 
     _record(essai=int(time.time()))
     try:
@@ -104,14 +115,36 @@ def run(dest: str | None = None, *, if_needed: bool = False) -> str:
             rsync, where, shown = ["rsync", "-rt", "--modify-window=2"], str(base), str(base)
         else:
             sh([*ssh, dest, f"mkdir -p {DEST}/models {DEST}/anciens"])
-            rsync, where, shown = ["rsync", "-a", "-e", " ".join(ssh)], f"{dest}:{DEST}", f"{dest}:{DEST}"
+            rsync, where, shown = (
+                ["rsync", "-a", "-e", " ".join(ssh)],
+                f"{dest}:{DEST}",
+                f"{dest}:{DEST}",
+            )
         rsync += ["--delete", "--backup", "--exclude", "*.tmp"]
-        sh([*rsync, f"--backup-dir=../anciens/{stamp}/models", f"{config.MODELS_DIR}/", f"{where}/models/"])
-        if config.CONFIG_FILE.exists():   # printer access code and access-code hash: keep the disk at home
-            sh([*rsync, f"--backup-dir=anciens/{stamp}", str(config.CONFIG_FILE), f"{where}/config.toml"])
+        sh(
+            [
+                *rsync,
+                f"--backup-dir=../anciens/{stamp}/models",
+                f"{config.MODELS_DIR}/",
+                f"{where}/models/",
+            ]
+        )
+        if (
+            config.CONFIG_FILE.exists()
+        ):  # printer access code and access-code hash: keep the disk at home
+            sh(
+                [
+                    *rsync,
+                    f"--backup-dir=anciens/{stamp}",
+                    str(config.CONFIG_FILE),
+                    f"{where}/config.toml",
+                ]
+            )
         if (config.ROOT / ".git").exists() and shutil.which("git"):
             with tempfile.TemporaryDirectory() as tmp:
-                bundle = Path(tmp) / "elegoo.bundle"   # the whole history in one file: `git clone elegoo.bundle`
+                bundle = (
+                    Path(tmp) / "elegoo.bundle"
+                )  # the whole history in one file: `git clone elegoo.bundle`
                 sh(["git", "-C", str(config.ROOT), "bundle", "create", str(bundle), "--all"])
                 sh([*rsync, f"--backup-dir=anciens/{stamp}", str(bundle), f"{where}/elegoo.bundle"])
         if local:
@@ -120,7 +153,13 @@ def run(dest: str | None = None, *, if_needed: bool = False) -> str:
                 if d.is_dir() and d.stat().st_mtime < old:
                     shutil.rmtree(d, ignore_errors=True)
         else:
-            sh([*ssh, dest, f"chmod 700 {DEST} && find {DEST}/anciens -mindepth 1 -maxdepth 1 -mtime +{KEEP_DAYS} -exec rm -rf {{}} +"])
+            sh(
+                [
+                    *ssh,
+                    dest,
+                    f"chmod 700 {DEST} && find {DEST}/anciens -mindepth 1 -maxdepth 1 -mtime +{KEEP_DAYS} -exec rm -rf {{}} +",
+                ]
+            )
     except (OSError, RuntimeError, subprocess.SubprocessError) as e:
         _record(erreur=str(e)[:300])
         raise RuntimeError(str(e)) from None

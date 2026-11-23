@@ -9,8 +9,8 @@ Ce module permet de :
 
 from __future__ import annotations
 
-from typing import Any
 import logging
+from typing import Any
 
 # 4CD Versions de firmware testées et supportées
 # Format: (version_min, version_max, description)
@@ -233,6 +233,7 @@ firmware_manager = FirmwareManager()
 
 
 # 4CD Fonctions utilitaires
+
 
 def check_firmware_version(version_string: str) -> tuple[bool, str]:
     """Vérifie si une version de firmware est supportée.

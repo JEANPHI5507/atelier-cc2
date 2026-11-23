@@ -15,14 +15,16 @@ import numpy as np
 
 from . import threemf
 
-MIN_MM, MAX_MM = 0.08, 0.28    # the CC2 0.4 nozzle profile's min_layer_height / max_layer_height
-BAND_MM = 0.4                  # heights are decided per band of this thickness
-MIN_SHARE = 0.05               # share of a band's surface that must want thinner layers for the band to get them
+MIN_MM, MAX_MM = 0.08, 0.28  # the CC2 0.4 nozzle profile's min_layer_height / max_layer_height
+BAND_MM = 0.4  # heights are decided per band of this thickness
+MIN_SHARE = 0.05  # share of a band's surface that must want thinner layers for the band to get them
 # level: (step height left on a slope, as a share of the chosen layer height; thickest layer, None = the chosen one)
 LEVELS = {"pentes": (0.5, None), "rapide": (0.5, MAX_MM)}
 
 
-def bands(v: np.ndarray, f: np.ndarray, layer_mm: float, level: str) -> list[tuple[float, float, float]]:
+def bands(
+    v: np.ndarray, f: np.ndarray, layer_mm: float, level: str
+) -> list[tuple[float, float, float]]:
     """(from z, to z, layer height) for a part resting on z = 0, merged where the height does not change."""
     share, top = LEVELS[level]
     hi, cusp = top or layer_mm, share * layer_mm
@@ -52,7 +54,7 @@ def bands(v: np.ndarray, f: np.ndarray, layer_mm: float, level: str) -> list[tup
         enough = np.cumsum(hist, axis=1) >= MIN_SHARE * total[:, None]
         first = np.where(enough.any(axis=1), enough.argmax(axis=1), len(steps) - 1)
         want = np.minimum(want, steps[first])
-    for i in range(1, count):            # grow back gently after a thin stretch, both ways
+    for i in range(1, count):  # grow back gently after a thin stretch, both ways
         want[i] = min(want[i], want[i - 1] * 1.5)
     for i in range(count - 2, -1, -1):
         want[i] = min(want[i], want[i + 1] * 1.5)
@@ -69,31 +71,53 @@ def bands(v: np.ndarray, f: np.ndarray, layer_mm: float, level: str) -> list[tup
 
 def apply(model: Path, layer_mm: float, level: str) -> int:
     """Add the height ranges of every object of ``model`` (a 3MF we wrote); returns roughly how many layers it
-    adds (negative when thick layers on the walls save more than the slopes cost), for the message."""
+    adds (negative when thick layers on the walls save more than the slopes cost), for the message.
+    """
     if level not in LEVELS:
         raise ValueError(f"hauteur de couche variable : « {level} » inconnu ({', '.join(LEVELS)})")
     objects, extra = [], 0.0
-    for k, o in enumerate(threemf.read(model).objects, 1):     # object ids in this file follow the build order
+    for k, o in enumerate(
+        threemf.read(model).objects, 1
+    ):  # object ids in this file follow the build order
         if not o.parts:
             continue
         v = np.vstack([p.vertices for p in o.parts])
-        f = np.vstack([p.faces + off for p, off in zip(o.parts, np.cumsum([0] + [len(p.vertices) for p in o.parts]), strict=False)])
+        f = np.vstack(
+            [
+                p.faces + off
+                for p, off in zip(
+                    o.parts, np.cumsum([0] + [len(p.vertices) for p in o.parts]), strict=False
+                )
+            ]
+        )
         v = v - [0, 0, v[:, 2].min()]
         rng = bands(v, f, layer_mm, level)
         extra += sum((z1 - z0) / h - (z1 - z0) / layer_mm for z0, z1, h in rng)
-        objects.append(f' <object id="{k}">\n' + "".join(
-            f'  <range min_z="{z0:.3f}" max_z="{z1:.3f}">\n   <option opt_key="layer_height">{h:.2f}</option>\n  </range>\n'
-            for z0, z1, h in rng) + " </object>\n")
+        objects.append(
+            f' <object id="{k}">\n'
+            + "".join(
+                f'  <range min_z="{z0:.3f}" max_z="{z1:.3f}">\n   <option opt_key="layer_height">{h:.2f}</option>\n  </range>\n'
+                for z0, z1, h in rng
+            )
+            + " </object>\n"
+        )
     with zipfile.ZipFile(model, "a", zipfile.ZIP_DEFLATED, compresslevel=1) as z:
-        z.writestr("Metadata/layer_config_ranges.xml", '<?xml version="1.0" encoding="utf-8"?>\n<objects>\n'
-                   + "".join(objects) + "</objects>\n")
+        z.writestr(
+            "Metadata/layer_config_ranges.xml",
+            '<?xml version="1.0" encoding="utf-8"?>\n<objects>\n'
+            + "".join(objects)
+            + "</objects>\n",
+        )
     return round(extra)
 
 
 def remove(model: Path) -> None:
     """Drop the height ranges again (OrcaSlicer refuses variable layers once organic supports come in)."""
     tmp = model.with_suffix(".tmp")
-    with zipfile.ZipFile(model) as zin, zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED, compresslevel=1) as zout:
+    with (
+        zipfile.ZipFile(model) as zin,
+        zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED, compresslevel=1) as zout,
+    ):
         for item in zin.infolist():
             if item.filename != "Metadata/layer_config_ranges.xml":
                 zout.writestr(item, zin.read(item.filename))

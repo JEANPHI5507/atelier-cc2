@@ -17,8 +17,23 @@ from pathlib import Path
 from urllib.parse import unquote, urljoin, urlsplit
 
 MAX_BYTES = 300 * 1024 * 1024
-MODEL_EXT = (".stl", ".3mf", ".obj", ".off", ".dae", ".glb", ".gltf", ".ply", ".step", ".stp", ".gcode")
-_LINK = re.compile(r"""href=["']([^"'#]+?\.(?:stl|3mf|obj|off|dae|glb|gltf|ply|step|stp|zip)(?:\?[^"']*)?)["']""", re.I)
+MODEL_EXT = (
+    ".stl",
+    ".3mf",
+    ".obj",
+    ".off",
+    ".dae",
+    ".glb",
+    ".gltf",
+    ".ply",
+    ".step",
+    ".stp",
+    ".gcode",
+)
+_LINK = re.compile(
+    r"""href=["']([^"'#]+?\.(?:stl|3mf|obj|off|dae|glb|gltf|ply|step|stp|zip)(?:\?[^"']*)?)["']""",
+    re.I,
+)
 
 
 class LinkError(ValueError):
@@ -30,7 +45,9 @@ def _check_host(url: str) -> None:
     if u.scheme != "https" or not u.hostname:
         raise LinkError("Seuls les liens https:// sont acceptés.")
     try:
-        addrs = {a[4][0] for a in socket.getaddrinfo(u.hostname, u.port or 443, proto=socket.IPPROTO_TCP)}
+        addrs = {
+            a[4][0] for a in socket.getaddrinfo(u.hostname, u.port or 443, proto=socket.IPPROTO_TCP)
+        }
     except OSError:
         raise LinkError(f"Adresse introuvable : {u.hostname}") from None
     for a in addrs:
@@ -54,8 +71,14 @@ async def _get(client, url: str) -> tuple[str, bytes, str, str | None]:
                 url = urljoin(url, r.headers["location"])
                 continue
             if r.status_code >= 400:
-                raise LinkError(f"Le site répond {r.status_code}"
-                                + (" : il faut sans doute être connecté. Télécharge le fichier puis dépose-le." if r.status_code in (401, 403) else "."))
+                raise LinkError(
+                    f"Le site répond {r.status_code}"
+                    + (
+                        " : il faut sans doute être connecté. Télécharge le fichier puis dépose-le."
+                        if r.status_code in (401, 403)
+                        else "."
+                    )
+                )
             if int(r.headers.get("content-length") or 0) > MAX_BYTES:
                 raise LinkError("Fichier trop gros (plus de 300 Mo).")
             buf = bytearray()
@@ -63,7 +86,12 @@ async def _get(client, url: str) -> tuple[str, bytes, str, str | None]:
                 buf += chunk
                 if len(buf) > MAX_BYTES:
                     raise LinkError("Fichier trop gros (plus de 300 Mo).")
-            return url, bytes(buf), r.headers.get("content-type", ""), r.headers.get("content-disposition")
+            return (
+                url,
+                bytes(buf),
+                r.headers.get("content-type", ""),
+                r.headers.get("content-disposition"),
+            )
     raise LinkError("Trop de redirections.")
 
 
@@ -84,19 +112,30 @@ def _from_zip(data: bytes) -> list[tuple[str, bytes]]:
 async def fetch(url: str) -> list[tuple[str, bytes]]:
     """The model files behind ``url``: [(file name, content)]."""
     import httpx
+
     url = url.strip()
-    async with httpx.AsyncClient(timeout=60, follow_redirects=False, headers={"User-Agent": "Atelier-CC2"}) as c:
+    async with httpx.AsyncClient(
+        timeout=60, follow_redirects=False, headers={"User-Agent": "Atelier-CC2"}
+    ) as c:
         final, data, ctype, disp = await _get(c, url)
         name = _name(final, disp)
         if "html" in ctype or data[:15].lstrip().lower().startswith((b"<!doctype", b"<html")):
             links = _LINK.findall(data.decode("utf-8", "ignore"))
             if not links:
-                raise LinkError("Cette page ne donne pas le fichier directement (le site demande souvent d'être connecté). "
-                                "Télécharge le modèle puis dépose-le dans la bibliothèque.")
+                raise LinkError(
+                    "Cette page ne donne pas le fichier directement (le site demande souvent d'être connecté). "
+                    "Télécharge le modèle puis dépose-le dans la bibliothèque."
+                )
             final, data, ctype, disp = await _get(c, urljoin(final, links[0]))
             name = _name(final, disp)
-    if name.lower().endswith(".zip") or data[:4] == b"PK\x03\x04" and not name.lower().endswith(".3mf"):
+    if (
+        name.lower().endswith(".zip")
+        or data[:4] == b"PK\x03\x04"
+        and not name.lower().endswith(".3mf")
+    ):
         return _from_zip(data)
     if not name.lower().endswith(MODEL_EXT):
-        raise LinkError("Ce lien ne mène pas à un modèle (STL, 3MF, OBJ, GLB, PLY, STEP, OFF, DAE… ou G-code).")
+        raise LinkError(
+            "Ce lien ne mène pas à un modèle (STL, 3MF, OBJ, GLB, PLY, STEP, OFF, DAE… ou G-code)."
+        )
     return [(name, data)]

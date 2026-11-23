@@ -25,24 +25,33 @@ class Test:
     title: str
     purpose: str
     look_for: list[str]
-    colours: int                 # CANVAS slots used
+    colours: int  # CANVAS slots used
     file: str
     build: Callable[[Path], None]
     slice_opts: dict
-    bands: tuple[str, float, float, float] | None = None   # (G-code with {v}, first value, step, band height mm)
+    bands: tuple[str, float, float, float] | None = (
+        None  # (G-code with {v}, first value, step, band height mm)
+    )
 
 
 def _mf(m: mf.Manifold) -> trimesh.Trimesh:
     out = m.to_mesh()
-    return trimesh.Trimesh(np.asarray(out.vert_properties)[:, :3], np.asarray(out.tri_verts), process=False)
+    return trimesh.Trimesh(
+        np.asarray(out.vert_properties)[:, :3], np.asarray(out.tri_verts), process=False
+    )
 
 
 def _first_layer(out: Path) -> None:
     """Five 30 mm squares one layer thick: four corners and the centre."""
     sq = 30.0
     m = 20.0  # distance from the bed edge
-    centres = [(m + sq / 2, m + sq / 2), (BED - m - sq / 2, m + sq / 2), (m + sq / 2, BED - m - sq / 2),
-               (BED - m - sq / 2, BED - m - sq / 2), (BED / 2, BED / 2)]
+    centres = [
+        (m + sq / 2, m + sq / 2),
+        (BED - m - sq / 2, m + sq / 2),
+        (m + sq / 2, BED - m - sq / 2),
+        (BED - m - sq / 2, BED - m - sq / 2),
+        (BED / 2, BED / 2),
+    ]
     boxes = []
     for x, y in centres:
         b = trimesh.creation.box((sq, sq, 0.2))
@@ -61,16 +70,23 @@ def _tower(out: Path) -> None:
 def tune(gcode: Path, test: Test) -> list[dict[str, float]]:
     """Give each band of the tower its own value: the command goes in at the first layer of the band.
     The slicer's own pressure advance lines are commented out so they cannot undo the bands, and the
-    flow factor is reset at the end so the next print is normal. Returns [{"from_mm", "to_mm", "value"}]."""
+    flow factor is reset at the end so the next print is normal. Returns [{"from_mm", "to_mm", "value"}].
+    """
     cmd, start, step, band = test.bands
     out, bands, cur, last_k = [], [], None, -1
     lines = gcode.read_text(errors="ignore").splitlines(keepends=True)
     for i, line in enumerate(lines):
         if line.startswith("SET_PRESSURE_ADVANCE") and cmd.startswith("SET_PRESSURE_ADVANCE"):
             line = "; (tour de calibration) " + line
-        elif line.startswith(";LAYER_CHANGE") and i + 1 < len(lines) and lines[i + 1].startswith(";Z:"):
+        elif (
+            line.startswith(";LAYER_CHANGE")
+            and i + 1 < len(lines)
+            and lines[i + 1].startswith(";Z:")
+        ):
             z = float(lines[i + 1][3:])
-            k = max(0, int((z - 2 - 1e-6) // band)) if z > 2 else -1   # the 2 mm base keeps the first value
+            k = (
+                max(0, int((z - 2 - 1e-6) // band)) if z > 2 else -1
+            )  # the 2 mm base keeps the first value
             v = round(start + step * max(k, 0), 4)
             if v != cur:
                 out.append(cmd.format(v=v) + " ; tour de calibration\n")
@@ -118,6 +134,7 @@ def _canvas(out: Path) -> None:
 def _dowels(out: Path) -> None:
     """A plate with 5 holes of increasing play (0.05 → 0.25 mm) and the matching dowel to try in each."""
     from . import cut
+
     plate = mf.Manifold.cube([70, 16, 8]).translate([0, 0, 0])
     for i, play in enumerate(DOWEL_PLAYS):
         r = cut.PIN_D / 2 + play
@@ -125,46 +142,106 @@ def _dowels(out: Path) -> None:
     # engraved marks: 1 to 5 notches next to each hole, read from the play table
     for i in range(len(DOWEL_PLAYS)):
         for k in range(i + 1):
-            plate = plate - mf.Manifold.cube([1.0, 2.5, 1.0]).translate([3 + i * 13.5 + k * 1.8, 0.8, 7.4])
-    pin = mf.Manifold.cylinder(2 * cut.PIN_DEPTH - 1, cut.PIN_D / 2, cut.PIN_D / 2, 64).translate([85, 8, 0])
+            plate = plate - mf.Manifold.cube([1.0, 2.5, 1.0]).translate(
+                [3 + i * 13.5 + k * 1.8, 0.8, 7.4]
+            )
+    pin = mf.Manifold.cylinder(2 * cut.PIN_DEPTH - 1, cut.PIN_D / 2, cut.PIN_D / 2, 64).translate(
+        [85, 8, 0]
+    )
     _mf(plate + pin).export(out)
 
 
 DOWEL_PLAYS = [0.05, 0.10, 0.15, 0.20, 0.25]
 
 TESTS = [
-    Test("premiere_couche", "Première couche", "Vérifier le nivellement et l'écrasement de la première couche sur tout le plateau.",
-         ["Les 5 carrés sont lisses, sans trous entre les lignes (trop haut) ni crêtes ou transparence (trop bas).",
-          "Les carrés des coins ressemblent à celui du centre : sinon relancer le nivellement automatique.",
-          "Ils se décollent d'une pièce, sans se déchirer."],
-         1, "calibration_premiere_couche.stl", _first_layer, {}),
-    Test("cube", "Cube de calibration 20 mm", "Contrôler dimensions, angles et qualité des parois.",
-         ["Au pied à coulisse : 20,0 mm sur X, Y et Z (± 0,2 mm).",
-          "Le X gravé sur le dessus est net et à 0,6 mm de profondeur.",
-          "Angles nets, parois sans vagues ni décalage de couche."],
-         1, "calibration_cube_20mm.stl", _cube, {}),
-    Test("canvas", "Test CANVAS 4 couleurs (mode Économie)", "Vérifier les 4 bobines, leur ordre et la propreté des changements sans tour d'essuyage.",
-         ["Bandes de bas en haut : bobines 1, 2, 3, 4, dans les couleurs chargées.",
-          "Damier à 4 couleurs sur le dessus, sans traînées d'une couleur dans l'autre.",
-          "Si des bavures ou mélanges apparaissent aux frontières : utiliser le mode Équilibré (avec tour)."],
-         4, "calibration_canvas_4couleurs.3mf", _canvas, {"mode": "economie"}),
-    Test("chevilles", "Ajustement des chevilles", "Choisir le jeu des trous utilisé pour assembler les pièces découpées.",
-         ["Essaie la cheville dans chaque trou (1 à 5 encoches = jeu 0,05 à 0,25 mm).",
-          "Retiens le premier trou où elle entre à la main, serrée mais sans forcer.",
-          "Reporte ce jeu dans « Jeu des chevilles » ci-dessous : toutes les prochaines découpes l'utiliseront."],
-         1, "calibration_chevilles.stl", _dowels, {"infill": 100}),
+    Test(
+        "premiere_couche",
+        "Première couche",
+        "Vérifier le nivellement et l'écrasement de la première couche sur tout le plateau.",
+        [
+            "Les 5 carrés sont lisses, sans trous entre les lignes (trop haut) ni crêtes ou transparence (trop bas).",
+            "Les carrés des coins ressemblent à celui du centre : sinon relancer le nivellement automatique.",
+            "Ils se décollent d'une pièce, sans se déchirer.",
+        ],
+        1,
+        "calibration_premiere_couche.stl",
+        _first_layer,
+        {},
+    ),
+    Test(
+        "cube",
+        "Cube de calibration 20 mm",
+        "Contrôler dimensions, angles et qualité des parois.",
+        [
+            "Au pied à coulisse : 20,0 mm sur X, Y et Z (± 0,2 mm).",
+            "Le X gravé sur le dessus est net et à 0,6 mm de profondeur.",
+            "Angles nets, parois sans vagues ni décalage de couche.",
+        ],
+        1,
+        "calibration_cube_20mm.stl",
+        _cube,
+        {},
+    ),
+    Test(
+        "canvas",
+        "Test CANVAS 4 couleurs (mode Économie)",
+        "Vérifier les 4 bobines, leur ordre et la propreté des changements sans tour d'essuyage.",
+        [
+            "Bandes de bas en haut : bobines 1, 2, 3, 4, dans les couleurs chargées.",
+            "Damier à 4 couleurs sur le dessus, sans traînées d'une couleur dans l'autre.",
+            "Si des bavures ou mélanges apparaissent aux frontières : utiliser le mode Équilibré (avec tour).",
+        ],
+        4,
+        "calibration_canvas_4couleurs.3mf",
+        _canvas,
+        {"mode": "economie"},
+    ),
+    Test(
+        "chevilles",
+        "Ajustement des chevilles",
+        "Choisir le jeu des trous utilisé pour assembler les pièces découpées.",
+        [
+            "Essaie la cheville dans chaque trou (1 à 5 encoches = jeu 0,05 à 0,25 mm).",
+            "Retiens le premier trou où elle entre à la main, serrée mais sans forcer.",
+            "Reporte ce jeu dans « Jeu des chevilles » ci-dessous : toutes les prochaines découpes l'utiliseront.",
+        ],
+        1,
+        "calibration_chevilles.stl",
+        _dowels,
+        {"infill": 100},
+    ),
 ]
 TESTS += [
-    Test("avance", "Tour de pressure advance", "Régler la pressure advance : angles nets, sans renflement ni manque.",
-         ["La tour change de valeur tous les 2,5 mm au-dessus du socle (0,000 en bas, +0,005 par bande).",
-          "Repère la hauteur où les angles sont les plus nets (ni arrondis gonflés, ni trous juste après l'angle).",
-          "Valeur = la bande lue sous la tour (résultat du tranchage) : reporte-la dans Réglages avancés → Pressure advance."],
-         1, "calibration_tour_avance.stl", _tower, {"usage": "profil"}, ("SET_PRESSURE_ADVANCE ADVANCE={v}", 0.0, 0.005, 2.5)),
-    Test("debit", "Tour de débit", "Régler le débit : parois pleines sans surépaisseur.",
-         ["La tour change de débit tous les 4 mm au-dessus du socle (90 % en bas, +2 % par bande).",
-          "Choisis la bande la plus lisse, sans trous entre les lignes ni bourrelets, paroi au pied à coulisse la plus proche de 1,6 mm.",
-          "Débit = le pourcentage de cette bande × 0,98 (débit du profil) : reporte-le dans Réglages avancés → Débit."],
-         1, "calibration_tour_debit.stl", _tower, {"usage": "profil"}, ("M221 S{v:g}", 90, 2, 4.0)),
+    Test(
+        "avance",
+        "Tour de pressure advance",
+        "Régler la pressure advance : angles nets, sans renflement ni manque.",
+        [
+            "La tour change de valeur tous les 2,5 mm au-dessus du socle (0,000 en bas, +0,005 par bande).",
+            "Repère la hauteur où les angles sont les plus nets (ni arrondis gonflés, ni trous juste après l'angle).",
+            "Valeur = la bande lue sous la tour (résultat du tranchage) : reporte-la dans Réglages avancés → Pressure advance.",
+        ],
+        1,
+        "calibration_tour_avance.stl",
+        _tower,
+        {"usage": "profil"},
+        ("SET_PRESSURE_ADVANCE ADVANCE={v}", 0.0, 0.005, 2.5),
+    ),
+    Test(
+        "debit",
+        "Tour de débit",
+        "Régler le débit : parois pleines sans surépaisseur.",
+        [
+            "La tour change de débit tous les 4 mm au-dessus du socle (90 % en bas, +2 % par bande).",
+            "Choisis la bande la plus lisse, sans trous entre les lignes ni bourrelets, paroi au pied à coulisse la plus proche de 1,6 mm.",
+            "Débit = le pourcentage de cette bande × 0,98 (débit du profil) : reporte-le dans Réglages avancés → Débit.",
+        ],
+        1,
+        "calibration_tour_debit.stl",
+        _tower,
+        {"usage": "profil"},
+        ("M221 S{v:g}", 90, 2, 4.0),
+    ),
 ]
 BY_KEY = {t.key: t for t in TESTS}
 

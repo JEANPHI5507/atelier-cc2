@@ -80,19 +80,19 @@ jobs:
 
       - name:  Run Ruff (Linting)
         run: |
-          uv run ruff check src/ tests/ || true
+          uv run ruff check src/ tests/
 
       - name:  Run Mypy (Type Checking)
         run: |
-          uv run mypy src/elegoo_lab --ignore-missing-imports || true
+          uv run mypy src/elegoo_lab --ignore-missing-imports
 
       - name:  Check Python Formatting (Black)
         run: |
-          uv run black --check src/ tests/ || true
+          uv run black --check src/ tests/
 
       - name:  Check Imports (isort)
         run: |
-          uv run isort --check-only src/ tests/ || true
+          uv run isort --check-only src/ tests/
 
   #  Job 2: Excution des tests unitaires (sans slicing)
   test-unit:
@@ -117,9 +117,14 @@ jobs:
         run: |
           uv sync
 
+      - name:  Install Fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fonts-dejavu-core fonts-urw-base35
+
       - name:  Run Unit Tests with Coverage
         run: |
-          uv run pytest tests/test_core.py -v --tb=short -m "not slicing" --cov=src/elegoo_lab --cov-report=xml --cov-report=html || true
+          uv run pytest tests/test_core.py -v --tb=short -m "not slicing" --cov=src/elegoo_lab --cov-report=xml --cov-report=html
 
       - name:  Upload Coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -181,7 +186,7 @@ jobs:
 
       - name:  Check JavaScript Syntax
         run: |
-          find src/elegoo_lab/web/js -name "*.js" -exec node --input-type=module --check {} \; || true
+          find src/elegoo_lab/web/js -name "*.js" -exec sh -c 'node --input-type=module --check < "$1"' _ {} \;
 
   #  Job 5: Build et Vrification du package
   build:

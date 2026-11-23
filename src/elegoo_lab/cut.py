@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
+from typing import cast
 
 import manifold3d as mf
 import numpy as np
@@ -17,13 +18,13 @@ from scipy.spatial import ConvexHull, QhullError, cKDTree
 
 from . import config, mesh
 
-MARGIN_MM = 10.0        # keep pieces comfortably inside the bed
-PIN_D = 5.0             # dowel diameter
-PIN_DEPTH = 8.0         # hole depth on each side of a cut
-PIN_DEPTH_SHORT = 5.0   # fallback where 8 mm would break through a thin wall
-PIERCE_TOLERANCE = 0.01 # share of a hole allowed outside the material (mesh noise)
+MARGIN_MM = 10.0  # keep pieces comfortably inside the bed
+PIN_D = 5.0  # dowel diameter
+PIN_DEPTH = 8.0  # hole depth on each side of a cut
+PIN_DEPTH_SHORT = 5.0  # fallback where 8 mm would break through a thin wall
+PIERCE_TOLERANCE = 0.01  # share of a hole allowed outside the material (mesh noise)
 # radial play of the holes: config.dowel_play(), tuned with the dowel test piece
-WALL = 2.0              # material kept between a hole and the outer surface
+WALL = 2.0  # material kept between a hole and the outer surface
 
 
 @dataclass
@@ -31,35 +32,45 @@ class Piece:
     name: str
     vertices: np.ndarray
     faces: np.ndarray
-    slots: np.ndarray      # filament slot (1..4) per face
+    slots: np.ndarray  # filament slot (1..4) per face
 
 
 @dataclass
 class CutResult:
     pieces: list[Piece]
     pins: trimesh.Trimesh | None
-    planes: list[tuple[int, float]]   # (axis, position mm)
+    planes: list[tuple[int, float]]  # (axis, position mm)
     pin_count: int
     pin_depths: list[float] = field(default_factory=list)
 
 
 def _to_manifold(v: np.ndarray, f: np.ndarray) -> mf.Manifold:
-    solid = mf.Manifold(mf.Mesh(vert_properties=np.asarray(v, np.float32), tri_verts=np.asarray(f, np.uint32)))
+    solid = mf.Manifold(
+        mf.Mesh(vert_properties=np.asarray(v, np.float32), tri_verts=np.asarray(f, np.uint32))
+    )
     if solid.status() != mf.Error.NoError or solid.is_empty():
         m = trimesh.Trimesh(v, f)
         m.merge_vertices()
         trimesh.repair.fill_holes(m)
         trimesh.repair.fix_normals(m)
-        solid = mf.Manifold(mf.Mesh(vert_properties=np.asarray(m.vertices, np.float32),
-                                    tri_verts=np.asarray(m.faces, np.uint32)))
+        solid = mf.Manifold(
+            mf.Mesh(
+                vert_properties=np.asarray(m.vertices, np.float32),
+                tri_verts=np.asarray(m.faces, np.uint32),
+            )
+        )
     if solid.status() != mf.Error.NoError or solid.is_empty():
-        raise ValueError("le maillage n'est pas un volume fermé : impossible de le découper proprement")
+        raise ValueError(
+            "le maillage n'est pas un volume fermé : impossible de le découper proprement"
+        )
     return solid
 
 
 def _mesh(solid: mf.Manifold) -> tuple[np.ndarray, np.ndarray]:
     m = solid.to_mesh()
-    return np.asarray(m.vert_properties)[:, :3].astype(float), np.asarray(m.tri_verts).astype(np.int64)
+    return np.asarray(m.vert_properties)[:, :3].astype(float), np.asarray(m.tri_verts).astype(
+        np.int64
+    )
 
 
 def _to_z(axis: int) -> np.ndarray:
@@ -69,7 +80,7 @@ def _to_z(axis: int) -> np.ndarray:
         r = np.array([[0, 0, -1], [0, 1, 0], [1, 0, 0]], float)
     elif axis == 1:
         r = np.array([[1, 0, 0], [0, 0, -1], [0, 1, 0]], float)
-    return np.c_[r, np.zeros(3)]
+    return cast("np.ndarray", np.c_[r, np.zeros(3)])
 
 
 def _inside(points: np.ndarray, rings: list[np.ndarray]) -> np.ndarray:
@@ -80,12 +91,16 @@ def _inside(points: np.ndarray, rings: list[np.ndarray]) -> np.ndarray:
         xa, ya = ring[:, 0], ring[:, 1]
         xb, yb = np.roll(xa, -1), np.roll(ya, -1)
         for x1, y1, x2, y2 in zip(xa, ya, xb, yb, strict=False):
-            crosses = ((y1 > y) != (y2 > y)) & (x < (x2 - x1) * (y - y1) / ((y2 - y1) or 1e-12) + x1)
+            crosses = ((y1 > y) != (y2 > y)) & (
+                x < (x2 - x1) * (y - y1) / ((y2 - y1) or 1e-12) + x1
+            )
             inside ^= crosses
     return inside
 
 
-def _pin_points(solid: mf.Manifold, axis: int, pos: float) -> np.ndarray:
+def _pin_points(
+    solid: mf.Manifold, axis: int, pos: float
+) -> tuple[np.ndarray, float, np.ndarray] | None:
     """Dowel positions (2D, in the rotated frame) spread over the cut section."""
     xf = _to_z(axis)
     rotated = solid.transform(xf)
@@ -94,14 +109,14 @@ def _pin_points(solid: mf.Manifold, axis: int, pos: float) -> np.ndarray:
     inset = section.offset(-(PIN_D / 2 + config.dowel_play() + WALL), mf.JoinType.Round)
     rings = [np.asarray(r) for r in inset.to_polygons() if len(r) >= 3]
     if not rings:
-        return np.zeros((0, 2))
+        return None
     lo = np.min([r.min(0) for r in rings], axis=0)
     hi = np.max([r.max(0) for r in rings], axis=0)
     gx, gy = np.meshgrid(np.arange(lo[0], hi[0] + 1, 2.0), np.arange(lo[1], hi[1] + 1, 2.0))
     cand = np.c_[gx.ravel(), gy.ravel()]
     cand = cand[_inside(cand, rings)]
     if not len(cand):
-        return np.zeros((0, 2))
+        return None
     want = int(min(6, max(1, round(inset.area() / 1500))))
     chosen = [cand[np.argmin(np.linalg.norm(cand - cand.mean(0), axis=1))]]  # start near the centre
     while len(chosen) < want:
@@ -109,10 +124,10 @@ def _pin_points(solid: mf.Manifold, axis: int, pos: float) -> np.ndarray:
         if d.max() < PIN_D * 3:
             break
         chosen.append(cand[np.argmax(d)])
-    return np.asarray(chosen), z, xf
+    return cast("np.ndarray", np.asarray(chosen)), z, xf
 
 
-MIN_BASE_MM2 = 25.0     # a piece touching the bed with less than this is laid on its largest flat face
+MIN_BASE_MM2 = 25.0  # a piece touching the bed with less than this is laid on its largest flat face
 
 
 def rest_flat(v: np.ndarray, f: np.ndarray) -> tuple[np.ndarray, bool]:
@@ -136,10 +151,12 @@ def plan(extent: np.ndarray, max_mm: float) -> list[tuple[int, int]]:
     return [(a, math.ceil(e / max_mm)) for a, e in enumerate(extent) if e > max_mm]
 
 
-STEP_MM = 2.0            # section profile resolution
-MIN_PIECE_MM = 20.0      # no sliver pieces at the ends
-ISLAND_PENALTY = 400.0   # mm² of extra cost per additional separate island cut through (spikes, fingers)
-BALANCE = 0.3            # cost x (1 + BALANCE * offset/extent): offsets are at most half the extent → ≤ +15 %
+STEP_MM = 2.0  # section profile resolution
+MIN_PIECE_MM = 20.0  # no sliver pieces at the ends
+ISLAND_PENALTY = (
+    400.0  # mm² of extra cost per additional separate island cut through (spikes, fingers)
+)
+BALANCE = 0.3  # cost x (1 + BALANCE * offset/extent): offsets are at most half the extent → ≤ +15 %
 
 
 def section_profile(solid: mf.Manifold, axis: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -190,29 +207,45 @@ def best_planes(solid: mf.Manifold, axis: int, count: int, max_mm: float) -> lis
     return sorted(float(pos[i]) for i in out)
 
 
-def cut(v: np.ndarray, f: np.ndarray, slots: np.ndarray, *, max_mm: float = mesh.BED_MM - MARGIN_MM,
-        name: str = "piece", smart: bool = True) -> CutResult:
+def cut(
+    v: np.ndarray,
+    f: np.ndarray,
+    slots: np.ndarray,
+    *,
+    max_mm: float = mesh.BED_MM - MARGIN_MM,
+    name: str = "piece",
+    smart: bool = True,
+) -> CutResult:
     solid = _to_manifold(v, f)
     lo, hi = np.asarray(solid.bounding_box()[:3]), np.asarray(solid.bounding_box()[3:])
     planes = []
     for a, k in plan(hi - lo, max_mm):
-        spots = best_planes(solid, a, k, max_mm) if smart else [lo[a] + (hi[a] - lo[a]) * i / k for i in range(1, k)]
+        spots = (
+            best_planes(solid, a, k, max_mm)
+            if smart
+            else [lo[a] + (hi[a] - lo[a]) * i / k for i in range(1, k)]
+        )
         planes += [(a, p) for p in spots]
     if not planes:
         return CutResult([Piece(name, v, f, slots)], None, [], 0)
 
     # drill dowel holes across each plane (computed on the uncut solid)
-    holes, pins = [], []  # pins: depth of each dowel's holes (mm on each side)
+    holes: list[mf.Manifold] = []
+    pins: list[float] = []  # pins: depth of each dowel's holes (mm on each side)
     r_hole = PIN_D / 2 + config.dowel_play()
     for axis, pos in planes:
         res = _pin_points(solid, axis, pos)
-        if not isinstance(res, tuple):
+        if res is None:
             continue
         pts, z, xf = res
         inv = np.linalg.inv(np.r_[xf, [[0, 0, 0, 1]]])[:3]
         for p in pts:
             for depth in (PIN_DEPTH, PIN_DEPTH_SHORT):  # a hole must stay inside the material
-                cyl = mf.Manifold.cylinder(2 * depth, r_hole, r_hole, 48).translate([p[0], p[1], z - depth]).transform(inv)
+                cyl = (
+                    mf.Manifold.cylinder(2 * depth, r_hole, r_hole, 48)
+                    .translate([p[0], p[1], z - depth])
+                    .transform(inv)
+                )
                 if (cyl - solid).volume() <= PIERCE_TOLERANCE * cyl.volume():
                     holes.append(cyl)
                     pins.append(depth)
@@ -250,5 +283,5 @@ def cut(v: np.ndarray, f: np.ndarray, slots: np.ndarray, *, max_mm: float = mesh
             length = 2 * depth - 1.0
             one = trimesh.creation.cylinder(radius=PIN_D / 2, height=length, sections=48)
             dowels.append(one.apply_translation([(k % cols) * 9, (k // cols) * 9, length / 2]))
-        pin_mesh = trimesh.util.concatenate(dowels)
+        pin_mesh = cast("trimesh.Trimesh", trimesh.util.concatenate(dowels))
     return CutResult(out, pin_mesh, planes, len(pins), pins)

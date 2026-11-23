@@ -81,7 +81,7 @@ line-ending = "auto"
 [tool.black]
 line-length = 100
 target-version = ["py312"]
-include = '\\.pyi?$'
+include = '\.pyi?$'
 exclude = '''
 /(
     \\.git

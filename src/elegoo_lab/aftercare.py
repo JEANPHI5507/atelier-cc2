@@ -24,65 +24,109 @@ from . import config, library
 # key: (title, cause, what to do, settings for next time from the print's facts)
 Fix = Callable[[dict[str, Any]], dict[str, Any]]
 ISSUES: dict[str, tuple[str, str, str, Fix]] = {
-    "decolle": ("Décollée ou coins relevés",
-                "Pas assez de surface ou de chaleur au contact du plateau.",
-                "Nettoie le plateau au liquide vaisselle et rince (pas de doigts dessus) ; la prochaine fois : bordure et plateau plus chaud.",
-                lambda u: {"advanced": {"bordure": "exterieure", "largeur_bordure": 8, "temp_plateau": min(u["plateau"] + 5, 70)}}),
-    "fils": ("Fils fins entre les parties",
-             "Buse trop chaude ou filament humide : il coule pendant les déplacements.",
-             "Les fils partent au pistolet à chaleur (passage rapide) ou à la pince. Le Silk prend l'humidité : sèche la bobine (50 °C, 6 h).",
-             lambda u: {"advanced": {"temp_buse": u["buse"] - 10}}),
-    "dessus": ("Dessus rugueux ou troué",
-               "Pas assez de couches pleines sur le remplissage.",
-               "La prochaine fois : plus de couches dessus et lissage de la face la plus haute.",
-               lambda _: {"advanced": {"dessus": 6, "lissage": "dernier"}}),
-    "couture": ("Ligne ou petits boutons sur le côté",
-                "La couture : chaque couche commence au même endroit.",
-                "Ébavure au cutter. La prochaine fois : couture cachée à l'arrière.",
-                lambda _: {"advanced": {"couture": "arriere"}}),
-    "fragile": ("Fragile, couches qui se séparent",
-                "Couches mal soudées (buse un peu froide) ou parois trop fines.",
-                "La prochaine fois : une paroi de plus, buse +5 °C, remplissage gyroïde.",
-                lambda u: {"advanced": {"parois": 4, "temp_buse": u["buse"] + 5, "motif": "gyroide"}, "usage": "solide"}),
-    "supports": ("Supports durs à enlever ou marques",
-                 "Supports trop solides ou trop collés à la pièce.",
-                 "Retire-les pièce froide, à la pince coupante, par petits morceaux. La prochaine fois : supports en arbre fins.",
-                 lambda _: {"supports": "arbre_fin"}),
-    "affaisse": ("Dessous ou surplombs affaissés",
-                 "Des zones penchées n'avaient rien dessous.",
-                 "La prochaine fois : supports en arbre, déclenchés plus tôt (40°).",
-                 lambda _: {"supports": "arbre", "advanced": {"angle_support": 40}}),
-    "maigre": ("Trous ou lignes maigres",
-               "Pas assez de plastique (débit, filament humide ou buse en partie bouchée).",
-               "Imprime la tour de débit (onglet Démarrage) et reporte la valeur ; vérifie que la bobine tourne librement.",
-               lambda _: {}),
-    "couleurs": ("Couleurs qui bavent les unes sur les autres",
-                 "La purge entre deux couleurs ne suffisait pas.",
-                 "La prochaine fois : mode multicolore Équilibré (tour d'essuyage).",
-                 lambda _: {"mode": "equilibre"}),
-    "gouttes": ("Gouttes ou pâtés aux changements de couleur",
-                "La buse coule en attendant la couleur suivante et dépose le surplus sur la pièce.",
-                "Les gouttes partent au cutter, pièce froide. La prochaine fois : mode Équilibré, la buse s'essuie sur une tour avant de revenir sur la pièce.",
-                lambda _: {"mode": "equilibre"}),
-    "tour": ("Tour de purge tombée ou décollée",
-             "La buse revient de chaque purge en suintant : le fil fait des boucles sur la tour et la buse finit par les accrocher.",
-             ("Ne remets pas la tour : reprends, quelques fils tomberont à sa place. L'atelier imprime déjà la tour avec une bordure "
-             "de 8 mm et lève la buse de 0,8 mm ; nettoie le plateau à cet endroit. Pour une petite pièce, le mode Économie n'a pas de tour."),
-             lambda _: {}),
-    "pied": ("Base évasée (pied d'éléphant)",
-             "Première couche écrasée par un plateau trop chaud.",
-             "Lime légèrement l'arête du bas. La prochaine fois : plateau 5 °C plus froid.",
-             lambda u: {"advanced": {"temp_plateau": max(u["plateau"] - 5, 45)}}),
-    "decalage": ("Couches décalées d'un coup",
-                 "La tête a sauté des pas : choc, courroie ou vitesse trop haute.",
-                 "Vérifie que rien ne gêne la tête, puis imprime en vitesse Équilibré ou Silencieux (onglet Imprimante).",
-                 lambda _: {}),
+    "decolle": (
+        "Décollée ou coins relevés",
+        "Pas assez de surface ou de chaleur au contact du plateau.",
+        "Nettoie le plateau au liquide vaisselle et rince (pas de doigts dessus) ; la prochaine fois : bordure et plateau plus chaud.",
+        lambda u: {
+            "advanced": {
+                "bordure": "exterieure",
+                "largeur_bordure": 8,
+                "temp_plateau": min(u["plateau"] + 5, 70),
+            }
+        },
+    ),
+    "fils": (
+        "Fils fins entre les parties",
+        "Buse trop chaude ou filament humide : il coule pendant les déplacements.",
+        "Les fils partent au pistolet à chaleur (passage rapide) ou à la pince. Le Silk prend l'humidité : sèche la bobine (50 °C, 6 h).",
+        lambda u: {"advanced": {"temp_buse": u["buse"] - 10}},
+    ),
+    "dessus": (
+        "Dessus rugueux ou troué",
+        "Pas assez de couches pleines sur le remplissage.",
+        "La prochaine fois : plus de couches dessus et lissage de la face la plus haute.",
+        lambda _: {"advanced": {"dessus": 6, "lissage": "dernier"}},
+    ),
+    "couture": (
+        "Ligne ou petits boutons sur le côté",
+        "La couture : chaque couche commence au même endroit.",
+        "Ébavure au cutter. La prochaine fois : couture cachée à l'arrière.",
+        lambda _: {"advanced": {"couture": "arriere"}},
+    ),
+    "fragile": (
+        "Fragile, couches qui se séparent",
+        "Couches mal soudées (buse un peu froide) ou parois trop fines.",
+        "La prochaine fois : une paroi de plus, buse +5 °C, remplissage gyroïde.",
+        lambda u: {
+            "advanced": {"parois": 4, "temp_buse": u["buse"] + 5, "motif": "gyroide"},
+            "usage": "solide",
+        },
+    ),
+    "supports": (
+        "Supports durs à enlever ou marques",
+        "Supports trop solides ou trop collés à la pièce.",
+        "Retire-les pièce froide, à la pince coupante, par petits morceaux. La prochaine fois : supports en arbre fins.",
+        lambda _: {"supports": "arbre_fin"},
+    ),
+    "affaisse": (
+        "Dessous ou surplombs affaissés",
+        "Des zones penchées n'avaient rien dessous.",
+        "La prochaine fois : supports en arbre, déclenchés plus tôt (40°).",
+        lambda _: {"supports": "arbre", "advanced": {"angle_support": 40}},
+    ),
+    "maigre": (
+        "Trous ou lignes maigres",
+        "Pas assez de plastique (débit, filament humide ou buse en partie bouchée).",
+        "Imprime la tour de débit (onglet Démarrage) et reporte la valeur ; vérifie que la bobine tourne librement.",
+        lambda _: {},
+    ),
+    "couleurs": (
+        "Couleurs qui bavent les unes sur les autres",
+        "La purge entre deux couleurs ne suffisait pas.",
+        "La prochaine fois : mode multicolore Équilibré (tour d'essuyage).",
+        lambda _: {"mode": "equilibre"},
+    ),
+    "gouttes": (
+        "Gouttes ou pâtés aux changements de couleur",
+        "La buse coule en attendant la couleur suivante et dépose le surplus sur la pièce.",
+        "Les gouttes partent au cutter, pièce froide. La prochaine fois : mode Équilibré, la buse s'essuie sur une tour avant de revenir sur la pièce.",
+        lambda _: {"mode": "equilibre"},
+    ),
+    "tour": (
+        "Tour de purge tombée ou décollée",
+        "La buse revient de chaque purge en suintant : le fil fait des boucles sur la tour et la buse finit par les accrocher.",
+        (
+            "Ne remets pas la tour : reprends, quelques fils tomberont à sa place. L'atelier imprime déjà la tour avec une bordure "
+            "de 8 mm et lève la buse de 0,8 mm ; nettoie le plateau à cet endroit. Pour une petite pièce, le mode Économie n'a pas de tour."
+        ),
+        lambda _: {},
+    ),
+    "pied": (
+        "Base évasée (pied d'éléphant)",
+        "Première couche écrasée par un plateau trop chaud.",
+        "Lime légèrement l'arête du bas. La prochaine fois : plateau 5 °C plus froid.",
+        lambda u: {"advanced": {"temp_plateau": max(u["plateau"] - 5, 45)}},
+    ),
+    "decalage": (
+        "Couches décalées d'un coup",
+        "La tête a sauté des pas : choc, courroie ou vitesse trop haute.",
+        "Vérifie que rien ne gêne la tête, puis imprime en vitesse Équilibré ou Silencieux (onglet Imprimante).",
+        lambda _: {},
+    ),
 }
 
 
 def used(gcode: Path) -> dict[str, Any]:
     """How the print was made, from the G-code's own settings block (end of file) and start code."""
-    out = {"buse": 210, "plateau": 60, "supports": False, "arbre": False, "couleurs": 1, "silk": False}
+    out = {
+        "buse": 210,
+        "plateau": 60,
+        "supports": False,
+        "arbre": False,
+        "couleurs": 1,
+        "silk": False,
+    }
     if not gcode.exists():
         return out
     with gcode.open("rb") as f:
@@ -104,26 +148,44 @@ def used(gcode: Path) -> dict[str, Any]:
 def tips(entry: dict[str, Any]) -> list[str]:
     """What to do with the part now, for this print."""
     u = used(config.MODELS_DIR / entry["fichier"])
-    u["couleurs"] = max(u["couleurs"], len(library.load_index().get(entry["fichier"], {}).get("couleurs") or []))
-    out = [(f"Attends que le plateau redescende sous 35 °C (il était à {u['plateau']} °C) : la pièce se décolle alors "
-           "presque seule. Sinon, retire la plaque et plie-la doucement.")]
+    u["couleurs"] = max(
+        u["couleurs"], len(library.load_index().get(entry["fichier"], {}).get("couleurs") or [])
+    )
+    out = [
+        (
+            f"Attends que le plateau redescende sous 35 °C (il était à {u['plateau']} °C) : la pièce se décolle alors "
+            "presque seule. Sinon, retire la plaque et plie-la doucement."
+        )
+    ]
     plan = supports_plan(config.MODELS_DIR / entry["fichier"]) if u["supports"] else None
     if plan:
         out += plan["tips"]
     elif u["supports"]:
-        out.append("Supports : retire-les pièce froide, à la pince coupante, en commençant par les plus fins.")
+        out.append(
+            "Supports : retire-les pièce froide, à la pince coupante, en commençant par les plus fins."
+        )
     if u["couleurs"] > 1:
-        out.append("Plusieurs couleurs : vide le bac de purge à l'arrière avant la prochaine impression.")
+        out.append(
+            "Plusieurs couleurs : vide le bac de purge à l'arrière avant la prochaine impression."
+        )
     if u["silk"]:
-        out.append("PLA Silk : ne ponce pas, il perd sa brillance. Les petits défauts partent au cutter, les fils au pistolet à chaleur.")
-    out.append("Avant d'en lancer une autre : plateau vide et propre (l'atelier le vérifie à la caméra).")
+        out.append(
+            "PLA Silk : ne ponce pas, il perd sa brillance. Les petits défauts partent au cutter, les fils au pistolet à chaleur."
+        )
+    out.append(
+        "Avant d'en lancer une autre : plateau vide et propre (l'atelier le vérifie à la caméra)."
+    )
     return out
 
 
 # --- where the supports are, from the G-code ----------------------------------------------------------
-_MOVE = re.compile(rb"^G[123] [^\n]*?X(-?[\d.]+) Y(-?[\d.]+)[^\n]*? E(\d*\.?\d+)", re.M)   # an extruding move
-CELL = 4.0           # mm: supports are mapped on a grid this coarse, which is plenty to say "left, front, low"
-MIN_SHARE = 0.04     # a zone under this share of the supports is not worth a line
+_MOVE = re.compile(
+    rb"^G[123] [^\n]*?X(-?[\d.]+) Y(-?[\d.]+)[^\n]*? E(\d*\.?\d+)", re.M
+)  # an extruding move
+CELL = (
+    4.0  # mm: supports are mapped on a grid this coarse, which is plenty to say "left, front, low"
+)
+MIN_SHARE = 0.04  # a zone under this share of the supports is not worth a line
 _plans: dict[tuple[str, int, int], dict[str, Any] | None] = {}
 
 
@@ -163,7 +225,9 @@ def supports_plan(gcode: Path) -> dict[str, Any] | None:
 
 
 def _supports_plan(gcode: Path) -> dict[str, Any] | None:
-    pts = _extruded(gcode.read_bytes(), {b"Support": "s", b"Support interface": "i", b"Outer wall": "p"})
+    pts = _extruded(
+        gcode.read_bytes(), {b"Support": "s", b"Support interface": "i", b"Outer wall": "p"}
+    )
     sup = np.vstack([pts["s"], pts["i"]])
     if len(sup) < 20 or not len(pts["p"]):
         return None
@@ -172,7 +236,9 @@ def _supports_plan(gcode: Path) -> dict[str, Any] | None:
     x0, y0 = np.floor(np.minimum(sup[:, :2].min(0), part[:, :2].min(0)) / CELL).astype(int)
     x1, y1 = np.floor(np.maximum(sup[:, :2].max(0), part[:, :2].max(0)) / CELL).astype(int)
     grid = np.zeros((y1 - y0 + 1, x1 - x0 + 1))
-    cx, cy = (np.floor(sup[:, 0] / CELL) - x0).astype(int), (np.floor(sup[:, 1] / CELL) - y0).astype(int)
+    cx, cy = (np.floor(sup[:, 0] / CELL) - x0).astype(int), (
+        np.floor(sup[:, 1] / CELL) - y0
+    ).astype(int)
     np.add.at(grid, (cy, cx), sup[:, 3])
     total = float(grid.sum())
     px0, py0 = part[:, :2].min(0)
@@ -182,12 +248,14 @@ def _supports_plan(gcode: Path) -> dict[str, Any] | None:
     edges = np.linspace(sup[:, 2].min(), sup[:, 2].max() + 1e-6, 4)
     ci_x = (np.floor(contact[:, 0] / CELL) - x0).astype(int).clip(0, grid.shape[1] - 1)
     ci_y = (np.floor(contact[:, 1] / CELL) - y0).astype(int).clip(0, grid.shape[0] - 1)
-    zones = []
+    zones: list[dict[str, Any]] = []
     for lo, hi in zip(edges[:-1], edges[1:], strict=False):
         inb = (sup[:, 2] >= lo) & (sup[:, 2] < hi)
         g = np.zeros_like(grid)
         np.add.at(g, (cy[inb], cx[inb]), sup[inb, 3])
-        label, count = ndimage.label(ndimage.binary_dilation(g > 0, iterations=1), structure=np.ones((3, 3)))
+        label, count = ndimage.label(
+            ndimage.binary_dilation(g > 0, iterations=1), structure=np.ones((3, 3))
+        )
         label = np.where(g > 0, label, 0)
         for n in range(1, count + 1):
             mask = label == n
@@ -196,10 +264,21 @@ def _supports_plan(gcode: Path) -> dict[str, Any] | None:
                 continue
             sz = sup[inb & mask[cy, cx]]
             w = sz[:, 3]
-            ci = contact[(contact[:, 2] >= lo) & (contact[:, 2] < hi) & mask[ci_y, ci_x]] if len(contact) else contact
-            zones.append({"share": share, "x": float((sz[:, 0] * w).sum() / w.sum()), "y": float((sz[:, 1] * w).sum() / w.sum()),
-                          "zlo": float(sz[:, 2].min()), "zhi": float(sz[:, 2].max()),
-                          "contact": (float(ci[:, 2].min()), float(ci[:, 2].max())) if len(ci) else None})
+            ci = (
+                contact[(contact[:, 2] >= lo) & (contact[:, 2] < hi) & mask[ci_y, ci_x]]
+                if len(contact)
+                else contact
+            )
+            zones.append(
+                {
+                    "share": share,
+                    "x": float((sz[:, 0] * w).sum() / w.sum()),
+                    "y": float((sz[:, 1] * w).sum() / w.sum()),
+                    "zlo": float(sz[:, 2].min()),
+                    "zhi": float(sz[:, 2].max()),
+                    "contact": (float(ci[:, 2].min()), float(ci[:, 2].max())) if len(ci) else None,
+                }
+            )
     if not zones:
         return None
     zones.sort(key=lambda z: -z["share"])
@@ -208,34 +287,59 @@ def _supports_plan(gcode: Path) -> dict[str, Any] | None:
     lines = []
     for i, z in enumerate(zones, 1):
         z["n"] = i
-        bits = [f"Zone {i}", f"{z['share'] / shown * 100:.0f} % des supports",
-                _word((z["x"] - px0) / max(px1 - px0, 1), ("à gauche", "au centre", "à droite")),
-                _word((z["y"] - py0) / max(py1 - py0, 1), ("à l'avant", "au milieu", "à l'arrière"))]
+        bits = [
+            f"Zone {i}",
+            f"{z['share'] / shown * 100:.0f} % des supports",
+            _word((z["x"] - px0) / max(px1 - px0, 1), ("à gauche", "au centre", "à droite")),
+            _word((z["y"] - py0) / max(py1 - py0, 1), ("à l'avant", "au milieu", "à l'arrière")),
+        ]
         if z["zlo"] < 0.8:
             bits.append(f"du plateau jusqu'à {z['zhi']:.0f} mm de haut")
         else:
             bits.append(f"de {z['zlo']:.0f} à {z['zhi']:.0f} mm de haut")
         if z["contact"]:
             a, b = z["contact"]
-            bits.append(f"touche la pièce entre {a:.0f} et {b:.0f} mm" if b - a >= 1 else f"touche la pièce vers {b:.0f} mm")
+            bits.append(
+                f"touche la pièce entre {a:.0f} et {b:.0f} mm"
+                if b - a >= 1
+                else f"touche la pièce vers {b:.0f} mm"
+            )
         lines.append(" · ".join(bits))
     u = used(gcode)
-    how = ("Ils se retirent du haut vers le bas : coupe d'abord les branches fines près de la pièce, au ras, puis le tronc. "
-           "Ne tire jamais sur une branche : tiens la pièce dans la main et coupe de l'autre."
-           if u["arbre"] else
-           "Glisse un cutter ou la pince sous un coin du bloc et soulève-le d'un seul morceau, sans tirer sur la pièce.")
+    how = (
+        "Ils se retirent du haut vers le bas : coupe d'abord les branches fines près de la pièce, au ras, puis le tronc. "
+        "Ne tire jamais sur une branche : tiens la pièce dans la main et coupe de l'autre."
+        if u["arbre"]
+        else "Glisse un cutter ou la pince sous un coin du bloc et soulève-le d'un seul morceau, sans tirer sur la pièce."
+    )
     # the page draws them: part outline and support zones, cells of CELL mm, y up
-    top = [[int((x + x0) * CELL), int((y + y0) * CELL)] for y, x in zip(*np.nonzero(_occupied(part, x0, y0, grid.shape)), strict=False)]
+    top = [
+        [int((x + x0) * CELL), int((y + y0) * CELL)]
+        for y, x in zip(*np.nonzero(_occupied(part, x0, y0, grid.shape)), strict=False)
+    ]
     return {
-        "tips": [f"Supports : {len(zones)} zone{'s' if len(zones) > 1 else ''} à retirer, en orange sur la vue 3D. {how}", *lines,
-                 "Il reste de petits points là où les supports touchaient : passe le cutter à plat, sans appuyer."],
-        "map": {"cell": CELL, "part": top, "supports": [[int((x + x0) * CELL), int((y + y0) * CELL)] for y, x in zip(*np.nonzero(grid), strict=False)]},
+        "tips": [
+            f"Supports : {len(zones)} zone{'s' if len(zones) > 1 else ''} à retirer, en orange sur la vue 3D. {how}",
+            *lines,
+            "Il reste de petits points là où les supports touchaient : passe le cutter à plat, sans appuyer.",
+        ],
+        "map": {
+            "cell": CELL,
+            "part": top,
+            "supports": [
+                [int((x + x0) * CELL), int((y + y0) * CELL)]
+                for y, x in zip(*np.nonzero(grid), strict=False)
+            ],
+        },
     }
 
 
 def _occupied(part: np.ndarray, x0: int, y0: int, shape: tuple[int, int]) -> np.ndarray:
     m = np.zeros(shape, bool)
-    m[(np.floor(part[:, 1] / CELL) - y0).astype(int), (np.floor(part[:, 0] / CELL) - x0).astype(int)] = True
+    m[
+        (np.floor(part[:, 1] / CELL) - y0).astype(int),
+        (np.floor(part[:, 0] / CELL) - x0).astype(int),
+    ] = True
     return m
 
 
@@ -253,7 +357,9 @@ QUESTIONS: dict[str, tuple[str, str | None]] = {
 def questions(entry: dict[str, Any]) -> list[dict[str, str | None]]:
     """The questions to rate for this print: the ones about supports and colours only when it had some."""
     u = used(config.MODELS_DIR / entry["fichier"])
-    u["couleurs"] = max(u["couleurs"], len(library.load_index().get(entry["fichier"], {}).get("couleurs") or []))
+    u["couleurs"] = max(
+        u["couleurs"], len(library.load_index().get(entry["fichier"], {}).get("couleurs") or [])
+    )
     skip = {"supports"} if not u["supports"] else set()
     skip |= {"couleurs"} if u["couleurs"] < 2 else set()
     return [{"key": k, "title": t, "issue": i} for k, (t, i) in QUESTIONS.items() if k not in skip]
@@ -283,13 +389,24 @@ def corrections(entry: dict[str, Any], issues: list[str]) -> dict[str, Any]:
     return out
 
 
-def review(entry: dict[str, Any], issues: list[str], note: str = "", notes: dict[str, Any] | None = None) -> dict[str, Any]:
+def review(
+    entry: dict[str, Any], issues: list[str], note: str = "", notes: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """Keep the review on the print and the corrections on its source model; returns both."""
     issues = [k for k in issues if k in ISSUES]
     marks = clean_notes(notes or {})
     fix = corrections(entry, issues)
     source = library.load_index().get(entry["fichier"], {}).get("source")
     if source and (issues or note or marks):
-        library.annotate(source, retour={"date": int(time.time()), "issues": issues, "note": note[:300], "notes": marks,
-                                         "titres": [ISSUES[k][0] for k in issues], **fix})
+        library.annotate(
+            source,
+            retour={
+                "date": int(time.time()),
+                "issues": issues,
+                "note": note[:300],
+                "notes": marks,
+                "titres": [ISSUES[k][0] for k in issues],
+                **fix,
+            },
+        )
     return {"issues": issues, "fix": fix, "source": source, "notes": marks}

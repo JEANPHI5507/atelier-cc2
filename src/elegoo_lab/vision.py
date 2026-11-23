@@ -26,11 +26,19 @@ from . import config
 
 MODEL_URL = "https://www.obico.io/static_pub/ml-models/model-weights-5a6b1be1fa.onnx"
 MODEL_SHA256 = "0a6ebd8e30dbf6a450c50f9c0a5406f04ba7eb1c99fd5996e888c78bb383b9aa"
-BOX_THRESH = 0.08          # a box counts from this confidence (Obico THRESH)
+BOX_THRESH = 0.08  # a box counts from this confidence (Obico THRESH)
 NMS = 0.45
 # Obico 2nd-gen hyper-parameters (backend/config/settings.py)
-PARAMS = {"EWM_SPAN": 12, "ROLLING_WIN_SHORT": 310, "ROLLING_WIN_LONG": 7200, "THRESHOLD_LOW": 0.38,
-          "THRESHOLD_HIGH": 0.78, "INIT_SAFE_FRAME_NUM": 30, "ROLLING_MEAN_SHORT_MULTIPLE": 3.8, "ESCALATING_FACTOR": 1.75}
+PARAMS = {
+    "EWM_SPAN": 12,
+    "ROLLING_WIN_SHORT": 310,
+    "ROLLING_WIN_LONG": 7200,
+    "THRESHOLD_LOW": 0.38,
+    "THRESHOLD_HIGH": 0.78,
+    "INIT_SAFE_FRAME_NUM": 30,
+    "ROLLING_MEAN_SHORT_MULTIPLE": 3.8,
+    "ESCALATING_FACTOR": 1.75,
+}
 _net = None
 _net_lock = threading.Lock()
 
@@ -46,6 +54,7 @@ def model_ready() -> bool:
 def download_model(progress=None) -> Path:
     """Fetch the model once (200 MB) and check it is exactly the published one."""
     import httpx
+
     p = model_path()
     p.parent.mkdir(parents=True, exist_ok=True)
     tmp = p.with_suffix(".part")
@@ -73,9 +82,12 @@ def _session():
     with _net_lock:
         if _net is None:
             import onnxruntime
+
             opts = onnxruntime.SessionOptions()
-            opts.intra_op_num_threads = 2          # leave the PC usable while printing
-            _net = onnxruntime.InferenceSession(str(model_path()), opts, providers=["CPUExecutionProvider"])
+            opts.intra_op_num_threads = 2  # leave the PC usable while printing
+            _net = onnxruntime.InferenceSession(
+                str(model_path()), opts, providers=["CPUExecutionProvider"]
+            )
         return _net
 
 
@@ -125,6 +137,7 @@ def annotate(jpeg: bytes, dets: list[tuple[float, tuple[float, float, float, flo
 @dataclass
 class Prediction:
     """Obico's per-print state (current print) plus the lifetime baseline."""
+
     frames: int = 0
     lifetime: int = 0
     ewm: float = 0.0
@@ -149,7 +162,9 @@ class Prediction:
     def failing(self, sensitivity: float = 1.0, escalate: bool = False) -> bool:
         if self.frames < PARAMS["INIT_SAFE_FRAME_NUM"]:
             return False
-        adj = (self.ewm - self.long) * sensitivity / (PARAMS["ESCALATING_FACTOR"] if escalate else 1)
+        adj = (
+            (self.ewm - self.long) * sensitivity / (PARAMS["ESCALATING_FACTOR"] if escalate else 1)
+        )
         if adj < PARAMS["THRESHOLD_LOW"]:
             return False
         if adj > PARAMS["THRESHOLD_HIGH"]:
@@ -160,6 +175,7 @@ class Prediction:
 async def grab(manager: Any, timeout: float = 10.0) -> bytes:
     """One JPEG from the printer camera through pycentauri's shared stream (the CC2's camera
     server starves if every reader opens its own connection)."""
+
     async def read() -> bytes:
         _, chunks = await manager.camera.subscribe()
         buf = b""
@@ -169,10 +185,11 @@ async def grab(manager: Any, timeout: float = 10.0) -> bytes:
                 a = buf.find(b"\xff\xd8")
                 b = buf.find(b"\xff\xd9", a + 2) if a >= 0 else -1
                 if b > 0:
-                    return buf[a:b + 2]  # type: ignore[no-any-return]
+                    return buf[a : b + 2]  # type: ignore[no-any-return]
                 if len(buf) > 8_000_000:
                     buf = buf[-1_000_000:]
         finally:
             await chunks.aclose()
         raise RuntimeError("caméra : flux terminé sans image")
+
     return await asyncio.wait_for(read(), timeout)

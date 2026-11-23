@@ -39,7 +39,9 @@ def binary() -> Path:
     for cand in (cfg, TOOLS / "squashfs-root" / "AppRun"):
         if cand and Path(cand).is_file():
             return Path(cand)
-    raise SliceError("Slicer introuvable. Lance: make slicer   (ou renseigne [slicer] path dans config.toml)")
+    raise SliceError(
+        "Slicer introuvable. Lance: make slicer   (ou renseigne [slicer] path dans config.toml)"
+    )
 
 
 def profiles_dir() -> Path:
@@ -72,12 +74,18 @@ def _flat(name: str) -> dict[str, Any]:
 def machine_profile(nozzle: str) -> Path:
     name = f"Elegoo Centauri Carbon 2 {nozzle} nozzle"
     if name not in _index():
-        raise SliceError(f"pas de profil machine pour une buse de {nozzle} mm (disponibles: {nozzles()})")
+        raise SliceError(
+            f"pas de profil machine pour une buse de {nozzle} mm (disponibles: {nozzles()})"
+        )
     return Path(_index()[name]["_path"])
 
 
 def nozzles() -> list[str]:
-    return sorted(n.split()[-2] for n in _index() if re.fullmatch(r"Elegoo Centauri Carbon 2 [\d.]+ nozzle", n))
+    return sorted(
+        n.split()[-2]
+        for n in _index()
+        if re.fullmatch(r"Elegoo Centauri Carbon 2 [\d.]+ nozzle", n)
+    )
 
 
 def qualities(nozzle: str = DEFAULT_NOZZLE) -> list[str]:
@@ -91,13 +99,22 @@ def clearances(nozzle: str = DEFAULT_NOZZLE) -> tuple[float, float]:
     (extruder_clearance_height_to_rod, the X carriage passing over it). OrcaSlicer's command
     line never checks them, so we do."""
     m = _flat(f"Elegoo Centauri Carbon 2 {nozzle} nozzle")
-    return (float(m.get("extruder_clearance_radius", 50)), float(m.get("extruder_clearance_height_to_rod", 35)))
+    return (
+        float(m.get("extruder_clearance_radius", 50)),
+        float(m.get("extruder_clearance_height_to_rod", 35)),
+    )
 
 
 def filaments() -> list[str]:
     """Elegoo's CC2 filaments, then the user's own profiles (catalog) built on one of them."""
-    elegoo = sorted(n[len("Elegoo "): -len(" @ECC2")] for n in _index() if n.startswith("Elegoo ") and n.endswith(" @ECC2"))
-    return elegoo + sorted(k for k, v in catalog.profiles().items() if v["base"] in elegoo and k not in elegoo)
+    elegoo = sorted(
+        n[len("Elegoo ") : -len(" @ECC2")]
+        for n in _index()
+        if n.startswith("Elegoo ") and n.endswith(" @ECC2")
+    )
+    return elegoo + sorted(
+        k for k, v in catalog.profiles().items() if v["base"] in elegoo and k not in elegoo
+    )
 
 
 def _filament_path(short: str) -> Path:
@@ -110,15 +127,29 @@ def _filament_path(short: str) -> Path:
 PALETTE = ["#E53935", "#1E88E5", "#43A047", "#FDD835"]
 
 
-def _user_filament(short: str, colour: str, dest: Path, overrides: dict[str, Any] | None = None) -> Path:
+def _user_filament(
+    short: str, colour: str, dest: Path, overrides: dict[str, Any] | None = None
+) -> Path:
     """Flattened copy of an Elegoo filament with its own colour: the slicer only registers
     several filaments when each one is a self-contained file with a distinct colour."""
     own = catalog.profiles().get(short)
     base = own["base"] if own else short
     _filament_path(base)  # validates the name
     f = _flat(f"Elegoo {base} @ECC2")
-    f.update({k: v if isinstance(v, list) else [str(v)] for k, v in (own or {}).get("reglages", {}).items()})
-    f.update({"type": "filament", "from": "User", "name": f"cc2lab {short} {colour}", "filament_colour": [colour]})
+    f.update(
+        {
+            k: v if isinstance(v, list) else [str(v)]
+            for k, v in (own or {}).get("reglages", {}).items()
+        }
+    )
+    f.update(
+        {
+            "type": "filament",
+            "from": "User",
+            "name": f"cc2lab {short} {colour}",
+            "filament_colour": [colour],
+        }
+    )
     f.update(overrides or {})
     f.pop("setting_id", None)
     p = dest / f"fil_{len(list(dest.glob('fil_*.json')))}.json"
@@ -130,10 +161,19 @@ def _official_names(gcode: bytes, names: list[str], process_name: str) -> bytes:
     """Put Elegoo's own profile names back in the G-code: our per-colour copies are named
     "cc2lab PLA #RRGGBB" (the slicer needs distinct files), but the CC2 refuses a print whose
     filament profile names it does not know."""
-    own = catalog.profiles()   # the user's own profiles go out under the Elegoo filament they build on
+    own = (
+        catalog.profiles()
+    )  # the user's own profiles go out under the Elegoo filament they build on
     fil = ";".join(f'"Elegoo {own[n]["base"] if n in own else n} @ECC2"' for n in names).encode()
-    gcode = re.sub(rb"^; filament_settings_id = .*$", b"; filament_settings_id = " + fil, gcode, flags=re.M)
-    return re.sub(rb"^; print_settings_id = .*$", b"; print_settings_id = " + process_name.encode(), gcode, flags=re.M)
+    gcode = re.sub(
+        rb"^; filament_settings_id = .*$", b"; filament_settings_id = " + fil, gcode, flags=re.M
+    )
+    return re.sub(
+        rb"^; print_settings_id = .*$",
+        b"; print_settings_id = " + process_name.encode(),
+        gcode,
+        flags=re.M,
+    )
 
 
 _MESH = re.compile(rb"^BED_MESH_CALIBRATE\b[^\n]*$", re.M)
@@ -155,13 +195,16 @@ def without_purge(gcode: bytes) -> bytes:
     """Colour changes with no flush at all: ``M6211`` (whose 23 + 6 mm push cannot be asked away) becomes the bare
     CANVAS switch. The first load (``A1``) and same-tool changes keep their original line.
 
-    The nozzle still holds the old colour, so the first millimetres after each change are a blend."""
+    The nozzle still holds the old colour, so the first millimetres after each change are a blend.
+    """
+
     def swap(m: re.Match[bytes]) -> bytes:
         line = m.group(0)
         t, length = re.search(rb"\bT(\d+)", line), re.search(rb"\bL([\d.]+)", line)
         if not t or b" A1" in line or not length or float(length.group(1)) <= 0:
             return line
         return b"CANVAS_SWITCH_FILAMENT T=" + t.group(1) + b" ; (purge retiree) " + line
+
     return _M6211.sub(swap, gcode)
 
 
@@ -178,7 +221,9 @@ def without_toolchange_reprime(gcode: bytes) -> bytes:
     tower's corner with one (seen on the real CC2, 2026-11-13). The push becomes the 1.7 mm M6211 itself pulled
     back; the retract before the change is kept."""
     lines = gcode.split(b"\n")
-    pending: bytes | None = None   # the length retracted before the last M6211, waiting for its push back
+    pending: bytes | None = (
+        None  # the length retracted before the last M6211, waiting for its push back
+    )
     retracted: bytes | None = None
     for i, line in enumerate(lines):
         m = re.match(rb"G1 E-([\d.]+)( F\d+)? *$", line)
@@ -191,10 +236,18 @@ def without_toolchange_reprime(gcode: bytes) -> bytes:
         elif pending is not None:
             m = re.match(rb"G1 E([\d.]+) F\d+ *$", line)
             if m and float(m.group(1)) == float(pending):
-                lines[i] = (b"G1 E" + REPRIME_MM + m.group(0)[len(b"G1 E") + len(m.group(1)):]
-                            + b" ; (au lieu de " + line + b" : re-poussee apres changement de couleur)")
+                lines[i] = (
+                    b"G1 E"
+                    + REPRIME_MM
+                    + m.group(0)[len(b"G1 E") + len(m.group(1)) :]
+                    + b" ; (au lieu de "
+                    + line
+                    + b" : re-poussee apres changement de couleur)"
+                )
                 pending = None
-            elif re.match(rb"G1 .*[XY][-\d.].* E", line):   # printing resumed without the push: nothing to drop
+            elif re.match(
+                rb"G1 .*[XY][-\d.].* E", line
+            ):  # printing resumed without the push: nothing to drop
                 pending = None
     return b"\n".join(lines)
 
@@ -209,13 +262,21 @@ def firmware_purge_m(gcode: bytes, n_fil: int) -> list[float]:
         t, length = re.search(r"\bT(\d+)", line), re.search(r"\bL([\d.]+)", line)
         if not t or not length or float(length.group(1)) <= 0 or int(t.group(1)) >= n_fil:
             continue
-        out[int(t.group(1))] += (max(float(length.group(1)), FLUSH_FLOOR_MM) + FLUSH_EXTRA_MM) / 1000
+        out[int(t.group(1))] += (
+            max(float(length.group(1)), FLUSH_FLOOR_MM) + FLUSH_EXTRA_MM
+        ) / 1000
     return out
 
 
 _FR = [
-    ("floating regions", "Des zones de la pièce sont dans le vide (surplombs) : active les supports ou change l'orientation."),
-    ("empty layer", "Une couche vide a été détectée : la pièce a peut-être une partie détachée ou trop fine."),
+    (
+        "floating regions",
+        "Des zones de la pièce sont dans le vide (surplombs) : active les supports ou change l'orientation.",
+    ),
+    (
+        "empty layer",
+        "Une couche vide a été détectée : la pièce a peut-être une partie détachée ou trop fine.",
+    ),
     ("too small", "Certains détails sont trop fins pour la buse et ne seront pas imprimés."),
 ]
 
@@ -234,15 +295,27 @@ class Result:
     filament_m: float | None = None
     per_filament_m: list[float] = field(default_factory=list)
     colour_changes: int = 0
-    purge_m: list[float] = field(default_factory=list)   # firmware purge per filament (not in Orca's totals)
-    temps: dict[str, Any] = field(default_factory=dict)  # nozzle per tool and bed, from the sliced profile
+    purge_m: list[float] = field(
+        default_factory=list
+    )  # firmware purge per filament (not in Orca's totals)
+    temps: dict[str, Any] = field(
+        default_factory=dict
+    )  # nozzle per tool and bed, from the sliced profile
     warnings: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, Any]:
-        return {"gcode": [p.name for p in self.gcode], "layers": self.layers, "time": self.time,
-                "filament_m": self.filament_m, "per_filament_m": self.per_filament_m,
-                "colour_changes": self.colour_changes, "purge_m": self.purge_m, "temps": self.temps,
-                "total_m": round((self.filament_m or 0) + sum(self.purge_m), 2), "warnings": self.warnings}
+        return {
+            "gcode": [p.name for p in self.gcode],
+            "layers": self.layers,
+            "time": self.time,
+            "filament_m": self.filament_m,
+            "per_filament_m": self.per_filament_m,
+            "colour_changes": self.colour_changes,
+            "purge_m": self.purge_m,
+            "temps": self.temps,
+            "total_m": round((self.filament_m or 0) + sum(self.purge_m), 2),
+            "warnings": self.warnings,
+        }
 
 
 def _header(gcode: Path) -> dict[str, str]:
@@ -250,12 +323,14 @@ def _header(gcode: Path) -> dict[str, str]:
     changes = 0
     purge: dict[int, float] = {}
     first_load = True
-    want = re.compile(r"; (total layer number|estimated printing time \(normal mode\)|total filament used \[mm\]|filament used \[mm\]"
-                      r"|nozzle_temperature|first_layer_bed_temperature)\s*[:=]\s*(.+)")
+    want = re.compile(
+        r"; (total layer number|estimated printing time \(normal mode\)|total filament used \[mm\]|filament used \[mm\]"
+        r"|nozzle_temperature|first_layer_bed_temperature)\s*[:=]\s*(.+)"
+    )
     out: dict[str, str] = {}
     with gcode.open("rb") as f:
         for raw in f:
-            if raw.startswith(b"CANVAS_SWITCH_FILAMENT T="):   # a change made by without_purge
+            if raw.startswith(b"CANVAS_SWITCH_FILAMENT T="):  # a change made by without_purge
                 changes += 1
             elif raw.startswith(b"M6211 ") and b" T" in raw:  # CC2 filament change macro
                 changes += 1
@@ -264,9 +339,9 @@ def _header(gcode: Path) -> dict[str, str]:
                     purge[int(m.group(1))] = purge.get(int(m.group(1)), 0.0) + float(m.group(2))
                 first_load = False
             elif raw.startswith(b"; "):
-                m = want.match(raw.decode("utf-8", "ignore"))
-                if m:
-                    out.setdefault(m.group(1), m.group(2).strip())
+                ms = want.match(raw.decode("utf-8", "ignore"))
+                if ms:
+                    out.setdefault(ms.group(1), ms.group(2).strip())
     out["colour changes"] = str(max(0, changes - 1))  # the first one loads the starting filament
     out["purge"] = json.dumps(purge)
     return out
@@ -293,16 +368,21 @@ def slice_model(
         raise SliceError(f"{model.name}: format non tranchable (accepté: {sorted(MESH_INPUT)})")
     process_name = f"{quality} @Elegoo CC2 {nozzle} nozzle"
     if process_name not in _index():
-        raise SliceError(f"qualité '{quality}' inconnue pour une buse de {nozzle} mm. Disponibles: {qualities(nozzle)}")
+        raise SliceError(
+            f"qualité '{quality}' inconnue pour une buse de {nozzle} mm. Disponibles: {qualities(nozzle)}"
+        )
     names = filament or [DEFAULT_FILAMENT]
     if len(names) > 4:
         raise SliceError("le CANVAS gère 4 filaments au maximum")
     if model.suffix.lower() == ".3mf":
         from .colorize import filament_count
+
         declared = filament_count(model)
         if declared and declared != len(names):
-            raise SliceError(f"{model.name} prévoit {declared} filament(s) mais {len(names)} fourni(s): "
-                             f"répète --filament {declared} fois")
+            raise SliceError(
+                f"{model.name} prévoit {declared} filament(s) mais {len(names)} fourni(s): "
+                f"répète --filament {declared} fois"
+            )
 
     proc = _flat(process_name)
     proc.update({"type": "process", "name": f"cc2lab {quality}", "from": "User"})
@@ -313,25 +393,42 @@ def slice_model(
         proc["wall_loops"] = str(walls)
     if supports:
         proc["enable_support"] = "1"
-    proc.setdefault("curr_bed_type", "Textured PEI Plate")  # the CC2 ships with a textured PEI plate (60 °C for PLA)
+    proc.setdefault(
+        "curr_bed_type", "Textured PEI Plate"
+    )  # the CC2 ships with a textured PEI plate (60 °C for PLA)
     proc.update(overrides or {})
     # ElegooSlicer ships the CC2 with ramming off: on, the CC2 stops with error 1243 "extrusion failed"
     proc["enable_filament_ramming"] = "0"
 
     out_dir.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as tmp:
-        cols = (colours or []) + PALETTE[len(colours or []):]
-        fil = [_user_filament(n, cols[i], Path(tmp), filament_overrides) for i, n in enumerate(names)]
+        cols = (colours or []) + PALETTE[len(colours or []) :]
+        fil = [
+            _user_filament(n, cols[i], Path(tmp), filament_overrides) for i, n in enumerate(names)
+        ]
         pf = Path(tmp) / "process.json"
         pf.write_text(json.dumps(proc))
         work = Path(tmp) / "out"
         # --allow-newer-file: projects saved by newer Bambu Studio / OrcaSlicer (most MakerWorld files)
         # are otherwise refused with "Unsupported 3MF version" (-24)
-        cmd = [str(binary()), "--slice", "0", "--allow-newer-file", *(cli_args or []), "--outputdir", str(work),
-               "--load-settings", f"{machine_profile(nozzle)};{pf}",
-               "--load-filaments", ";".join(str(p) for p in fil), str(model.resolve())]  # cwd is tmp
+        cmd = [
+            str(binary()),
+            "--slice",
+            "0",
+            "--allow-newer-file",
+            *(cli_args or []),
+            "--outputdir",
+            str(work),
+            "--load-settings",
+            f"{machine_profile(nozzle)};{pf}",
+            "--load-filaments",
+            ";".join(str(p) for p in fil),
+            str(model.resolve()),
+        ]  # cwd is tmp
         try:
-            run = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=tmp)  # its log lands in tmp
+            run = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=timeout, cwd=tmp
+            )  # its log lands in tmp
         except subprocess.TimeoutExpired as err:
             raise SliceError(f"tranchage trop long (> {timeout:.0f}s)") from err
         report: dict[str, Any] = {}
@@ -341,16 +438,34 @@ def slice_model(
         if run.returncode != 0 or report.get("return_code", 0) != 0 or not gcodes:
             # without supports, OrcaSlicer's command line fails (return -100, code 156) on parts that would hang
             # in the air instead of warning; its log only says so at --debug 3, so the caller retries with supports
-            if not supports and report.get("return_code", run.returncode) in (156, -100) and "return -100" in run.stdout + run.stderr:
+            if (
+                not supports
+                and report.get("return_code", run.returncode) in (156, -100)
+                and "return -100" in run.stdout + run.stderr
+            ):
                 raise SupportNeededError("une partie flotterait sans support")
-            detail = (report.get("error_string") or "") + " " + (run.stdout + run.stderr).strip()[-400:]
-            raise SliceError(f"OrcaSlicer a échoué (code {report.get('return_code', run.returncode)}): {detail.strip()}")
+            detail = (
+                (report.get("error_string") or "") + " " + (run.stdout + run.stderr).strip()[-400:]
+            )
+            raise SliceError(
+                f"OrcaSlicer a échoué (code {report.get('return_code', run.returncode)}): {detail.strip()}"
+            )
 
         tag = quality.split()[0] + (f"_{'-'.join(names)}" if filament else "")
         # plain ASCII file names for the printer: "Noël" -> "Noel"
-        tag = re.sub(r"[^\w.-]+", "_", unicodedata.normalize("NFKD", tag).encode("ascii", "ignore").decode(), flags=re.A)
-        res = Result(warnings=[_fr(w["warning_message"]) for p in report.get("sliced_plates", [])
-                               if (w := p).get("warning_message")])
+        tag = re.sub(
+            r"[^\w.-]+",
+            "_",
+            unicodedata.normalize("NFKD", tag).encode("ascii", "ignore").decode(),
+            flags=re.A,
+        )
+        res = Result(
+            warnings=[
+                _fr(w["warning_message"])
+                for p in report.get("sliced_plates", [])
+                if (w := p).get("warning_message")
+            ]
+        )
         for i, g in enumerate(gcodes):
             dest = out_dir / f"{model.stem}_{tag}{'' if len(gcodes) == 1 else f'_p{i + 1}'}.gcode"
             data = _official_names(g.read_bytes(), names, process_name)
@@ -371,14 +486,22 @@ def slice_model(
         n_fil = len(names)
         if h.get("nozzle_temperature") or h.get("first_layer_bed_temperature"):
             bed = re.match(r"[\d.]+", h.get("first_layer_bed_temperature") or "")
-            res.temps = {"nozzle": [int(float(x)) for x in re.findall(r"[\d.]+", h.get("nozzle_temperature", ""))][:n_fil],
-                         "bed": int(float(bed.group())) if bed else None}
+            res.temps = {
+                "nozzle": [
+                    int(float(x)) for x in re.findall(r"[\d.]+", h.get("nozzle_temperature", ""))
+                ][:n_fil],
+                "bed": int(float(bed.group())) if bed else None,
+            }
         res.purge_m = [round(purge.get(i, 0.0) / 1000, 2) for i in range(n_fil)] if purge else []
-        if any(fw_purge):      # the firmware's own count: higher than OrcaSlicer's whenever changes ask for under 23 mm
+        if any(
+            fw_purge
+        ):  # the firmware's own count: higher than OrcaSlicer's whenever changes ask for under 23 mm
             res.purge_m = [round(x, 2) for x in fw_purge]
         if res.colour_changes > 150:
-            res.warnings.append(f"{res.colour_changes} changements de couleur (≈ 1 min chacun) : pour gagner du temps, "
-                                "passe en couches de 0,28 mm ou regroupe une couleur peu utilisée avec une autre.")
+            res.warnings.append(
+                f"{res.colour_changes} changements de couleur (≈ 1 min chacun) : pour gagner du temps, "
+                "passe en couches de 0,28 mm ou regroupe une couleur peu utilisée avec une autre."
+            )
         fm = h.get("total filament used [mm]") or h.get("filament used [mm]")
         if fm:
             try:
