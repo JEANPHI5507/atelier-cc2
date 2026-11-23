@@ -63,7 +63,7 @@
 | R1.5 | Documentation des limites CC2 | ✅ **Terminé** | Vibe Code | [#4](https://github.com/JEANPHI5507/atelier-cc2/pull/4) | 2026-11-23 | 2026-11-23 |
 | R1.6 | Gestion des erreurs caméra | ✅ **Terminé** | Vibe Code | [#7](https://github.com/JEANPHI5507/atelier-cc2/pull/7) | 2026-11-23 | 2026-11-23 |
 
-**Prochaine Tâche Prioritaire** : Phase 2 restante (INF.2 Docker Hub — secrets DOCKER_HUB_* à configurer), puis Phase 3 (R2.2 CANVAS 3D, R2.3 notifications, R2.4 backup auto, R2.5 assistant guidé… ; R2.1 mode Débutant ✅ PR #17)
+**Prochaine Tâche Prioritaire** : Phase 2 restante (INF.2 Docker Hub — secrets DOCKER_HUB_* à configurer), puis Phase 3 (R2.3 notifications intelligentes en cours, R2.4 backup auto, R2.5 assistant guidé… ; R2.1 ✅ PR #17, R2.2 ✅ PR #19)
 
 ---
 
@@ -75,6 +75,7 @@
 | ID | Tâche | Statut | Contributeur | PR | Date Début | Date Fin |
 |----|-------|--------|--------------|----|------------|----------|
 | R2.1 | Mode Débutant | ⏳ **À faire** | - | - | - | - |
+| R2.2 | Schéma interactif du CANVAS : 4 bobines SVG (couleur actuelle, stock restant), bobine active « en cours », clic → fiche stock | Vibe Code | 2026-11-23 | [#19](https://github.com/JEANPHI5507/atelier-cc2/pull/19) |
 | R2.2 | Visualisation CANVAS 3D | ⏳ **À faire** | - | - | - | - |
 | R2.3 | Notifications Intelligentes | ⏳ **À faire** | - | - | - | - |
 | R2.4 | Backup Automatique | ⏳ **À faire** | - | - | - | - |
@@ -119,7 +120,7 @@
 | Contributeur | Tâches Assignées | PR Ouvertes | PR Mergées | Dernière Contribution |
 |--------------|------------------|-------------|------------|----------------------|
 | JEANPHI5507 | 4 | 1 | 4 | 2024-11-22 |
-| Vibe Code | 13 | 0 | 11 | 2026-11-23 |
+| Vibe Code | 14 | 0 | 12 | 2026-11-23 |
 
 ---
 

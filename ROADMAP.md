@@ -78,7 +78,7 @@
 | ID | Tâche | Description | Complexité | Statut | Issue GitHub | PR | Contributeur |
 |----|-------|-------------|------------|--------|--------------|----|--------------|
 | **R2.1** | 👶 **Mode Débutant** | Bascule Débutant/Avancé persistée (config.toml [interface] mode), options .advanced masquées en mode débutant, endpoints /lab/api/mode, i18n EN. | ⭐⭐⭐ | ✅ **Terminé** | [#16](https://github.com/JEANPHI5507/atelier-cc2/issues/16) | [#17](https://github.com/JEANPHI5507/atelier-cc2/pull/17) | 2026-11-23 |
-| **R2.2** | 3A8 **Visualisation CANVAS 3D** | Schéma interactif des 4 bobines avec couleurs actuelles. | ⭐⭐⭐ | 53D4CA **À faire** | [#8](https://github.com/JEANPHI5507/atelier-cc2/issues/8) | - | - |
+| **R2.2** | 🎨 **Visualisation CANVAS** | Schéma interactif des 4 bobines (SVG, couleur actuelle, remplissage = stock restant, bobine active « en cours », clic → fiche stock). | ⭐⭐⭐⭐ | ✅ **Terminé** | [#18](https://github.com/JEANPHI5507/atelier-cc2/issues/18) | [#19](https://github.com/JEANPHI5507/atelier-cc2/pull/19) | 2026-11-23 |
 | **R2.3** | 514 **Notifications Intelligentes** | Niveaux de priorité (Critique/Avertissement/Info) + historique. | ⭐⭐ | 53D4CA **À faire** | [#9](https://github.com/JEANPHI5507/atelier-cc2/issues/9) | - | - |
 | **R2.4** | 4BE **Backup Automatique** | Sauvegarde de `config.toml` et bibliothèque avec versioning. | ⭐⭐ | 53D4CA **À faire** | [#10](https://github.com/JEANPHI5507/atelier-cc2/issues/10) | - | - |
 | **R2.5** | 39F **Assistant Guidé** | Étendre le chat pour proposer des workflows pas à pas. | ⭐⭐⭐ | 53D4CA **À faire** | [#11](https://github.com/JEANPHI5507/atelier-cc2/issues/11) | - | - |
