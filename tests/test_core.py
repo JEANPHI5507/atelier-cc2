@@ -4395,30 +4395,42 @@ def test_web_forme_endpoint(web):
 
 def test_web_endpoints_round2(web):
     client, _lib = web
-    H = {"Origin": "http://testserver"}
+    hdrs = {"Origin": "http://testserver"}
     stl = trimesh.creation.box((20, 20, 10)).export(file_type="stl")
-    client.post("/lab/api/models", files={"file": ("cube.stl", stl)}, headers=H)
+    client.post("/lab/api/models", files={"file": ("cube.stl", stl)}, headers=hdrs)
     client.post(
         "/lab/api/models",
         files={"file": ("p.gcode", b"G28\n;LAYER_CHANGE\n;Z:0.2\nG1 X1\n")},
-        headers=H,
+        headers=hdrs,
     )
     assert client.get("/lab/api/models/p.gcode/coupe").status_code == 200
     assert client.get("/lab/api/models/cube.stl/cut-preview.glb").status_code == 200
-    assert client.post("/lab/api/langue", json={"lang": "en"}, headers=H).status_code == 200
-    assert client.post("/lab/api/entretien/plateau", headers=H).status_code == 200
-    assert client.post("/lab/api/lancement", json={"printer_check": False}, headers=H).status_code == 200
-    assert client.post("/lab/api/models/cube.stl/optimize", json={}, headers=H).status_code == 200
-    assert client.post("/lab/api/models/cube.stl/repair", json={}, headers=H).status_code == 200
+    assert client.post("/lab/api/langue", json={"lang": "en"}, headers=hdrs).status_code == 200
+    assert client.post("/lab/api/entretien/plateau", headers=hdrs).status_code == 200
     assert (
-        client.post("/lab/api/models/cube.stl/retouch", json={"couleur": 1, "zones": []}, headers=H).status_code
+        client.post("/lab/api/lancement", json={"printer_check": False}, headers=hdrs).status_code
         == 200
     )
-    r = client.post("/lab/api/setup/check", json={"host": "127.0.0.1", "access_code": "123456"}, headers=H)
+    assert (
+        client.post("/lab/api/models/cube.stl/optimize", json={}, headers=hdrs).status_code == 200
+    )
+    assert client.post("/lab/api/models/cube.stl/repair", json={}, headers=hdrs).status_code == 200
+    assert (
+        client.post(
+            "/lab/api/models/cube.stl/retouch", json={"couleur": 1, "zones": []}, headers=hdrs
+        ).status_code
+        == 200
+    )
+    r = client.post(
+        "/lab/api/setup/check", json={"host": "127.0.0.1", "access_code": "123456"}, headers=hdrs
+    )
     assert r.status_code == 200, r.text  # answer from connexion.check, ok or not
-    r = client.post("/lab/api/setup/dowel", data={"play": "0.2"}, headers=H)
+    r = client.post("/lab/api/setup/dowel", data={"play": "0.2"}, headers=hdrs)
     assert r.status_code == 200 and r.json()["dowel_play"] == 0.2
-    assert client.post("/lab/api/queue", json={"name": "p.gcode"}, headers=H).status_code in (200, 409)
+    assert client.post("/lab/api/queue", json={"name": "p.gcode"}, headers=hdrs).status_code in (
+        200,
+        409,
+    )
     assert client.get("/lab/api/bilan/x").status_code == 404
 
 
@@ -4429,7 +4441,9 @@ def test_assistant_config_helpers(tmp_path, monkeypatch):
     assert assistant.api_key() is None  # pas de clé dans un config vierge
     assert assistant.model_name()
     assert assistant.moteur()
-    (tmp_path / "config.toml").write_text('[assistant]\napi_key = "sk-test"\nmodel = "gros"\nmoteur = "cli"\ncommande = "vibe"\n')
+    (tmp_path / "config.toml").write_text(
+        '[assistant]\napi_key = "sk-test"\nmodel = "gros"\nmoteur = "cli"\ncommande = "vibe"\n'
+    )
     assert assistant.api_key() == "sk-test"
     assert assistant.model_name() == "gros"
     assert assistant.moteur() == "cli"
