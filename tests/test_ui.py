@@ -775,3 +775,15 @@ def test_workflow_guide_checklist(page):
     assert "✔" in page.inner_text(".wf .wf-step")
     assert "mm" in page.inner_text(".wf .wf-step")
     assert page.errors == []
+
+
+def test_help_dialog(page):
+    page.click("#help-open")
+    page.wait_for_selector("#help[open]")
+    assert len(page.query_selector_all("#help .tuto")) == 3  # 3 tutos
+    assert len(page.query_selector_all("#help .tuto-v")) == 3  # 3 SVG animés
+    assert page.query_selector("#help a[href*='/tree/main/guide']") is not None
+    assert "CANVAS" in page.inner_text("#help")
+    page.click("#help [data-close]")
+    page.wait_for_function("!document.getElementById('help').open")
+    assert page.errors == []

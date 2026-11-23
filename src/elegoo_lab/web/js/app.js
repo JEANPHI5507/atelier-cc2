@@ -29,6 +29,7 @@ for (const t of ['start', 'lab', 'ui', 'gal']) $('t-' + t).onclick = () => {
   if (t === 'ui') openPrinter(); else closeCamera();
 };
 document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => b.closest('dialog').close());
+$('help-open').onclick = () => $('help').showModal();
 
 /* boot */
 if ('serviceWorker' in navigator && isSecureContext) navigator.serviceWorker.register('sw.js', { scope: '/lab/' }).catch(() => {});
