@@ -4699,9 +4699,9 @@ def test_cli_sauvegarde_commands(tmp_path, monkeypatch):
 
     from elegoo_lab import cli, sauvegarde
 
-    monkeypatch.setattr(cli, "UNIT_DIR", tmp_path / "units")
+    monkeypatch.setattr(sauvegarde, "UNIT_DIR", tmp_path / "units")
     monkeypatch.setattr(
-        cli, "_systemctl", lambda *a, check=True: SimpleNamespace(stdout="", returncode=0)
+        sauvegarde, "_systemctl", lambda *a, check=True: SimpleNamespace(stdout="", returncode=0)
     )
     runner = CliRunner()
     monkeypatch.setattr(sauvegarde, "run", lambda *a, **k: "sauvegarde faite vers /usb")
@@ -5955,4 +5955,99 @@ def test_notifications_filters_assets():
     assert ".ev-filters" in css
     en = _json.loads((web / "i18n" / "en.json").read_text(encoding="utf-8"))
     for k in ("Toutes", "Critiques", "Avertissements", "Historique", "Aucune alerte de ce niveau."):
+        assert k in en["exact"] and en["exact"][k], k
+
+
+# --- R2.4 : backup automatique guidé depuis l'UI (helpers auto, endpoints, assets) ---
+
+
+def test_sauvegarde_auto_helpers(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from elegoo_lab import sauvegarde
+
+    units = tmp_path / "units"
+    monkeypatch.setattr(sauvegarde, "UNIT_DIR", units)
+    calls = []
+    monkeypatch.setattr(
+        sauvegarde,
+        "_systemctl",
+        lambda *a, check=True: calls.append(a) or SimpleNamespace(stdout="", returncode=0),
+    )
+    msg = sauvegarde.install_auto("/mnt/usb")
+    assert "installée" in msg and (units / "cc2-sauvegarde.timer").exists()
+    assert (units / "cc2-sauvegarde.service").exists()
+    assert "--vers /mnt/usb" in (units / "cc2-sauvegarde.service").read_text()
+    assert ("enable", "--now", "cc2-sauvegarde.timer") in calls
+    msg2 = sauvegarde.remove_auto()
+    assert "retirée" in msg2
+    assert not (units / "cc2-sauvegarde.timer").exists()
+    assert ("disable", "--now", "cc2-sauvegarde.timer") in calls
+
+
+def test_web_backup_endpoints(web, monkeypatch):
+    from types import SimpleNamespace
+
+    from elegoo_lab import sauvegarde
+
+    client, _lib = web
+    hdrs = {"Origin": "http://testserver"}
+    monkeypatch.setattr(
+        sauvegarde,
+        "status",
+        lambda: {"ok": 1700000000, "vers": "/usb", "essai": 1700000100, "erreur": ""},
+    )
+    monkeypatch.setattr(sauvegarde, "usb_disk", lambda: None)
+    monkeypatch.setattr(
+        sauvegarde, "overdue", lambda: "Aucune sauvegarde de la bibliothèque n'a encore réussi."
+    )
+    monkeypatch.setattr(sauvegarde, "UNIT_DIR", _lib / "units")
+    r = client.get("/lab/api/sauvegarde")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["disque"] is False and body["auto"] is False
+    assert "jamais" not in body["en_retard"] and "Aucune" in body["en_retard"]
+    # POST sans contrôle -> 403 (pas de manager démarré dans ce fixture)
+    assert client.post("/lab/api/sauvegarde/faire", headers=hdrs).status_code == 403
+    assert (
+        client.post("/lab/api/sauvegarde/auto", json={"activer": True}, headers=hdrs).status_code
+        == 403
+    )
+    # avec contrôle : copie immédiate + timer auto (fonctions mockées)
+    client.app.state.manager = SimpleNamespace(enable_control=True)
+    monkeypatch.setattr(sauvegarde, "run", lambda *a, **k: "sauvegarde faite vers /usb")
+    r = client.post("/lab/api/sauvegarde/faire", headers=hdrs)
+    assert r.status_code == 200 and r.json()["ok"] and "faite" in r.json()["message"]
+
+    def boom(*a, **k):
+        raise RuntimeError("disque de sauvegarde non branché")
+
+    monkeypatch.setattr(sauvegarde, "run", boom)
+    r = client.post("/lab/api/sauvegarde/faire", headers=hdrs)
+    assert r.status_code == 409 and "non branché" in r.json()["detail"]
+    monkeypatch.setattr(sauvegarde, "install_auto", lambda vers=None: "auto installée")
+    monkeypatch.setattr(sauvegarde, "remove_auto", lambda: "auto retirée")
+    r = client.post(
+        "/lab/api/sauvegarde/auto", json={"activer": True, "vers": "/mnt/usb"}, headers=hdrs
+    )
+    assert r.status_code == 200 and "installée" in r.json()["message"]
+    r = client.post("/lab/api/sauvegarde/auto", json={"activer": False}, headers=hdrs)
+    assert r.status_code == 200 and "retirée" in r.json()["message"]
+
+
+def test_backup_ui_assets():
+    import json as _json
+
+    web = Path(config.ROOT) / "src" / "elegoo_lab" / "web"
+    html = (web / "index.html").read_text(encoding="utf-8")
+    assert 'id="bk-now"' in html and 'id="bk-auto"' in html and 'id="bk-status"' in html
+    assert 'id="bk-vers"' in html and "Sauvegarder la bibliothèque" in html
+    js = (web / "js" / "setup.js").read_text(encoding="utf-8")
+    assert "/sauvegarde/faire" in js and "/sauvegarde/auto" in js and "loadBackup" in js
+    en = _json.loads((web / "i18n" / "en.json").read_text(encoding="utf-8"))
+    for k in (
+        "Sauvegarder maintenant",
+        "Activer la sauvegarde auto",
+        "Sauvegarder la bibliothèque",
+    ):
         assert k in en["exact"] and en["exact"][k], k

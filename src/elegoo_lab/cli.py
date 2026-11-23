@@ -400,25 +400,9 @@ def backup_install(
     ] = None,
 ) -> None:
     """Sauvegarde automatique : essai toutes les heures, une copie par jour, rattrapée dès que le disque est branché."""
-    exe = Path(sys.executable).parent / "cc2"
-    UNIT_DIR.mkdir(parents=True, exist_ok=True)
-    (UNIT_DIR / "cc2-sauvegarde.service").write_text(
-        f"[Unit]\nDescription=Atelier CC2 - sauvegarde vers {vers or 'le disque USB'}\n\n"
-        f"[Service]\nType=oneshot\nWorkingDirectory={config.ROOT}\n"
-        f"ExecStart={exe} sauvegarde faire{f' --vers {vers}' if vers else ''} --si-besoin\n"
-        "SuccessExitStatus=1\n"  # an unplugged disk is not a failure of the service: the status file keeps the reason
-        "Nice=10\nIOSchedulingClass=idle\n"
-    )
-    (UNIT_DIR / "cc2-sauvegarde.timer").write_text(
-        "[Unit]\nDescription=Atelier CC2 - sauvegarde toutes les heures si besoin\n\n"
-        "[Timer]\nOnBootSec=10min\nOnUnitActiveSec=1h\nPersistent=true\n\n[Install]\nWantedBy=timers.target\n"
-    )
-    _systemctl("daemon-reload")
-    _systemctl("enable", "--now", "cc2-sauvegarde.timer")
-    typer.echo(
-        f"Sauvegarde automatique installée vers {vers or 'le disque USB branché (dossier atelier-cc2)'}. "
-        "Suivi : `cc2 sauvegarde etat`."
-    )
+    from . import sauvegarde
+
+    typer.echo(sauvegarde.install_auto(vers))
 
 
 @backup.command("etat")

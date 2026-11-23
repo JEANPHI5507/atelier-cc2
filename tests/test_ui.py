@@ -747,3 +747,15 @@ def test_alerts_filters_and_history(page):
     page.wait_for_timeout(600)
     assert page.eval_on_selector("#ev-hist", "b => b.classList.contains('on')")
     assert page.errors == []
+
+
+def test_backup_card(page):
+    page.click("#t-start")
+    page.wait_for_selector("#bk-status")
+    page.wait_for_function(
+        "document.getElementById('bk-status').textContent.trim() !== '\u2026' && document.getElementById('bk-status').textContent.trim() !== ''"
+    )
+    assert "Dernière sauvegarde" in page.inner_text("#bk-status")
+    page.click("#bk-now")  # pas de disque USB dans le simulateur -> toast d'erreur propre
+    page.wait_for_timeout(800)
+    assert page.errors == []

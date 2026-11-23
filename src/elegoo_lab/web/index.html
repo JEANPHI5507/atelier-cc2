@@ -289,6 +289,18 @@
         <p class="note">Après le test des chevilles : choisis le jeu du premier trou où la cheville entre à la main, serrée sans forcer. Il sert à toutes les prochaines découpes.</p>
         <div class="plays" id="plays"></div>
       </div>
+      <div class="card">
+        <div class="step-h"><span class="num">5</span><h2>Sauvegarder la bibliothèque</h2></div>
+        <p class="note">models/, config.toml et l'historique git partent sur un disque USB branché (dossier « atelier-cc2 », anciennes copies dans « anciens/ ») ou vers une machine distante. Essaie maintenant, ou laisse faire toutes les heures.</p>
+        <p class="note" id="bk-status">…</p>
+        <div class="two" style="max-width:560px">
+          <div class="field"><label for="bk-vers">Destination (vide = disque USB branché)</label><input id="bk-vers" type="text" placeholder="ex. maison, un alias défini chez toi"></div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn primary" id="bk-now" data-ctl>Sauvegarder maintenant</button>
+          <button class="btn" id="bk-auto" data-ctl>Activer la sauvegarde auto</button>
+        </div>
+      </div>
     </div>
   </section>
   <section id="gal" hidden>

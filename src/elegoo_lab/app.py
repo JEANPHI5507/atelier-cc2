@@ -198,6 +198,11 @@ class ModeIn(BaseModel):
     mode: str
 
 
+class BackupAutoIn(BaseModel):
+    activer: bool
+    vers: str | None = None
+
+
 class PrepareIn(BaseModel):
     mapping: dict[int, int] = {}  # source colour index -> CANVAS slot (1..4)
     filaments: list[str] = ["PLA"]  # filament per slot
@@ -1388,6 +1393,47 @@ def lab_router(cfg: config.Config) -> APIRouter:
             return maintenance.done(task)
         except ValueError as err:
             raise HTTPException(404, str(err)) from err
+
+    @r.get("/sauvegarde")
+    def backup_status() -> dict[str, Any]:
+        """Backup state: last success/error, whether a USB disk is plugged, overdue warning, auto timer on."""
+        from . import sauvegarde
+
+        s = sauvegarde.status()
+        return {
+            **s,
+            "disque": sauvegarde.usb_disk() is not None,
+            "en_retard": sauvegarde.overdue(),
+            "auto": (sauvegarde.UNIT_DIR / "cc2-sauvegarde.timer").exists(),
+        }
+
+    @r.post("/sauvegarde/faire")
+    async def backup_now(request: Request) -> dict[str, Any]:
+        """One backup right now, to the plugged USB disk."""
+        from . import sauvegarde
+
+        mgr = getattr(request.app.state, "manager", None)
+        if not getattr(mgr, "enable_control", False):
+            raise HTTPException(403, "lecture seule : relance avec --control")
+        try:
+            msg = await asyncio.to_thread(sauvegarde.run, None)
+        except RuntimeError as err:
+            raise HTTPException(409, str(err)) from err
+        return {"ok": True, "message": msg}
+
+    @r.post("/sauvegarde/auto")
+    async def backup_auto_set(request: Request, body: BackupAutoIn) -> dict[str, Any]:
+        """Install or remove the hourly automatic backup (systemd user timer)."""
+        from . import sauvegarde
+
+        mgr = getattr(request.app.state, "manager", None)
+        if not getattr(mgr, "enable_control", False):
+            raise HTTPException(403, "lecture seule : relance avec --control")
+        if body.activer:
+            msg = await asyncio.to_thread(sauvegarde.install_auto, body.vers)
+        else:
+            msg = await asyncio.to_thread(sauvegarde.remove_auto)
+        return {"ok": True, "message": msg}
 
     @r.get("/lancement")
     def launch_options() -> dict[str, Any]:

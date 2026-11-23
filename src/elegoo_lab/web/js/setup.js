@@ -11,8 +11,34 @@ async function openStart() {
   if (!$('cfg-host').value) $('cfg-host').value = setup.printer.host || '';
   $('cfg-code').placeholder = setup.printer.code_set ? 'déjà enregistré (ressaisis-le pour tester)' : 'ex. Ab3dEf';
   $('s1-h').classList.toggle('done', !!setup.printer.host && setup.printer.code_set);
-  renderTests(); renderPlays();
+  renderTests(); renderPlays(); loadBackup();
 }
+
+/* R2.4: backup status + one-shot copy + hourly automatic backup (systemd user timer) */
+async function loadBackup() {
+  const s = await api('/sauvegarde').catch(() => null);
+  if (!s) return;
+  const last = s.ok ? new Date(s.ok * 1000).toLocaleString('fr-FR') + (s.vers ? ' vers ' + s.vers : '') : 'jamais';
+  $('bk-status').textContent = 'Dernière sauvegarde : ' + last + '.'
+    + (s.erreur ? ' Dernier essai en erreur : ' + s.erreur + '.' : '')
+    + (s.en_retard ? ' ' + s.en_retard : '')
+    + (s.disque ? '' : ' Aucun disque USB détecté.');
+  $('bk-auto').textContent = s.auto ? 'Désactiver la sauvegarde auto' : 'Activer la sauvegarde auto';
+  $('bk-auto').dataset.on = s.auto ? '1' : '';
+}
+$('bk-now').onclick = async () => {
+  try { const r = await api('/sauvegarde/faire', { method: 'POST' }); toast(r.message, 'ok'); }
+  catch (e) { toast(e.message, 'bad'); }
+  loadBackup();
+};
+$('bk-auto').onclick = async () => {
+  const on = $('bk-auto').dataset.on !== '1';
+  try {
+    const r = await api('/sauvegarde/auto', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ activer: on, vers: $('bk-vers').value.trim() || null }) });
+    toast(r.message, 'ok');
+  } catch (e) { toast(e.message, 'bad'); }
+  loadBackup();
+};
 $('cfg-test').onclick = async () => {
   const b = $('cfg-test'); b.disabled = true; b.innerHTML = '<span class="spin"></span>Test en cours…'; $('cfg-save').disabled = true; $('cfg-after').hidden = true;
   try {
