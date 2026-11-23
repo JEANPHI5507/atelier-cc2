@@ -56,19 +56,19 @@
 
 | ID | Tâche | Description | Complexité | Statut | Issue GitHub | PR | Contributeur |
 |----|-------|-------------|------------|--------|--------------|----|--------------|
-| **R1.1** | 489 **Dockerisation** | Créer une image Docker officielle avec toutes les dépendances (OrcaSlicer, IA, Python). | ⭐⭐⭐ | 53D4CA **À faire** | [#1](https://github.com/JEANPHI5507/atelier-cc2/issues/1) | - | - |
-| **R1.2** | 526 **Support WSL2** | Guide d'installation complet pour Windows via WSL2. | ⭐⭐ | 53D4CA **À faire** | [#2](https://github.com/JEANPHI5507/atelier-cc2/issues/2) | - | - |
-| **R1.3** | 9A8 **Mode Safe Firmware** | Désactiver les commandes critiques si le firmware n'est pas reconnu. | ⭐⭐⭐ | 53D4CA **À faire** | [#3](https://github.com/JEANPHI5507/atelier-cc2/issues/3) | - | - |
-| **R1.4** | 4A1 **Diagnostic Amélioré** | Étendre `cc2 doctor` pour vérifier OrcaSlicer, IA, caméra, etc. | ⭐⭐ | 53D4CA **À faire** | [#4](https://github.com/JEANPHI5507/atelier-cc2/issues/4) | - | - |
-| **R1.5** | 4DD **Documentation des Limites CC2** | Ajouter une section claire dans l'UI sur les commandes bloquées. | ⭐ | 53D4CA **À faire** | [#5](https://github.com/JEANPHI5507/atelier-cc2/issues/5) | - | - |
-| **R1.6** | 998 **Gestion des Erreurs Caméra** | Détection automatique des caméras gelées + redémarrage. | ⭐⭐ | 53D4CA **À faire** | [#6](https://github.com/JEANPHI5507/atelier-cc2/issues/6) | - | - |
+| **R1.1** | 489 **Dockerisation** | Créer une image Docker officielle avec toutes les dépendances (OrcaSlicer, IA, Python). | ⭐⭐⭐ | 53D4CA **Terminé** | - | [#1](https://github.com/JEANPHI5507/atelier-cc2/pull/1) | JEANPHI5507 |
+| **R1.2** | 526 **Support WSL2** | Guide d'installation complet pour Windows via WSL2. | ⭐⭐ | 53D4CA **Terminé** | - | [#1](https://github.com/JEANPHI5507/atelier-cc2/pull/1) | JEANPHI5507 |
+| **R1.3** | 9A8 **Mode Safe Firmware** | Désactiver les commandes critiques si le firmware n'est pas reconnu. | ⭐⭐⭐ | 53D4CA **Terminé** | - | [#1](https://github.com/JEANPHI5507/atelier-cc2/pull/1) | JEANPHI5507 |
+| **R1.4** | 4A1 **Diagnostic Amélioré** | Étendre `cc2 doctor` pour vérifier OrcaSlicer, IA, caméra, etc. | ⭐⭐ | 53D4CA **Terminé** | - | [#1](https://github.com/JEANPHI5507/atelier-cc2/pull/1) | JEANPHI5507 |
+| **R1.5** | 4DD **Documentation des Limites CC2** | Ajouter une section claire dans l'UI sur les commandes bloquées. | ⭐ | 53D4CA **Terminé** | [#6](https://github.com/JEANPHI5507/atelier-cc2/issues/6) | [#4](https://github.com/JEANPHI5507/atelier-cc2/pull/4) | Vibe Code |
+| **R1.6** | 998 **Gestion des Erreurs Caméra** | Détection automatique des caméras gelées + redémarrage. | ⭐⭐ | 53D4CA **Terminé** | [#5](https://github.com/JEANPHI5507/atelier-cc2/issues/5) | [#7](https://github.com/JEANPHI5507/atelier-cc2/pull/7) | Vibe Code |
 
 **Livrables Phase 1 :**
 - [ ] Image Docker publique sur Docker Hub
-- [ ] Guide d'installation WSL2
-- [ ] Système de détection de firmware
-- [ ] Outil `cc2 doctor` étendu
-- [ ] Messages d'erreur clairs dans l'UI
+- [x] Guide d'installation WSL2
+- [x] Système de détection de firmware
+- [x] Outil `cc2 doctor` étendu
+- [x] Messages d'erreur clairs dans l'UI
 
 ---
 

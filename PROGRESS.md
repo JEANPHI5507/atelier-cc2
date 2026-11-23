@@ -1,6 +1,6 @@
 # 📊 Suivi des Progrès - Atelier CC2
 
-> *Dernière mise à jour : 24 Novembre 2024*
+> *Dernière mise à jour : 23 Novembre 2026*
 > *Ce fichier suit l'avancement des tâches de la [ROADMAP.md](ROADMAP.md).*
 
 ---
@@ -20,24 +20,26 @@
 | Métrique | Valeur | % Completion |
 |----------|--------|--------------|
 | **Tâches Totales** | 34 | - |
-| **Tâches Terminées** | 8 | 24% |
+| **Tâches Terminées** | 10 | 29% |
 | **Tâches en Cours** | 0 | 0% |
-| **Tâches à Faire** | 26 | 76% |
+| **Tâches à Faire** | 24 | 71% |
 | **Tâches Bloquées** | 0 | 0% |
 
 ### 📈 **Statistiques de Code**
 | Métrique | Valeur | Statut |
 |----------|--------|--------|
 | **Erreurs ruff** | 0 | ✅ Clean |
-| **Tests non-slicing** | 86 passed, 6 skipped | ✅ 93% success |
-| **Tests slicing** | 16 tests | ⏳ Nécessitent OrcaSlicer |
-| **Couverture de code** | À configurer | ⏳ Codecov |
+| **Erreurs mypy** | 0 (55 fichiers, src + scripts) | ✅ Clean |
+| **Tests non-slicing** | 85 passed, 6 skipped | ✅ CI verte |
+| **Tests slicing** | 21 passed en CI (OrcaSlicer + WebKitGTK installés) | ✅ |
+| **Tests UI (Playwright)** | 17+ passed en CI (Chromium fr-FR) | ✅ |
+| **Couverture de code** | uploadée sur Codecov à chaque job (flags unittests/slicingtests/uitests) | ✅ Codecov |
 | **Fichiers source** | 51 Python files | ✅ |
 | **Lignes de code** | ~13K | ✅ |
 
 | Phase | Tâches | Terminées | En Cours | % Completion |
 |-------|--------|-----------|----------|--------------|
-| **Phase 1: Stabilité & Portabilité** | 6 | 5 | 0 | 83% |
+| **Phase 1: Stabilité & Portabilité** | 6 | 6 | 0 | **100%** ✅ |
 | **Phase 2: Expérience Utilisateur** | 8 | 0 | 0 | 0% |
 | **Phase 3: Fonctionnalités Avancées** | 7 | 0 | 0 | 0% |
 | **Phase 4: Performance & Optimisation** | 6 | 0 | 0 | 0% |
@@ -50,7 +52,7 @@
 ### 🔴 **Phase 1: Stabilité & Portabilité** *(🔥 Priorité Haute)*
 **Objectif** : Résoudre les problèmes critiques de compatibilité et de stabilité.
 **Échéance** : 31 Décembre 2024
-**Statut** : 🟡 **En Cours** (4/6 tâches terminées)
+**Statut** : ✅ **Terminée** (6/6 tâches terminées)
 
 | ID | Tâche | Statut | Contributeur | PR | Date Début | Date Fin |
 |----|-------|--------|--------------|----|------------|----------|
@@ -58,10 +60,10 @@
 | R1.2 | Support WSL2 | ✅ **Terminé** | JEANPHI5507 | [#1](https://github.com/JEANPHI5507/atelier-cc2/pull/1) | 2024-11-20 | 2024-11-22 |
 | R1.3 | Mode Safe Firmware | ✅ **Terminé** | JEANPHI5507 | [#1](https://github.com/JEANPHI5507/atelier-cc2/pull/1) | 2024-11-20 | 2024-11-22 |
 | R1.4 | Outil cc2 doctor étendu | ✅ **Terminé** | JEANPHI5507 | [#1](https://github.com/JEANPHI5507/atelier-cc2/pull/1) | 2024-11-20 | 2024-11-22 |
-| R1.5 | Documentation des limites CC2 | 🟡 **En Cours** | - | - | 2024-11-22 | - |
-| R1.6 | Gestion des erreurs caméra | ⏳ **À faire** | - | - | - | - |
+| R1.5 | Documentation des limites CC2 | ✅ **Terminé** | Vibe Code | [#4](https://github.com/JEANPHI5507/atelier-cc2/pull/4) | 2026-11-23 | 2026-11-23 |
+| R1.6 | Gestion des erreurs caméra | ✅ **Terminé** | Vibe Code | [#7](https://github.com/JEANPHI5507/atelier-cc2/pull/7) | 2026-11-23 | 2026-11-23 |
 
-**Prochaine Tâche Prioritaire** : R1.5 (Documentation des limites CC2)
+**Prochaine Tâche Prioritaire** : Phase 2 (INF.1 Codecov, INF.2 Docker Hub, INF.3 couverture 80%, INF.4-8 linting avancé)
 
 ---
 
@@ -103,6 +105,9 @@
 | INF.2 | Correction de 101 erreurs ruff → 0 | Vibe Code | 2024-11-22 | main |
 | INF.3 | Configuration CI/CD avec GitHub Actions | Vibe Code | 2024-11-22 | main |
 | TEST.1 | Correction de 24 erreurs d'import dans les tests | Vibe Code | 2024-11-22 | main |
+| A0.1-A0.5 | Phase 0 : CI bloquante (ruff/mypy/black/isort sans \|\| true, OpenGL, Chrome, tests slicing/UI) | Vibe Code | 2026-11-23 | #2, #3 |
+| R1.5 | Section UI des limites CC2 (commandes bloquées dynamiques, bandeau firmware, guides FR/EN, i18n) | Vibe Code | 2026-11-23 | [#4](https://github.com/JEANPHI5507/atelier-cc2/pull/4) |
+| R1.6 | Détection caméra figée hors impression + redémarrage auto du flux + alerte unique réarmable | Vibe Code | 2026-11-23 | [#7](https://github.com/JEANPHI5507/atelier-cc2/pull/7) |
 
 ---
 

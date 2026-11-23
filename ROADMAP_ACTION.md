@@ -11,13 +11,14 @@
 - **Infrastructure de linting** : ruff, mypy, black, isort configurés et fonctionnels
 - **CI/CD** : GitHub Actions configuré
 - **Code principal** : 0 erreur ruff (tout est clean dans `src/`)
-- **Phase 1** : 83% complète (5/6 tâches terminées)
+- **Phase 0 (débloquer la CI)** : ✅ terminée (PR #2, #3 — CI 100% verte et bloquante, mypy 0 erreur, slicing/UI OK)
+- **Phase 1** : ✅ **100% complète (6/6 tâches terminées)**
   - ✅ R1.1 : Dockerisation
   - ✅ R1.2 : Support WSL2
   - ✅ R1.3 : Mode Safe Firmware
   - ✅ R1.4 : Outil cc2 doctor étendu
-  - ⚠️ R1.5 : Documentation des limites CC2 (en cours)
-  - ❌ R1.6 : Gestion des erreurs caméra (à faire)
+  - ⚠️ R1.5 : Documentation des limites CC2 (PR #4, issue #6) ✅
+  - ❌ R1.6 : Gestion des erreurs caméra (PR #7, issue #5) ✅
 
 ### ⚠️ **Points Bloquants Identifiés**
 
@@ -29,7 +30,7 @@
 | **CI** | Chrome manquant pour Playwright | Tests UI bloqués | 🔴 **Haute** | Configurer Chrome dans CI |
 | **Couverture** | Codecov non configuré | Pas de suivi de couverture | 🟡 **Moyenne** | Configurer Codecov |
 | **Docker** | Image non publiée | Pas de déploiement facile | 🟡 **Moyenne** | Publier sur Docker Hub |
-| **Documentation** | R1.5 incomplète | Documentation incomplète | 🟡 **Moyenne** | Compléter la documentation |
+| **Documentation** | R1.5 terminée (PR #4) | - | ✅ | - |
 
 ### 📈 **Statistiques**
 - **Code source** : 51 fichiers Python, ~13K lignes
@@ -44,19 +45,19 @@
 ### 🔴 **PHASE 0 : DÉBLOQUER LA CI (Priorité Absolue)**
 **Objectif** : Avoir une CI qui passe complètement (linting + tests)
 **Durée estimée** : 1-2 jours
-**Statut** : ⚠️ **Bloquant**
+**Statut** : ✅ **Terminée** (PR #2, #3 — CI 100% verte, mypy 0, slicing/UI OK)
 
 | ID | Tâche | Description | Complexité | Statut | Dépendances |
 |----|-------|-------------|------------|--------|-------------|
-| **A0.1** | Configurer ignores ruff pour tests | Ajouter PT018, E702, PT011, ARG005, etc. dans per-file-ignores | ⭐⭐ | ⏳ À faire | Aucune |
-| **A0.2** | Configurer OpenGL dans CI | Installer libopengl0 et libglu1-mesa dans le workflow CI | ⭐⭐⭐ | ⏳ À faire | Aucune |
-| **A0.3** | Configurer Chrome pour Playwright | Installer Chrome et ses dépendances dans CI | ⭐⭐⭐ | ⏳ À faire | Aucune |
-| **A0.4** | Corriger les 11 tests échoués | Analyser et corriger les tests qui échouent | ⭐⭐⭐ | ⏳ À faire | A0.2, A0.3 |
-| **A0.5** | Vérifier que CI passe | Exécuter la CI complète et corriger les derniers problèmes | ⭐⭐ | ⏳ À faire | A0.1-A0.4 |
+| **A0.1** | Configurer ignores ruff pour tests | Ajouter PT018, E702, PT011, ARG005, etc. dans per-file-ignores | ⭐⭐ | ✅ Fait | Aucune |
+| **A0.2** | Configurer OpenGL dans CI | Installer libopengl0 et libglu1-mesa dans le workflow CI | ⭐⭐⭐ | ✅ Fait | Aucune |
+| **A0.3** | Configurer Chrome pour Playwright | Installer Chrome et ses dépendances dans CI | ⭐⭐⭐ | ✅ Fait | Aucune |
+| **A0.4** | Corriger les 11 tests échoués | Analyser et corriger les tests qui échouent | ⭐⭐⭐ | ✅ Fait | A0.2, A0.3 |
+| **A0.5** | Vérifier que CI passe | Exécuter la CI complète et corriger les derniers problèmes | ⭐⭐ | ✅ Fait | A0.1-A0.4 |
 
 **Livrables Phase 0 :**
-- [ ] CI passe avec ✅ (linting + tous les tests)
-- [ ] Workflow GitHub Actions fonctionnel
+- [x] CI passe avec ✅ (linting + tous les tests)
+- [x] Workflow GitHub Actions fonctionnel
 - [ ] Documentation mise à jour (guide de développement)
 
 ---
@@ -64,17 +65,17 @@
 ### 🟡 **PHASE 1 : FINALISER LA PHASE 1 (Priorité Haute)**
 **Objectif** : Terminer les 2 tâches restantes de la Phase 1
 **Durée estimée** : 3-5 jours
-**Statut** : ⚠️ **En cours**
+**Statut** : ✅ **Terminée (6/6)**
 
 | ID | Tâche | Description | Complexité | Statut | Dépendances |
 |----|-------|-------------|------------|--------|-------------|
-| **R1.5** | Documentation des limites CC2 | Ajouter une section claire dans l'UI sur les commandes bloquées | ⭐⭐ | ⏳ À faire | Aucune |
-| **R1.6** | Gestion des erreurs caméra | Détection automatique des caméras gelées + redémarrage | ⭐⭐⭐ | ⏳ À faire | Aucune |
+| **R1.5** | Documentation des limites CC2 | Ajouter une section claire dans l'UI sur les commandes bloquées | ⭐⭐ | ✅ Fait (PR #4, issue #6) | Aucune |
+| **R1.6** | Gestion des erreurs caméra | Détection automatique des caméras gelées + redémarrage | ⭐⭐⭐ | ✅ Fait (PR #7, issue #5) | Aucune |
 
 **Livrables Phase 1 :**
-- [ ] Documentation complète des limites CC2
-- [ ] Système de détection et redémarrage des caméras
-- [ ] Phase 1 à 100% complète
+- [x] Documentation complète des limites CC2
+- [x] Système de détection et redémarrage des caméras
+- [x] Phase 1 à 100% complète
 
 ---
 

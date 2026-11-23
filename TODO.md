@@ -1,6 +1,6 @@
 # 📋 TODO - Tâches en Cours et Problèmes Connus
 
-> *Dernière mise à jour : 22 Novembre 2024*
+> *Dernière mise à jour : 23 Novembre 2026*
 
 ---
 
@@ -11,10 +11,10 @@
 - [x] ✅ Créer les fichiers de configuration
 - [x] ✅ Mettre à jour GitHub Actions CI
 - [x] ✅ Ajouter les commandes dans Makefile
-- [ ] ⏳ **Configurer les secrets GitHub** (DOCKER_HUB_USERNAME, DOCKER_HUB_TOKEN, CODECOV_TOKEN)
-- [ ] ⏳ **Configurer OpenGL dans CI** pour faire passer les tests de slicing
-- [ ] ⏳ **Publier l'image Docker** sur Docker Hub
-- [ ] ⏳ **Configurer Codecov** pour le suivi de couverture
+- [ ] ⏳ **Configurer les secrets GitHub** (DOCKER_HUB_USERNAME, DOCKER_HUB_TOKEN) pour publier l'image
+- [x] ✅ **Configurer OpenGL dans CI** (libopengl0, libglu1-mesa, libwebkit2gtk-4.1) — tests slicing verts
+- [ ] ⏳ **Publier l'image Docker** sur Docker Hub (build CI OK, push désactivé sans secrets)
+- [x] ✅ **Configurer Codecov** (upload à chaque job avec flags unittests/slicingtests/uitests)
 
 ### 2. **Qualité du Code**
 - [x] ✅ Corriger les imports inutilisés (F401)
@@ -27,10 +27,10 @@
 
 ### 3. **Tests**
 - [x] ✅ Installer OrcaSlicer
-- [ ] ⏳ **Installer libopengl0 et libglu1-mesa** dans l'environnement CI
-- [ ] ⏳ **Corriger les 11 tests échoués** (principalement dépendances système)
-- [ ] ⏳ **Configurer Chrome pour Playwright** dans CI
-- [ ] ⏳ **Atteindre 80% de couverture** sur le code critique
+- [x] ✅ **Installer libopengl0, libglu1-mesa, libwebkit2gtk-4.1** dans l'environnement CI
+- [x] ✅ **Tests réparés** : 85 passed / 6 skipped (non-slicing), 21 passed (slicing), UI Playwright verts (Chromium fr-FR)
+- [x] ✅ **Configurer Chrome/Playwright** dans CI
+- [ ] ⏳ **Atteindre 80% de couverture** sur le code critique (mesurée sur Codecov)
 
 ---
 
@@ -49,12 +49,13 @@
 ### Tests
 | Type | Total | Pass | Fail | Skip |
 |------|-------|------|------|------|
-| **Unitaires** | 138 | 79 | 11 | 44 |
-| **Slicing** | ~50 | 0 | ~50 | 0 |
+| **Unitaires (non-slicing)** | 91 | 85 | 0 | 6 |
+| **Slicing (CI)** | 21 | 21 | 0 | 0 |
+| **UI (CI, Playwright)** | ~25 | ~25 | 0 | 0 |
 
 ### Couverture
-- **Actuelle** : ~60%
-- **Objectif** : >80%
+- **Suivi** : Codecov, upload à chaque job CI (flags par famille de tests)
+- **Objectif** : >80% (voir tableau Codecov)
 
 ---
 
@@ -173,9 +174,9 @@ pre-commit install
 ## 🎯 **Prochaines Étapes**
 
 ### Cette Semaine
-1. **Configurer les secrets GitHub** pour Docker Hub et Codecov
+1. **Configurer les secrets GitHub** pour Docker Hub (publier l'image)
 2. **Corriger les problèmes RET502/RET503** dans access.py et advisor.py
-3. **Configurer OpenGL dans CI**
+3. ✅ **Configurer OpenGL dans CI** — fait
 
 ### Semaine Prochaine
 1. **Corriger les problèmes BLE001** (except Exception)
