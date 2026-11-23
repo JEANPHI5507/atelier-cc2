@@ -118,6 +118,7 @@
 | **R2.5** | Assistant Guidé | Étendre le chat pour proposer des workflows pas à pas | ⭐⭐⭐⭐ | ✅ Terminé (#25, #24) | Phase 1 |
 | **R2.6** | Tutoriels Intégrés | Bouton « Aide » + 3 tutos animés SVG/CSS (CANVAS, impression, suivi) + liens guides GitHub | ⭐⭐ | ✅ Terminé (#27, #26) | Phase 1 |
 | **R2.7** | Thème Sombre pour Tablette | 5e thème « Auto » suivant prefers-color-scheme (noir OLED en sombre, sable en clair) | ⭐ | ✅ Terminé (#29, #28) | Phase 1 |
+| **R2.9** | Maquette UI Moderne | Dashboard autonome vanilla (maquette/index.html) : sidebar, KPI live, vue 3D, caméra, responsive | ⭐⭐ | ✅ Terminé (#31, #30) | Phase 1 |
 
 **Livrables Phase 3 :**
 - [x] Interface simplifiée pour les débutants (mode Débutant, PR #17)
@@ -127,6 +128,7 @@
 - [x] Assistant guidé (workflow pas à pas dans le chat, PR #25)
 - [x] Tutoriels intégrés (bouton Aide, 3 tutos animés SVG/CSS sans vidéo, PR #27)
 - [x] Thème « Auto » réactif au système (noir OLED / sable, PR #29)
+- [x] Maquette UI moderne autonome (dashboard sombre OLED, vanilla, PR #31)
 
 ---
 
