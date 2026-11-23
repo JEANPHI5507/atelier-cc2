@@ -761,7 +761,7 @@ def doctor() -> None:
 
     # 3. OrcaSlicer
     typer.echo("\n=== OrcaSlicer ===")
-    orca_path = Path(config.TOOLS_DIR) / "orcaslicer" / "squashfs-root" / "AppRun"  # type: ignore[attr-defined]
+    orca_path = slicer.TOOLS / "squashfs-root" / "AppRun"
     orca_ok = orca_path.exists()
     typer.echo(f"{ok(orca_ok)}OrcaSlicer {'installé' if orca_ok else 'NON installé'}")
     if not orca_ok:
@@ -772,7 +772,7 @@ def doctor() -> None:
     try:
         from . import vision
 
-        model_ok = vision.model_loaded()  # type: ignore[attr-defined]
+        model_ok = vision.model_ready()
         typer.echo(f"{ok(model_ok)}Modèle IA {'chargé' if model_ok else 'NON chargé'}")
         if not model_ok:
             typer.echo("    → Exécute 'make ia' pour l'installer")
