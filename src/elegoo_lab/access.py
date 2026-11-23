@@ -111,11 +111,12 @@ def tailscale() -> dict[str, str] | None:
     import shutil
     import subprocess
 
-    if not shutil.which("tailscale"):
+    ts = shutil.which("tailscale")
+    if not ts:
         return None
     try:
-        r = subprocess.run(
-            ["tailscale", "status", "--json"], capture_output=True, text=True, timeout=5
+        r = subprocess.run(  # noqa: S603 — internal tool, tailscale resolved above
+            [ts, "status", "--json"], capture_output=True, text=True, timeout=5
         )
         me = json.loads(r.stdout)["Self"]
     except (OSError, subprocess.SubprocessError, ValueError, KeyError):

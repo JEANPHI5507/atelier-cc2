@@ -9,10 +9,12 @@ one plain sentence per change; nothing is sliced here and the original file is n
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from . import advisor, config, mesh, orient, printprep
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 REPAIRABLE = {".glb", ".gltf", ".obj", ".ply", ".stl"}
 MAX_ROUNDS = 3  # advisor passes: a fix can reveal the next point (larger part -> new overhangs)

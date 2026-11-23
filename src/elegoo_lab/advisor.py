@@ -8,14 +8,16 @@ the workshop can apply in one click (the same fields as the "Taille et réglages
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import manifold3d as mf
 import numpy as np
 import trimesh
 
 from . import colors, mesh
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 NOZZLE = 0.4
 MIN_WALL = 2 * NOZZLE  # thinner than two lines: the slicer drops or weakens it

@@ -11,13 +11,15 @@ from __future__ import annotations
 import io
 import json
 import time
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from PIL import Image, ImageFilter
 
 from . import config
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 SIZE = (160, 90)  # compared at this size: fine enough for a part, blind to sensor noise
 PLATE = (

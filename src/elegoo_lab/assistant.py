@@ -417,7 +417,7 @@ def chat_events(
         try:
             res = chat(name, message, history, conversation, emit=q.put)
             q.put({"type": "final", **res})
-        except Exception as err:  # one dict like the page's error shows
+        except Exception as err:  # noqa: BLE001 — — one dict like the page's error shows
             q.put({"type": "erreur", "texte": str(err)})
 
     th = threading.Thread(target=work, daemon=True)
@@ -538,7 +538,7 @@ def _sidecar_ply(name: str) -> str | None:
             return str(out)
         mesh.load(config.MODELS_DIR / name).export(out)
         return str(out)
-    except Exception:
+    except (OSError, ValueError, RuntimeError):
         return None
 
 
@@ -611,7 +611,7 @@ def chat_cli(
         i = args.index("--output")
         args[i + 1] = "streaming"
         with tempfile.TemporaryFile(mode="w+", encoding="utf-8") as ef:
-            sp = subprocess.Popen(
+            sp = subprocess.Popen(  # noqa: S603 — CLI binary from the user's config
                 args,
                 stdout=subprocess.PIPE,
                 stderr=ef,
@@ -703,7 +703,7 @@ def chat_cli(
             args += ["--system-prompt-file", system_file]
         if emit:  # live mode: one CLI run, events out as they happen
             return _spawn_stream(args)
-        sp = subprocess.run(
+        sp = subprocess.run(  # noqa: S603 — CLI binary from the user's config
             args,
             capture_output=True,
             text=True,
@@ -980,7 +980,7 @@ def slice_brain(
         system_file,
     ]
     try:
-        sp = subprocess.run(
+        sp = subprocess.run(  # noqa: S603 — CLI binary from the user's config
             args,
             capture_output=True,
             text=True,

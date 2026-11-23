@@ -9,13 +9,15 @@ touched (the copy is written next to it, and only when it really is closed).
 from __future__ import annotations
 
 import json
-from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 import trimesh
 
 from . import advisor, config
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 DEBRIS_SHARE = 0.002  # fragments under 0.2 % of the faces (and of the volume) are stray specks
 MAX_CHANGE = (

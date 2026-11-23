@@ -8,11 +8,14 @@ from __future__ import annotations
 
 import base64
 import io
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 import trimesh
 from PIL import Image, ImageDraw
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 SIZE = 144
 MAX_FACES = 60000  # enough for 144 px; bigger meshes are sampled (largest faces first)

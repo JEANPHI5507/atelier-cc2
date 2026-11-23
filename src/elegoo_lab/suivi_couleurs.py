@@ -10,10 +10,12 @@ from __future__ import annotations
 
 import re
 from functools import lru_cache
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from . import slicer
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 _TOOL = re.compile(r"\bT(\d+)")
 _LEN = re.compile(r"\bL([\d.]+)")

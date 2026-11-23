@@ -25,9 +25,7 @@ import os
 import re
 import struct
 from collections import Counter
-from collections.abc import Callable
-from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 import trimesh
@@ -35,6 +33,10 @@ from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import connected_components
 
 from . import colorize, config, mesh, slicer, threemf
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from pathlib import Path
 
 MAX_SLOTS = 4
 MIN_SHARE = 0.01  # colours covering less than 1 % of the surface join their nearest colour
@@ -416,7 +418,7 @@ def _mesh_project(path: Path) -> threemf.Project:
                     if cv.kind == "vertex"
                     else np.asarray(cv.face_colors, dtype=float)[:, :3]
                 )
-        except Exception:
+        except Exception:  # noqa: BLE001
             fc = np.full((len(g.faces), 3), 192.0)
         verts = trimesh.transform_points(np.asarray(g.vertices, float), xf)
         parts.append(threemf.Part(path.stem, verts, np.asarray(g.faces), 1, None, fc))

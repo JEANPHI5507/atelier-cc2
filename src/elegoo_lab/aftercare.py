@@ -13,13 +13,15 @@ from __future__ import annotations
 import re
 import time
 from collections.abc import Callable
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from scipy import ndimage
 
 from . import config, library
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # key: (title, cause, what to do, settings for next time from the print's facts)
 Fix = Callable[[dict[str, Any]], dict[str, Any]]

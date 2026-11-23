@@ -1,0 +1,10 @@
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+    patch:
+      default:
+        # a lint/refactoring PR mostly touches imports and annotations: the patch
+        # coverage is shown on Codecov but must not block such PRs
+        informational: true

@@ -134,7 +134,8 @@ async def check(
             )
         )
         out["ok"] = True
-    except Exception as err:  # MQTT auth or protocol: report, do not crash the page
+    # MQTT auth or protocol: report, do not crash the page
+    except Exception as err:  # noqa: BLE001
         steps.append(
             _step(
                 "Imprimante",

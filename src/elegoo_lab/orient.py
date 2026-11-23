@@ -9,13 +9,15 @@ colour changes in multicolour). Open meshes fall back to face statistics.
 from __future__ import annotations
 
 import base64
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import manifold3d as mf
 import numpy as np
 
 from . import advisor, colors, mesh, thumbnail
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 POSITIONS: list[tuple[str, str, tuple[int, int, int]]] = [
     ("debout", "Telle quelle", (0, 0, 0)),

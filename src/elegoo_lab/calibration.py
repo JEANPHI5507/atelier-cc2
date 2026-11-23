@@ -6,15 +6,18 @@ what to look at once printed. Colour tests are written as painted 3MF so they ex
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import manifold3d as mf
 import numpy as np
 import trimesh
 
 from . import colorize, colors, config, mesh
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from pathlib import Path
 
 BED = mesh.BED_MM
 

@@ -74,7 +74,8 @@ class CameraFeed:
                         return
             except asyncio.CancelledError:
                 raise
-            except Exception as e:  # camera away (printer off, LAN mode off): try again shortly
+            # camera away (printer off, LAN mode off): try again shortly
+            except Exception as e:  # noqa: BLE001
                 log.info("caméra: %s", e)
             await asyncio.sleep(2)
 
