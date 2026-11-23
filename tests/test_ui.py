@@ -198,8 +198,12 @@ def test_printer_tab_forms_reach_the_server(page, site):
     assert api(site, "/lab/api/surveillance")["timelapse"] is False
     page.click("#sv-tl")
     page.click("#mc-check")  # machine default option
-    page.wait_for_timeout(800)
-    assert api(site, "/lab/api/lancement")["printer_check"] is False
+    for _ in range(25):  # the server writes it behind, occasionally slower than 800 ms
+        if api(site, "/lab/api/lancement")["printer_check"] is False:
+            break
+        page.wait_for_timeout(200)
+    else:
+        raise AssertionError("printer_check n'est pas passé à False")
     if page.is_visible("#mt-list .mt-more > summary"):  # tasks that are not due are folded away
         page.click("#mt-list .mt-more > summary")
     page.click("#mt-list [data-mt='plateau']")
