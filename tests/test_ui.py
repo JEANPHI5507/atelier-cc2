@@ -245,7 +245,9 @@ def test_phone_layout(browser, site):
     )
     pg = ctx.new_page()
     pg.goto(site["base"] + "/lab/")
-    pg.wait_for_selector("#dash:not([hidden]), #pv:not([hidden])")  # a phone opens on the dashboard (or the printer while it prints)
+    pg.wait_for_selector(
+        "#dash:not([hidden]), #pv:not([hidden])"
+    )  # a phone opens on the dashboard (or the printer while it prints)
     assert not pg.is_visible("#t-start")  # the first-day guide is for the PC
     width = "document.documentElement.scrollWidth"
     for tab in ("lab", "ui", "gal"):
