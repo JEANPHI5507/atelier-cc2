@@ -209,11 +209,12 @@ async function loadModelFor(file) {
       try {
         const g = await new GLTFLoader().loadAsync('/lab/api/models/' + encodeURIComponent(m) + '/preview.glb?v=' + Date.now());
         if (model) scene.remove(model);
-        model = g.scene;
-        const b = new THREE.Box3().setFromObject(model), c = b.getCenter(new THREE.Vector3()), sz = b.getSize(new THREE.Vector3());
+        const mesh = g.scene;
+        const b = new THREE.Box3().setFromObject(mesh), c = b.getCenter(new THREE.Vector3()), sz = b.getSize(new THREE.Vector3());
         const k = 190 / Math.max(sz.x, sz.y, sz.z, 1);
-        model.scale.setScalar(k);
-        model.position.set(-c.x * k, -b.min.y * k, -c.z * k);
+        mesh.scale.setScalar(k);
+        mesh.position.set(-c.x * k, -b.min.y * k, -c.z * k);   // pièce centrée sur le plateau, posée dessus
+        model = new THREE.Group(); model.add(mesh);            // le pivot est au centre : la pièce tourne SUR PLACE
         scene.add(model); fitCam();
         if (tag) tag.textContent = nice(m) + (m === wanted ? ' · sur le plateau' : ' · dernier modèle');
         return;
