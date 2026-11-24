@@ -205,3 +205,9 @@ header { box-shadow: 0 1px 0 var(--line); }
 #dash .qlist li > div:not(.bar) { min-width: 0; flex: 1; }
 #dplate #dthumb { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; z-index: 1; background: var(--bg); }
 #dplate .plate-tag { z-index: 2; max-width: calc(100% - 24px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* long nom de fichier : le titre de l'impression se limite à 2 lignes (le nom complet reste en info-bulle) */
+#pv-state, #pv-file { display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.job-top-t { min-width: 0; }
+@media (max-width: 600px) { #pv-state, #pv-file { font-size: 18px; line-height: 1.25; } }
+#dash .hello #hello-name { max-width: 100%; }
