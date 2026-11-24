@@ -203,3 +203,5 @@ header { box-shadow: 0 1px 0 var(--line); }
 #dash .hello .note, #dash .qlist b, #dash .flist b, #dash .qlist small { overflow-wrap: anywhere; }
 #dash .hello #hello-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #dash .qlist li > div:not(.bar) { min-width: 0; flex: 1; }
+#dplate #dthumb { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; z-index: 1; background: var(--bg); }
+#dplate .plate-tag { z-index: 2; max-width: calc(100% - 24px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

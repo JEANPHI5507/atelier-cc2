@@ -195,31 +195,52 @@ function fitCam() {   // cadre le modèle ET le plateau, même dans un cadre ét
 }
 const failed = new Set();   // modèles dont l'aperçu a échoué : on n'insiste pas
 let loadKey = null;
+const showThumb = url => {
+  let im = $('#dthumb');
+  if (!im) { im = document.createElement('img'); im.id = 'dthumb'; im.alt = 'Vignette de l\'impression'; $('#dplate').prepend(im); }
+  im.hidden = !url; if (url) im.src = url;
+  if (renderer) renderer.domElement.style.visibility = url ? 'hidden' : 'visible';
+};
+async function show3d(m) {
+  const g = await new GLTFLoader().loadAsync('/lab/api/models/' + encodeURIComponent(m) + '/preview.glb?v=' + Date.now());
+  if (model) scene.remove(model);
+  const mesh = g.scene;
+  const b = new THREE.Box3().setFromObject(mesh), c = b.getCenter(new THREE.Vector3()), sz = b.getSize(new THREE.Vector3());
+  const k = 190 / Math.max(sz.x, sz.y, sz.z, 1);
+  mesh.scale.setScalar(k);
+  mesh.position.set(-c.x * k, -b.min.y * k, -c.z * k);   // pièce centrée sur le plateau, posée dessus
+  model = new THREE.Group(); model.add(mesh);            // le pivot est au centre : la pièce tourne SUR PLACE
+  scene.add(model); fitCam(); showThumb(null);
+}
+/* Ce qui s'imprime vraiment : le modèle source du G-code en cours (sinon sa vignette). Jamais un autre modèle. */
 async function loadModelFor(file) {
   if (!scene || loadKey === (file || '')) return;   // inutile de relister la bibliothèque à chaque rafraîchissement
   loadKey = file || '';
   const tag = $('#plate-tag');
   try {
     const models = (await api('/models')) || [];
-    const names = models.map(x => x.name || x).filter(Boolean);
-    const stem = (file || '').replace(/\.gcode$/i, '');
-    const wanted = file ? names.find(n => stem.startsWith(n.replace(/\.[^.]+$/, ''))) : null;
-    const byDate = models.filter(x => x.mtime).sort((a, b) => b.mtime - a.mtime).map(x => x.name);
-    for (const m of [wanted, ...byDate, ...names].filter((v, i, a) => v && a.indexOf(v) === i && !failed.has(v)).slice(0, 3)) {
-      try {
-        const g = await new GLTFLoader().loadAsync('/lab/api/models/' + encodeURIComponent(m) + '/preview.glb?v=' + Date.now());
-        if (model) scene.remove(model);
-        const mesh = g.scene;
-        const b = new THREE.Box3().setFromObject(mesh), c = b.getCenter(new THREE.Vector3()), sz = b.getSize(new THREE.Vector3());
-        const k = 190 / Math.max(sz.x, sz.y, sz.z, 1);
-        mesh.scale.setScalar(k);
-        mesh.position.set(-c.x * k, -b.min.y * k, -c.z * k);   // pièce centrée sur le plateau, posée dessus
-        model = new THREE.Group(); model.add(mesh);            // le pivot est au centre : la pièce tourne SUR PLACE
-        scene.add(model); fitCam();
-        if (tag) tag.textContent = nice(m) + (m === wanted ? ' · sur le plateau' : ' · dernier modèle');
+    if (file) {
+      const entry = models.find(x => x.name === file);
+      const stem = file.replace(/\.gcode$/i, '');
+      const guess = models.map(x => x.name).filter(n => n && !/\.gcode$/i.test(n) && stem.startsWith(n.replace(/\.[^.]+$/, ''))).sort((a, b) => b.length - a.length)[0];
+      const src = entry?.source || guess;
+      if (src && !failed.has(src)) {
+        try { await show3d(src); if (tag) tag.textContent = nice(file) + ' · en cours'; return; } catch { failed.add(src); }
+      }
+      if (entry || src) {   // pas de 3D possible : la vignette embarquée dans le G-code montre la vraie impression
+        showThumb('/lab/api/models/' + encodeURIComponent(entry ? file : src) + '/thumb.png');
+        if (tag) tag.textContent = nice(file) + ' · en cours';
         return;
-      } catch { failed.add(m); }
+      }
+      if (tag) tag.textContent = nice(file) + ' · aperçu indisponible';
+      showThumb(null); return;
     }
-    if (tag) tag.textContent = 'Aperçu 3D indisponible pour ce modèle';
+    // au repos : le modèle le plus récent de la bibliothèque
+    showThumb(null);
+    const byDate = models.filter(x => x.mtime && !/\.gcode$/i.test(x.name)).sort((a, b) => b.mtime - a.mtime).map(x => x.name);
+    for (const m of byDate.filter(n => !failed.has(n)).slice(0, 3)) {
+      try { await show3d(m); if (tag) tag.textContent = nice(m) + ' · dernier modèle'; return; } catch { failed.add(m); }
+    }
+    if (tag) tag.textContent = 'CC2 · plateau 256 × 256';
   } catch { if (tag) tag.textContent = 'Aperçu 3D indisponible'; loadKey = null; }
 }
