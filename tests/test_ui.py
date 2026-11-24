@@ -117,7 +117,7 @@ def browser():
         )  # WebGL without a GPU
         new_context = b.new_context
 
-        def in_workshop(*a, **kw):  # la plupart des tests parlent à l'atelier, pas au tableau de bord (onglet par défaut)
+        def in_workshop(*a, **kw):  # tests: onglet Atelier, pas le tableau de bord
             c = new_context(*a, **kw)
             c.add_init_script(
                 "try{if(!localStorage.getItem('cc2-tab'))localStorage.setItem('cc2-tab','lab')}catch(e){}"
