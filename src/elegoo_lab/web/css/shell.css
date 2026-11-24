@@ -119,7 +119,7 @@ header { box-shadow: 0 1px 0 var(--line); }
 #dash .st.run { background: var(--acc); box-shadow: 0 0 8px var(--acc); }
 #dash .st.wait { background: var(--warn); }
 #dash .st.done { background: var(--ok); }
-#dash .qlist .bar { margin-left: auto; }
+#dash .qlist .bar { }
 #dash .flist li { display: flex; gap: 10px; align-items: flex-start; padding: 9px 0; border-bottom: 1px solid var(--line); }
 #dash .flist li:last-child { border-bottom: 0; }
 #dash .flist .i { margin-top: 2px; }
@@ -168,3 +168,38 @@ header { box-shadow: 0 1px 0 var(--line); }
 #dash .bar { flex: none; }
 #dash .bar.slim { width: 90px; }
 #dash .spark { margin-top: 0; }
+
+.m-logo { display: none; }
+/* ---- téléphone : en-tête compacte sur UNE ligne, tableau de bord en 2 colonnes ---- */
+@media (max-width: 600px) {
+  header { flex-wrap: nowrap; height: 56px; padding: 6px 12px; gap: 6px; row-gap: 0; }
+  .m-logo { display: grid; place-items: center; width: 32px; height: 32px; flex: none; border-radius: 9px; color: #fff; background: linear-gradient(135deg, var(--acc), #ff4d2f); }
+  .m-logo svg.i { width: 16px; height: 16px; }
+  header .btn span:not(.led), header .btn small { display: none; }
+  header .btn { width: 40px; height: 40px; min-height: 40px; padding: 0; flex: none; }
+  header #mode, header #lang { width: auto; padding: 0 6px; font-size: 12px; }
+  header #ai-open, header #board-open, header #install { display: none; }
+  header .themes { flex: none; }
+  header .grow { display: none; }
+  header [data-cap] { height: 40px; } header [data-cap]::after { display: none; }
+  header .themes[data-cap] { width: 36px; }
+  header .pill#printer { flex: 1 1 0; min-width: 0; justify-content: center; padding: 4px 8px; }
+  #printer-txt { display: inline; max-width: 100%; overflow: hidden; text-overflow: ellipsis; font-size: 12.5px; }
+  #printer-temp { display: none; }
+  .side .seg button { font-size: 10.5px; font-weight: 600; letter-spacing: -.01em; }
+  #dash .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  #dash .kpis > .kpi:nth-child(3), #dash .kpis > .kpi:nth-child(4) { grid-column: span 2; }
+  #dash .kpi { padding: 12px 14px; }
+  #dash .kpi-v { font-size: 24px; }
+  #dash .hello { padding: 14px 16px; } #dash .hello h1 { font-size: 20px; }
+  #dash .plate { height: 240px; margin: 10px 12px 12px; }
+  #dash .cam-view { height: auto; aspect-ratio: 16 / 9; margin: 10px 12px 12px; }
+}
+
+/* un nom de fichier très long ne doit jamais élargir la page (vu sur téléphone) */
+#dash { min-width: 0; max-width: 100%; overflow-x: hidden; }
+#dash > *, #dash .grid > *, #dash .kpis > * { min-width: 0; max-width: 100%; }
+#dash .hello > div:first-child { min-width: 0; flex: 1; }
+#dash .hello .note, #dash .qlist b, #dash .flist b, #dash .qlist small { overflow-wrap: anywhere; }
+#dash .hello #hello-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#dash .qlist li > div:not(.bar) { min-width: 0; flex: 1; }

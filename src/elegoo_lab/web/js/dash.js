@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from '../vendor/addons/GLTFLoader.js';
-import { BUSY, api, ctl, toast } from './core.js';
+import { BUSY, api, ctl, nice, toast } from './core.js';
 
 /* Tableau de bord live : toutes les données viennent du serveur (/status, /canvas, /lab/api/*).
    Aucun chiffre en dur : si l'imprimante est injoignable, on l'affiche. */
@@ -45,7 +45,7 @@ async function refresh() {
   const prog = st && (busy || file) ? Math.round(st.progress || 0) : 0;
   loadModelFor(file);
   if ($('#hello-pct')) $('#hello-pct').textContent = prog + ' %';
-  if ($('#hello-name')) $('#hello-name').textContent = file || 'aucune impression';
+  if ($('#hello-name')) $('#hello-name').textContent = file ? nice(file) : 'aucune impression'; $('#hello-name').title = file || '';
   if ($('#hello-eta')) {
     const lc = st && st.layer && st.layer.total ? `couche ${st.layer.current ?? '?'} / ${st.layer.total}` : (busy ? 'en cours' : 'au repos');
     $('#hello-eta').textContent = lc;
@@ -98,7 +98,7 @@ async function refresh() {
       const li = document.createElement('li');
       li.className = 'on';
       li.innerHTML = `<span class="st run"></span><div><b></b><small>En cours · ${prog} %</small></div><div class="bar slim"><i style="width:${prog}%"></i></div>`;
-      li.querySelector('b').textContent = file;
+      li.querySelector('b').textContent = nice(file);
       ql.appendChild(li);
     }
     q.slice(0, 4).forEach(n => {
@@ -186,36 +186,39 @@ function init3d() {
   $('#v-rot').onclick = () => { spinning = !spinning; toast(spinning ? 'Rotation auto' : 'Rotation arrêtée', 'ok'); };
   $('#v-fit').onclick = () => fitCam();
 }
-function fitCam() {
+function fitCam() {   // cadre le modèle ET le plateau, même dans un cadre étroit (téléphone en portrait)
   if (!model || !camera) return;
-  const b = new THREE.Box3().setFromObject(model), c = b.getCenter(new THREE.Vector3()), s = b.getSize(new THREE.Vector3()).length() || 100;
+  const b = new THREE.Box3().setFromObject(model), c = b.getCenter(new THREE.Vector3());
+  const s = Math.max(b.getSize(new THREE.Vector3()).length(), 230) / Math.min(1, camera.aspect || 1);
   camera.position.set(c.x + s * .9, c.y + s * .65, c.z + s * 1.05);
-  camera.lookAt(c);
+  camera.lookAt(c.x, c.y * .6, c.z);
 }
+const failed = new Set();   // modèles dont l'aperçu a échoué : on n'insiste pas
+let loadKey = null;
 async function loadModelFor(file) {
-  if (!scene) return;
+  if (!scene || loadKey === (file || '')) return;   // inutile de relister la bibliothèque à chaque rafraîchissement
+  loadKey = file || '';
   const tag = $('#plate-tag');
   try {
-    const models = await api('/models');
-    let m = null;
-    if (file) {
-      const stem = file.replace(/\.gcode$/i, '');
-      m = (models || []).map(x => x.name || x).find(n => n && stem.startsWith(n.replace(/\.[^.]+$/, ''))) || null;
+    const models = (await api('/models')) || [];
+    const names = models.map(x => x.name || x).filter(Boolean);
+    const stem = (file || '').replace(/\.gcode$/i, '');
+    const wanted = file ? names.find(n => stem.startsWith(n.replace(/\.[^.]+$/, ''))) : null;
+    const byDate = models.filter(x => x.mtime).sort((a, b) => b.mtime - a.mtime).map(x => x.name);
+    for (const m of [wanted, ...byDate, ...names].filter((v, i, a) => v && a.indexOf(v) === i && !failed.has(v)).slice(0, 3)) {
+      try {
+        const g = await new GLTFLoader().loadAsync('/lab/api/models/' + encodeURIComponent(m) + '/preview.glb?v=' + Date.now());
+        if (model) scene.remove(model);
+        model = g.scene;
+        const b = new THREE.Box3().setFromObject(model), c = b.getCenter(new THREE.Vector3()), sz = b.getSize(new THREE.Vector3());
+        const k = 190 / Math.max(sz.x, sz.y, sz.z, 1);
+        model.scale.setScalar(k);
+        model.position.set(-c.x * k, -b.min.y * k, -c.z * k);
+        scene.add(model); fitCam();
+        if (tag) tag.textContent = nice(m) + (m === wanted ? ' · sur le plateau' : ' · dernier modèle');
+        return;
+      } catch { failed.add(m); }
     }
-    if (!m) {  // au repos : le modèle le plus récent de la bibliothèque
-      const byDate = (models || []).filter(x => x.mtime).sort((a, b) => b.mtime - a.mtime);
-      m = (byDate[0] || models[0] || {}).name || null;
-    }
-    if (!m || m === loadedFor) return;
-    loadedFor = m;
-    const g = await new GLTFLoader().loadAsync('/lab/api/models/' + encodeURIComponent(m) + '/preview.glb?v=' + Date.now());
-    if (model) scene.remove(model);
-    model = g.scene;
-    const b = new THREE.Box3().setFromObject(model), c = b.getCenter(new THREE.Vector3()), sz = b.getSize(new THREE.Vector3());
-    const k = 190 / Math.max(sz.x, sz.y, sz.z, 1);
-    model.scale.setScalar(k);
-    model.position.set(-c.x * k, -b.min.y * k, -c.z * k);
-    scene.add(model); fitCam();
-    if (tag) tag.textContent = m + ' · sur le plateau';
-  } catch (e) { if (tag) tag.textContent = 'Aperçu 3D indisponible : ' + (e.message || e); }
+    if (tag) tag.textContent = 'Aperçu 3D indisponible pour ce modèle';
+  } catch { if (tag) tag.textContent = 'Aperçu 3D indisponible'; loadKey = null; }
 }
