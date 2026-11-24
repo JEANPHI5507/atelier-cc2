@@ -115,6 +115,16 @@ def browser():
             headless=True,
             args=["--use-angle=swiftshader", "--enable-unsafe-swiftshader"],
         )  # WebGL without a GPU
+        new_context = b.new_context
+
+        def in_workshop(*a, **kw):  # la plupart des tests parlent à l'atelier, pas au tableau de bord (onglet par défaut)
+            c = new_context(*a, **kw)
+            c.add_init_script(
+                "try{if(!localStorage.getItem('cc2-tab'))localStorage.setItem('cc2-tab','lab')}catch(e){}"
+            )
+            return c
+
+        b.new_context = in_workshop
         yield b
         b.close()
 
@@ -811,14 +821,13 @@ def test_maquette_page_in_app(page, site):
     assert len(page.query_selector_all(".nav-i")) == 6
     page.click(".spool")  # sur le tableau de bord : toast avec le stock de la bobine
     page.wait_for_selector(".toast.show")
-    page.click('[data-tab="ui"]')
-    page.wait_for_selector('.tab[data-tab="ui"].on')
-    assert page.eval_on_selector(".tab.on", "t => t.dataset.tab") == "ui"
     th0 = page.evaluate("document.documentElement.dataset.theme")
     page.click("#theme-t")
     assert (
         page.evaluate("document.documentElement.dataset.theme") != th0
     )  # bascule sombre/clair persistée
+    page.click('[data-tab="ui"]')  # les autres onglets ouvrent l'atelier complet
+    page.wait_for_url("**/lab/")
     assert page.errors == []
 
 
