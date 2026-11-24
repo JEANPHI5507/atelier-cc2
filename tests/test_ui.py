@@ -119,9 +119,10 @@ def browser():
 
         def in_workshop(*a, **kw):  # tests: onglet Atelier, pas le tableau de bord
             c = new_context(*a, **kw)
-            c.add_init_script(
-                "try{if(!localStorage.getItem('cc2-tab'))localStorage.setItem('cc2-tab','lab')}catch(e){}"
-            )
+            if not kw.get("is_mobile"):  # un téléphone garde son onglet d'accueil
+                c.add_init_script(
+                    "try{if(!localStorage.getItem('cc2-tab'))localStorage.setItem('cc2-tab','lab')}catch(e){}"
+                )
             return c
 
         b.new_context = in_workshop
@@ -244,7 +245,7 @@ def test_phone_layout(browser, site):
     )
     pg = ctx.new_page()
     pg.goto(site["base"] + "/lab/")
-    pg.wait_for_selector("#pv:not([hidden])")  # a phone opens on the printer
+    pg.wait_for_selector("#dash:not([hidden]), #pv:not([hidden])")  # a phone opens on the dashboard (or the printer while it prints)
     assert not pg.is_visible("#t-start")  # the first-day guide is for the PC
     width = "document.documentElement.scrollWidth"
     for tab in ("lab", "ui", "gal"):
@@ -821,13 +822,14 @@ def test_maquette_page_in_app(page, site):
     assert len(page.query_selector_all(".nav-i")) == 6
     page.click(".spool")  # sur le tableau de bord : toast avec le stock de la bobine
     page.wait_for_selector(".toast.show")
+    page.click('[data-tab="ui"]')
+    page.wait_for_selector('.tab[data-tab="ui"].on')
+    assert page.eval_on_selector(".tab.on", "t => t.dataset.tab") == "ui"
     th0 = page.evaluate("document.documentElement.dataset.theme")
     page.click("#theme-t")
     assert (
         page.evaluate("document.documentElement.dataset.theme") != th0
     )  # bascule sombre/clair persistée
-    page.click('[data-tab="ui"]')  # les autres onglets ouvrent l'atelier complet
-    page.wait_for_url("**/lab/")
     assert page.errors == []
 
 
