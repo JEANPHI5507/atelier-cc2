@@ -115,6 +115,17 @@ def browser():
             headless=True,
             args=["--use-angle=swiftshader", "--enable-unsafe-swiftshader"],
         )  # WebGL without a GPU
+        new_context = b.new_context
+
+        def in_workshop(*a, **kw):  # tests: onglet Atelier, pas le tableau de bord
+            c = new_context(*a, **kw)
+            if not kw.get("is_mobile"):  # un téléphone garde son onglet d'accueil
+                c.add_init_script(
+                    "try{if(!localStorage.getItem('cc2-tab'))localStorage.setItem('cc2-tab','lab')}catch(e){}"
+                )
+            return c
+
+        b.new_context = in_workshop
         yield b
         b.close()
 
@@ -234,7 +245,9 @@ def test_phone_layout(browser, site):
     )
     pg = ctx.new_page()
     pg.goto(site["base"] + "/lab/")
-    pg.wait_for_selector("#pv:not([hidden])")  # a phone opens on the printer
+    pg.wait_for_selector(
+        "#dash:not([hidden]), #pv:not([hidden])"
+    )  # a phone opens on the dashboard (or the printer while it prints)
     assert not pg.is_visible("#t-start")  # the first-day guide is for the PC
     width = "document.documentElement.scrollWidth"
     for tab in ("lab", "ui", "gal"):

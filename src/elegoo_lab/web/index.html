@@ -6,7 +6,7 @@
 <script src="js/mode.js"></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Atelier Centauri Carbon 2</title>
+<title>Atelier CC2 · Centauri Carbon 2</title>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#000000">
 <link rel="icon" type="image/png" href="icons/favicon.png">
@@ -17,6 +17,7 @@
 <meta name="apple-mobile-web-app-title" content="Atelier CC2">
 <script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
 <link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/shell.css">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -44,11 +45,36 @@
   <symbol id="i-power" viewBox="0 0 24 24"><path d="M12 3v8"/><path d="M6.3 6.8a8 8 0 1 0 11.4 0"/></symbol>
   <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></symbol>
   <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.2a2.6 2.6 0 1 1 3.7 2.4c-.9.45-1.3 1-1.3 2"/><path d="M12 17.2h.01"/></symbol>
+  <symbol id="i-dash" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></symbol>
+  <symbol id="i-print" viewBox="0 0 24 24"><path d="M7 8V4h10v4"/><rect x="4" y="8" width="16" height="8" rx="2"/><path d="M7 13h10v7H7z"/></symbol>
+  <symbol id="i-img" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="m5 18 5-5 3 3 3-3 3 3"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+  <symbol id="i-cam" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z"/><path d="m4 7.5 8 4.5 8-4.5M12 12v9"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 3 5 13h5l-1 8 8-10h-5l1-8Z"/></symbol>
+  <symbol id="i-spool" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.2"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3m0 13v3M2.5 12h3m13 0h3M5 5l2.1 2.1m9.8 9.8L19 19M19 5l-2.1 2.1M7.1 16.9 5 19"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2m0 15v2m-9.5-9.5h2m15 0h2M5 5l1.4 1.4m11.2 11.2L19 19M19 5l-1.4 1.4M6.4 17.6 5 19"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5Z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 4 2.5 20h19L12 4Z"/><path d="M12 10v4m0 3h.01"/></symbol>
 </svg>
 
+<div class="shell">
+<aside class="side">
+  <div class="brand"><div class="logo"><svg class="i"><use href="#i-layers"/></svg></div><span>Atelier CC2</span></div>
+  <nav class="seg" id="nav" aria-label="Navigation">
+    <button id="t-dash" class="on"><svg class="i"><use href="#i-dash"/></svg><span>Tableau de bord</span></button>
+    <button id="t-lab"><svg class="i"><use href="#i-box"/></svg><span>Atelier</span></button>
+    <button id="t-ui"><svg class="i"><use href="#i-print"/></svg><span>Imprimante</span></button>
+    <button id="t-gal"><svg class="i"><use href="#i-img"/></svg><span>Galerie</span></button>
+    <button id="t-start" class="m-hide"><svg class="i"><use href="#i-spark"/></svg><span>Démarrage</span></button>
+  </nav>
+  <div class="side-card"><span class="led"></span><div><b>Centauri Carbon 2</b><small id="side-host">Connexion…</small></div></div>
+</aside>
+<div class="mainwrap">
 <header>
-  <div class="brand"><div class="logo"><svg class="i"><use href="#i-layers"/></svg></div><span>Centauri Carbon 2</span></div>
-  <div class="seg"><button id="t-lab" class="on">Atelier</button><button id="t-ui">Imprimante</button><button id="t-gal">Galerie</button><button id="t-start" class="m-hide">Démarrage</button></div>
+  <div class="m-logo" aria-hidden="true"><svg class="i"><use href="#i-layers"/></svg></div>
   <div class="grow"></div>
   <button class="btn ghost" id="ai-open" data-cap="IA" title="Générer un modèle avec l'IA"><svg class="i"><use href="#i-spark"/></svg><span>Générer avec l'IA</span></button>
   <button class="btn ghost bell" id="ev-open" data-cap="Alertes" title="Suivi des impressions et alertes" aria-label="Alertes"><svg class="i"><use href="#i-bell"/></svg><b id="ev-badge" hidden></b></button>
@@ -64,13 +90,85 @@
 </header>
 
 <main>
+  <section id="dash" hidden>
+        <div class="hello card">
+          <div>
+            <h1>Bonjour 👋</h1>
+            <p class="note"><b id="hello-name">…</b> — <b id="hello-pct">0 %</b> · <b id="hello-eta">au repos</b></p>
+          </div>
+          <div class="ring-wrap">
+            <svg class="ring" viewBox="0 0 72 72" aria-hidden="true">
+              <circle class="ring-bg" cx="36" cy="36" r="30"/>
+              <circle class="ring-fg" id="ring-fg" cx="36" cy="36" r="30" pathLength="100"/>
+            </svg>
+            <b id="ring-txt">72%</b>
+          </div>
+        </div>
+
+        <div class="kpis">
+          <article class="card kpi">
+            <div class="kpi-h"><svg class="i"><use href="#i-bolt"/></svg>Buse</div>
+            <b class="kpi-v"><span id="t-noz">–</span><small id="t-noz-t">/ –</small></b>
+            <div class="bar"><i id="b-noz" style="width:0%"></i></div>
+            <svg class="spark" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true"><polyline pathLength="100" points="0,15 9,13 18,14 27,10 36,11 45,8 54,9 63,6 72,7 81,5 90,6 100,4"/></svg>
+          </article>
+          <article class="card kpi">
+            <div class="kpi-h"><svg class="i"><use href="#i-print"/></svg>Plateau</div>
+            <b class="kpi-v"><span id="t-bed">–</span><small id="t-bed-t">/ –</small></b>
+            <div class="bar"><i id="b-bed" class="ok" style="width:0%"></i></div>
+          </article>
+          <article class="card kpi">
+            <div class="kpi-h"><svg class="i"><use href="#i-spool"/></svg>CANVAS</div>
+            <div class="spools">
+              <button class="spool" title="Bobine 1"><svg viewBox="0 0 34 34"><circle class="rim" cx="17" cy="17" r="14"/><circle class="fill" cx="17" cy="17" r="10" fill="#E9E9E7" style="opacity:.82"/><circle class="hub" cx="17" cy="17" r="3"/></svg><small>82%</small></button>
+              <button class="spool" title="Bobine 2"><svg viewBox="0 0 34 34"><circle class="rim" cx="17" cy="17" r="14"/><circle class="fill" cx="17" cy="17" r="10" fill="#F2A900" style="opacity:.64"/><circle class="hub" cx="17" cy="17" r="3"/></svg><small>64%</small></button>
+              <button class="spool" title="Bobine 3"><svg viewBox="0 0 34 34"><circle class="rim" cx="17" cy="17" r="14"/><circle class="fill" cx="17" cy="17" r="10" fill="#D22630" style="opacity:.31"/><circle class="hub" cx="17" cy="17" r="3"/></svg><small>31%</small></button>
+              <button class="spool" title="Bobine 4"><svg viewBox="0 0 34 34"><circle class="rim empty" cx="17" cy="17" r="14"/><circle class="fill" cx="17" cy="17" r="10" fill="#008755" style="opacity:.12"/><circle class="hub" cx="17" cy="17" r="3"/></svg><small>0%</small></button>
+            </div>
+          </article>
+          <article class="card kpi">
+            <div class="kpi-h"><svg class="i"><use href="#i-clock"/></svg>File d'attente</div>
+            <b class="kpi-v"><span id="q-count">0</span><span class="kpi-s">fichiers</span></b>
+            <p class="note" id="dq-next">File vide</p>
+          </article>
+        </div>
+
+        <div class="grid">
+          <article class="card view3d">
+            <div class="card-h">Vue 3D <span class="pill">plateau 256 × 256</span><span class="grow"></span>
+              <button class="mini" id="v-rot" title="Pivoter / arrêter la rotation"><svg class="i"><use href="#i-box"/></svg></button>
+              <button class="mini" id="v-fit" title="Recadrer"><svg class="i"><use href="#i-search"/></svg></button>
+            </div>
+            <div class="plate" id="dplate">
+              <div id="view3d" aria-label="Vue 3D du modèle"></div>
+              <span class="plate-tag" id="plate-tag">CC2 · plateau 256 × 256</span>
+            </div>
+          </article>
+
+          <article class="card dcam">
+            <div class="card-h"><svg class="i"><use href="#i-cam"/></svg>Caméra <span class="rec"></span><span class="pill ok" id="ia-pill">IA prête</span></div>
+            <div class="cam-view"><img id="cam-img" alt="Caméra de l'imprimante" style="width:100%;height:100%;object-fit:cover"><div class="scan"></div><span class="cam-tag">En direct</span></div>
+          </article>
+
+          <article class="card queue">
+            <div class="card-h">File d'impression <span class="grow"></span><button class="mini" id="q-pause" title="Mettre en pause"><svg class="i"><use href="#i-pause"/></svg></button>
+              <button class="mini" id="q-stop" title="Arrêter l'impression" style="color:#e5484d">✕</button></div>
+            <ul class="qlist" id="qlist"></ul>
+          </article>
+
+          <article class="card feed">
+            <div class="card-h">Activité récente</div>
+            <ul class="flist" id="flist"></ul>
+          </article>
+        </div>
+      </section>
   <div id="firmware-warning" class="fw-warning" hidden>
     <svg class="i" style="color:var(--error)"><use href="#i-x"/></svg>
     <span id="fw-message"></span>
     <button class="btn ghost sm" id="fw-details">Voir les limites</button>
     <button class="btn ghost sm" onclick="document.getElementById('firmware-warning').hidden=true" title="Masquer">×</button>
   </div>
-  <section id="lab">
+  <section id="lab" hidden>
     <aside class="lib">
       <div class="lib-head"><h2>Bibliothèque</h2><div style="display:flex;gap:2px"><button class="btn ghost" id="make-open" title="Créer une pièce sur mesure (boîte, étiquette, crochet…)"><svg class="i"><use href="#i-plus"/></svg>Créer</button><button class="btn ghost" id="asm-open" title="Assembler plusieurs pièces, une couleur chacune"><svg class="i"><use href="#i-puzzle"/></svg>Assembler</button></div></div>
       <div class="lib-add">
@@ -443,6 +541,8 @@
     </div>
   </section>
 </main>
+</div>
+</div>
 
 <dialog id="ai">
   <div class="dlg-h">Générer un modèle avec l'IA<button class="btn ghost" data-close aria-label="Fermer"><svg class="i"><use href="#i-x"/></svg></button></div>

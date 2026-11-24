@@ -4,6 +4,7 @@ import { loadGallery, openBilanById } from './gallery.js';
 import { grid, loadFiles, phone, plateMat, renderAdvanced, renderUsages, setUsage } from './lab.js';
 import { closeCamera, openPrinter, pollPrinter } from './printer.js';
 import { openStart } from './setup.js';
+import { refreshDash, startDash } from './dash.js';
 
 /* theme */
 const mqLight = matchMedia('(prefers-color-scheme: light)');
@@ -24,11 +25,13 @@ const onSchemeChange = () => { try { if ((localStorage.getItem('cc2-theme') || '
 if (mqLight.addEventListener) mqLight.addEventListener('change', onSchemeChange); else mqLight.addListener(onSchemeChange);
 
 /* tabs & dialogs */
-for (const t of ['start', 'lab', 'ui', 'gal']) $('t-' + t).onclick = () => {
-  $('lab').hidden = t !== 'lab'; $('pv').hidden = t !== 'ui'; $('start').hidden = t !== 'start'; $('gal').hidden = t !== 'gal';
-  ['start', 'lab', 'ui', 'gal'].forEach(x => $('t-' + x).classList.toggle('on', x === t));
+const TABS = ['dash', 'lab', 'ui', 'gal', 'start'];
+const SECTION = { dash: 'dash', lab: 'lab', ui: 'pv', gal: 'gal', start: 'start' };
+for (const t of TABS) $('t-' + t).onclick = () => {
+  TABS.forEach(x => { $(SECTION[x]).hidden = x !== t; $('t-' + x).classList.toggle('on', x === t); });
   if (t === 'start') openStart();
   if (t === 'gal') loadGallery();
+  if (t === 'dash') refreshDash();
   try { localStorage.setItem('cc2-tab', t); } catch {}
   if (t === 'ui') openPrinter(); else closeCamera();
 };
@@ -69,9 +72,12 @@ $('install').onclick = async () => { if (!installEv) return; installEv.prompt();
 Object.assign(cfg, await api('/slicer').catch(() => ({ available: false })));
 if (cfg.available) { $('quality').innerHTML = cfg.qualities.map(q => `<option ${q === cfg.default_quality ? 'selected' : ''}>${esc(q)}</option>`).join(''); renderAdvanced(); renderUsages(); setUsage('decoratif'); }
 else { $('go').disabled = true; $('go').title = cfg.error || 'Slicer indisponible'; }
-loadFiles(); pollPrinter();
+loadFiles(); pollPrinter(); startDash();
 // on a phone the printer comes first (and the first-day guide is for the PC)
-try { let t = location.hash === '#imprimante' ? 'ui' : localStorage.getItem('cc2-tab'); if (narrow() && (!t || t === 'start')) t = 'ui'; if (t && t !== 'lab') $('t-' + t).click(); } catch {}
+let t0 = 'dash'; try { t0 = location.hash === '#imprimante' ? 'ui' : localStorage.getItem('cc2-tab') || 'dash'; } catch {}
+if (narrow() && t0 === 'start') t0 = 'ui';
+if (!TABS.includes(t0)) t0 = 'dash';
+$('t-' + t0).click();
 
 /* a link from the phone notification (ntfy « Faire le bilan ») opens that print's review */
 function bilanFromHash() {   // also when the workshop is already open in that tab: only the hash changes

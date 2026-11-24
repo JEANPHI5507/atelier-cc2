@@ -15,7 +15,7 @@ function beep(level) {
     notes.forEach((f, i) => { const o = a.createOscillator(), g = a.createGain(); o.frequency.value = f; o.connect(g); g.connect(a.destination);
       const t = a.currentTime + i * 0.18; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.2, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16); o.start(t); o.stop(t + 0.17); });
   } catch {}
-  navigator.vibrate?.(level === 'bad' ? [200, 100, 200, 100, 200] : [150]);
+  if (navigator.userActivation?.hasBeenActive !== false) navigator.vibrate?.(level === 'bad' ? [200, 100, 200, 100, 200] : [150]);
 }
 function startAlerts() {
   const es = new EventSource('/lab/api/events/stream');
