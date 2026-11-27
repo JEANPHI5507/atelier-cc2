@@ -290,6 +290,12 @@
           <button class="btn ghost block m-morebtn" id="m-more" type="button">Plus d'options</button>
           <div class="switch" style="margin:-4px 0 12px"><label for="split">Découper en pièces (avec chevilles) si c'est plus grand que le plateau</label><input id="split" type="checkbox" checked></div>
           <p class="note" id="split-note" hidden style="margin:-6px 0 12px"></p>
+          <details class="field" id="gf"><summary>Grand format : hauteur finale, découpe et bilan</summary>
+            <div class="field"><label for="gf-height">Hauteur finale voulue (mm, 20 à 1500)</label><input id="gf-height" type="number" min="20" max="1500" step="1" placeholder="ex. 600"></div>
+            <div class="field"><label for="gf-zones">Zones où ne pas couper (hauteurs en mm, séparées par des virgules)</label><input id="gf-zones" type="text" placeholder="ex. 150-190, 230-260 (visage, mains)"></div>
+            <div class="seg wide"><button id="gf-preview" type="button">Voir l'aperçu</button><button id="gf-slice" type="button" disabled>Trancher toutes les pièces</button></div>
+            <div id="gf-out" class="note" aria-live="polite"></div>
+          </details>
           <div class="field"><label for="plate">Plateau</label><select id="plate"></select></div>
           <div class="field"><label>Comment poser la pièce <span id="rot-v">telle quelle</span></label>
             <div class="orients" id="orients"><p class="note" style="margin:0">Choisis un modèle pour voir les positions.</p></div>

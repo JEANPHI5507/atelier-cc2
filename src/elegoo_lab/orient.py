@@ -74,6 +74,45 @@ def _layer_stats(solid: mf.Manifold, rot: np.ndarray | None, scale: float) -> di
     }
 
 
+def score(o: dict[str, Any]) -> float:
+    """Lower is better: overhangs, a part standing on a few mm² (comes loose, 2026-11-11: standing on its
+    tip, 1 mm², must lose to lying flat even with 1300 mm² of overhang), height, and a tall thin part
+    that sways at the top (the advisor's "pièce haute et fine": over 4 times its base)."""
+    sx, sy, sz = o["size_mm"]
+    return float(
+        o["surplomb"]
+        + (2000 * (1 - o["contact"] / 30) if o["contact"] < 30 else 0)
+        + 200 / (1 + o["contact"] / 50)
+        + 0.5 * o["hauteur"]
+        + 300 * max(0.0, sz / max(min(sx, sy), 1.0) - 4)
+    )
+
+
+def best_pose(v: np.ndarray, f: np.ndarray, max_mm: float) -> dict[str, Any] | None:
+    """Best of the six positions for one cut piece (arrays, mm), among those that fit the plate
+    (both sides <= ``max_mm``, height <= the bed). Returns the laid vertices, the label and the size,
+    or None when no position fits."""
+    solid = _solid(v, f)
+    best: dict[str, Any] | None = None
+    for key_, label, (rx, ry, _) in POSITIONS:
+        rot = colors.rotation((rx, ry, 0))
+        t = v @ rot.T if rot is not None else v.copy()
+        t = t - t.min(axis=0)
+        size = np.ptp(t, axis=0)
+        if size[0] > max_mm or size[1] > max_mm or size[2] > mesh.BED_MM:
+            continue
+        st = _layer_stats(solid, rot, 1.0) if solid is not None else _stats(t, f)
+        o = {"id": key_, "label": label, "size_mm": [float(x) for x in size], **st}
+        o["score"] = score(o)
+        if best is None or o["score"] < best["score"]:
+            best = {
+                **o,
+                "vertices": t,
+                "faces": colors.flip_if_mirrored(rot, f) if rot is not None else f,
+            }
+    return best
+
+
 def orientations(path: Path, height_mm: float | None = None, rz: int = 0) -> list[dict[str, Any]]:
     """The six positions, best first marked ``recommandee`` (keeping the user's turn on the plate, ``rz``)."""
     st = path.stat()
@@ -113,19 +152,9 @@ def orientations(path: Path, height_mm: float | None = None, rz: int = 0) -> lis
                 "image": "data:image/png;base64," + base64.b64encode(png).decode(),
             }
         )
-    # fewest overhangs first; a part standing on a few mm² falls over or comes loose; lower = shorter print
+    # fewest overhangs first; lower = shorter print (see ``score``)
     for o in out:
-        # a part standing on a few mm² for hours comes loose and the print is lost, while overhangs get tree supports:
-        # standing on its tip (1 mm², 2026-11-11) must lose to lying flat even with 1300 mm² of overhang
-        # and a tall thin part sways at the top (the advisor's "pièce haute et fine": over 4 times its base)
-        sx, sy, sz = o["size_mm"]
-        o["score"] = (
-            o["surplomb"]
-            + (2000 * (1 - o["contact"] / 30) if o["contact"] < 30 else 0)
-            + 200 / (1 + o["contact"] / 50)
-            + 0.5 * o["hauteur"]
-            + 300 * max(0.0, sz / max(min(sx, sy), 1.0) - 4)
-        )
+        o["score"] = score(o)
         o["tient"] = max(o["size_mm"]) <= mesh.BED_MM
     best = min((o for o in out if o["tient"]), key=lambda o: o["score"], default=out[0])
     for o in out:

@@ -30,7 +30,7 @@ from typing import Any, cast
 import httpx
 import numpy as np
 
-from . import colors, config, forme, mesh, orient, printprep, repair, slicer
+from . import colors, config, forme, grandformat, mesh, orient, printprep, repair, slicer
 
 API = "https://api.mistral.ai/v1/chat/completions"
 TOOL_ROUNDS = 6  # tool calls before the answer must come out: no runaway loops
@@ -188,6 +188,51 @@ def _trancher(src: Path, args: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def _plan_for_model(p: dict[str, Any]) -> dict[str, Any]:
+    """The plan as the brain reads it back: short, factual."""
+    return {
+        "taille_finale_mm": p["taille_mm"],
+        "plans_de_coupe": p["plans"],
+        "pieces": [
+            {"nom": x["nom"], "taille_mm": x["taille_mm"], "pose": x["pose"]} for x in p["pieces"]
+        ],
+        "chevilles": p["chevilles"],
+        "alertes": [{"message": a["message"], "bloquante": a["bloquante"]} for a in p["alertes"]],
+        "tient_sur_le_plateau": p["ok"],
+    }
+
+
+def _couper(src: Path, args: dict[str, Any]) -> dict[str, Any]:
+    height = args.get("hauteur") or float(mesh.info(src)["size_mm"][2])
+    return _plan_for_model(grandformat.plan(src, float(height), args.get("interdites")))
+
+
+def _grand_format(src: Path, args: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(args.get("hauteur"), (int, float)):
+        raise ValueError("donne la hauteur finale voulue en mm")
+    height = float(args["hauteur"])
+    zones = args.get("interdites")
+    if not args.get("trancher"):
+        return _plan_for_model(grandformat.plan(src, height, zones))
+    usage = args.get("usage") or printprep.suggest_usage(src)
+    infill = args.get("remplissage")
+    res = grandformat.executer(
+        src,
+        height,
+        zones,
+        usage=usage if usage in printprep.USAGES else "decoratif",
+        supports=args.get("supports") or False,
+        quality=args.get("qualite") or slicer.DEFAULT_QUALITY,
+        infill=max(0, min(100, int(infill))) if isinstance(infill, (int, float)) else None,
+    )
+    return {
+        "bilan": res["bilan"],
+        "gcode": res["gcode"],
+        "alertes": [a["message"] for a in res["alertes"]],
+        "avertissements": res["avertissements"][:3],
+    }
+
+
 def _forme(src: Path, args: dict[str, Any]) -> dict[str, Any]:
     try:
         zone = args.get("zone")
@@ -217,6 +262,8 @@ SCHEMAS: dict[str, str] = {
     "faire_pivoter": "Tourner le modèle d'un angle en degrés sur X, Y, Z (multiples de 90). Nouveau fichier.",
     "orienter": "Les poses proposées avec le moins de surplombs, meilleures en premier. Ne change rien.",
     "percer_ou_ajouter": "Percer (trou d'aimant, de vis), ajouter (plot, socle) ou garder l'intersection du modèle avec cylindre, pavé ou boule. taille = [largeur, hauteur, profondeur] mm (pour un cylindre: [diamètre, hauteur, diamètre]), position = décalage en mm depuis le centre du modèle. Si l'utilisateur a CIBLÉ un point, passe ses coordonnées telles quelles dans zone : l'atelier les convertit exactement. Nouveau fichier.",
+    "couper": "Voir comment le modèle serait découpé en pièces à sa taille actuelle (ou à `hauteur`) : plans de coupe aux endroits discrets (cou, taille), pièces, poses, chevilles, alertes. `interdites` = zones où aucune coupe ne doit passer (visage, mains). Ne change rien et ne tranche rien.",
+    "grand_format": "Module grand format : à partir de la hauteur finale voulue, redimensionne, coupe, choisit la meilleure pose de chaque pièce et vérifie que tout tient sur le plateau. Sans `trancher`, rend seulement le plan (pièces, plans, alertes) pour que l'utilisateur le valide sur l'aperçu. Avec trancher=true (SEULEMENT après que l'utilisateur a vu et validé le plan), tranche toutes les pièces et rend le bilan : pièces, durée, grammes, coût, chevilles.",
     "trancher": "Trancher avec OrcaSlicer (profils Elegoo CC2) maintenant : durée, filaments par bobine, températures. Peut prendre une minute. qualite = un profil de couches (ex. « 0.12mm Fine », « 0.20mm Standard »), remplissage = % infill, reglages = dictionnaire des réglages fins du profil (skill cc2-orcaslicer).",
 }
 
@@ -251,6 +298,39 @@ PROPS: dict[str, dict[str, Any]] = {
             "type": "integer",
             "description": "pour « ajouter » : 1-4, ou un de plus pour une nouvelle couleur",
         },
+    },
+    "couper": {
+        "hauteur": {
+            "type": "number",
+            "description": "hauteur finale en mm, sinon la taille actuelle",
+        },
+        "interdites": {
+            "type": "array",
+            "items": {"type": "object"},
+            "description": "zones interdites à la coupe, repère du modèle (X, Y depuis le centre, Z depuis la base, mm) : {axe: 'Z', de: 150, a: 190} (une bande), {boite: [[x,y,z],[x,y,z]]} ou {point: [x,y,z], rayon: 15}",
+        },
+    },
+    "grand_format": {
+        "hauteur": {"type": "number", "description": "hauteur finale voulue en mm (20 à 1500)"},
+        "interdites": {
+            "type": "array",
+            "items": {"type": "object"},
+            "description": "zones interdites à la coupe, repère du modèle (X, Y depuis le centre, Z depuis la base, mm) : {axe: 'Z', de: 150, a: 190} (une bande), {boite: [[x,y,z],[x,y,z]]} ou {point: [x,y,z], rayon: 15}",
+        },
+        "trancher": {
+            "type": "boolean",
+            "description": "true seulement après validation du plan par l'utilisateur",
+        },
+        "usage": {"type": "string", "enum": list(printprep.USAGES)},
+        "supports": {
+            "type": "string",
+            "enum": ["aucun", "arbre", "arbre_fin", "arbre_solide", "colonnes"],
+        },
+        "qualite": {
+            "type": "string",
+            "description": "profil de couches OrcaSlicer, ex. 0.20mm Standard",
+        },
+        "remplissage": {"type": "integer", "description": "% de remplissage (0-100)"},
     },
     "trancher": {
         "usage": {"type": "string", "enum": list(printprep.USAGES)},
@@ -326,8 +406,12 @@ def run_tool(tool: str, args: dict[str, Any], name: str) -> dict[str, Any]:
             }
         if tool == "percer_ou_ajouter":
             return _forme(src, args)
+        if tool == "couper":
+            return _couper(src, args)
+        if tool == "grand_format":
+            return _grand_format(src, args)
         return _trancher(src, args)
-    except (ValueError, OSError) as err:
+    except (ValueError, OSError, slicer.SliceError) as err:
         return {"erreur": str(err)[:200]}
 
 

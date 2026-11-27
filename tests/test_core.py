@@ -6260,3 +6260,263 @@ def test_design_maquette_all_tabs_assets():
     tab = (web / "tableau.html").read_text(encoding="utf-8")
     assert ".card:hover { transform: translateY(-3px)" in tab  # page tableau.html
     assert ".btn:hover:not(:disabled) { transform: translateY(-1px); }" in tab
+
+
+# --- large format: cut with forbidden zones, plan, assistant tools -----------------------------------
+
+
+def _figure(path, height=300.0):
+    """A 300 mm 'figure': wide body, thin neck (z 180-210), wide head. Returns the STL path."""
+    body = trimesh.creation.box((80, 80, 180))
+    body.apply_translation((0, 0, 90))
+    neck = trimesh.creation.cylinder(radius=10, height=30, sections=48)
+    neck.apply_translation((0, 0, 195))
+    head = trimesh.creation.box((70, 70, 90))
+    head.apply_translation((0, 0, 255))
+    trimesh.boolean.union([body, neck, head], engine="manifold").export(path)
+    return path
+
+
+def test_cut_avoids_forbidden_zone_and_reports_a_forced_one():
+    import numpy as np
+
+    from elegoo_lab import cut
+
+    m = trimesh.creation.box((60, 60, 300))
+    m.apply_translation((0, 0, 150))
+    m = m.subdivide().subdivide()
+    v, f = np.asarray(m.vertices), np.asarray(m.faces)
+    slots = np.ones(len(f), int)
+    free = cut.cut(v, f, slots)
+    zone = ((-cut.INF, -cut.INF, 100.0), (cut.INF, cut.INF, 200.0))  # Z from the base
+    res = cut.cut(v, f, slots, forbidden=[zone])
+    assert res.planes and not any(a["bloquante"] for a in res.alerts)
+    assert all(not 100 <= p <= 200 for a, p in res.planes if a == 2)
+    assert free.planes != res.planes
+    # a zone over the whole height leaves no admissible cut: the forced cut is reported, blocking
+    allz = ((-cut.INF, -cut.INF, 0.0), (cut.INF, cut.INF, 300.0))
+    forced = cut.cut(v, f, slots, forbidden=[allz])
+    assert any(a["type"] == "zone_interdite" and a["bloquante"] for a in forced.alerts)
+
+
+def test_cut_alerts_for_big_small_and_pinless_pieces():
+    import numpy as np
+
+    from elegoo_lab import cut
+
+    big = cut.Piece(
+        "grosse",
+        np.array([[0, 0, 0], [300, 300, 300.0], [1, 1, 1]]),
+        np.zeros((1, 3), int),
+        np.ones(1, int),
+    )
+    small = cut.Piece(
+        "mini",
+        np.array([[0, 0, 0], [5, 5, 5.0], [1, 1, 1]]),
+        np.zeros((1, 3), int),
+        np.ones(1, int),
+    )
+    kinds = {a["type"]: a["bloquante"] for a in cut.check_pieces([big, small], 246.0)}
+    assert kinds == {"trop_grande": True, "trop_petite": False}
+    assert cut.fits([250, 200, 100], 246.0)
+    assert not cut.fits([300, 100, 100], 246.0)
+    assert not cut.fits([250, 250, 100], 246.0)
+    # a bar too thin for any dowel is still cut, with a warning
+    bar = trimesh.creation.box((8, 8, 300)).subdivide()
+    res = cut.cut(np.asarray(bar.vertices), np.asarray(bar.faces), np.ones(len(bar.faces), int))
+    assert res.planes and res.pin_count == 0
+    assert any(a["type"] == "sans_cheville" for a in res.alerts)
+
+
+def test_orient_best_pose_fits_the_plate_or_says_none():
+    import numpy as np
+
+    from elegoo_lab import orient
+
+    box = trimesh.creation.box((80, 80, 200))
+    v, f = np.asarray(box.vertices), np.asarray(box.faces)
+    p = orient.best_pose(v, f, 246.0)
+    assert p is not None and max(p["size_mm"][:2]) <= 246.0
+    assert abs(p["vertices"].min(axis=0)).max() < 1e-6  # laid on the plate
+    huge = trimesh.creation.box((300, 300, 300))
+    assert orient.best_pose(np.asarray(huge.vertices), np.asarray(huge.faces), 246.0) is None
+
+
+def test_grandformat_zones_and_height_limits(tmp_path):
+    import pytest
+
+    from elegoo_lab import cut, grandformat
+
+    z = grandformat.parse_zones(
+        [
+            {"axe": "z", "de": 190, "a": 150},
+            {"boite": [[10, 10, 10], [0, 0, 0]]},
+            {"point": [1, 2, 3], "rayon": 5},
+        ]
+    )
+    assert z[0] == ((-cut.INF, -cut.INF, 150.0), (cut.INF, cut.INF, 190.0))
+    assert z[1] == ((0, 0, 0), (10, 10, 10)) and z[2] == ((-4, -3, -2), (6, 7, 8))
+    for bad in ({"axe": "W", "de": 1, "a": 2}, {"x": 1}, {"boite": [[1, 2], [3, 4]]}, "zone"):
+        with pytest.raises(ValueError, match="zone"):
+            grandformat.parse_zones([bad])
+    src = _figure(tmp_path / "fig.stl")
+    for h in (5, 2000):
+        with pytest.raises(ValueError, match="hauteur finale"):
+            grandformat.plan(src, h)
+    assert grandformat.seconds("1d 2h 3m 4s") == 93784 and grandformat.seconds("5m 2s") == 302
+    assert grandformat.seconds(None) == 0 and grandformat.seconds("n'importe quoi") == 0
+
+
+def test_grandformat_plan_resizes_cuts_and_respects_zones(tmp_path):
+    from elegoo_lab import grandformat
+
+    src = _figure(tmp_path / "fig.stl")
+    p = grandformat.plan(src, 300)
+    assert p["ok"] and p["taille_mm"][2] == 300.0 and len(p["pieces"]) == 2 and p["chevilles"] >= 1
+    assert all(x["pose"] and max(x["taille_posee_mm"][:2]) <= 246 for x in p["pieces"])
+    big = grandformat.plan(src, 600)  # twice the size: more pieces, every one fits the plate
+    assert big["ok"] and len(big["pieces"]) > len(p["pieces"])
+    assert all(max(x["taille_posee_mm"][:2]) <= 246 for x in big["pieces"])
+    banned = grandformat.plan(src, 300, [{"axe": "Z", "de": 170, "a": 215}])
+    assert all(not 170 <= x["mm"] <= 215 for x in banned["plans"] if x["axe"] == "Z")
+    stuck = grandformat.plan(src, 300, [{"axe": "Z", "de": 0, "a": 300}])
+    assert not stuck["ok"] and any(a["bloquante"] for a in stuck["alertes"])
+    with __import__("pytest").raises(ValueError, match="plan à corriger"):
+        grandformat.executer(src, 300, [{"axe": "Z", "de": 0, "a": 300}])
+    s, glb = grandformat.preview(src, 300)
+    assert s["pieces"] and glb[:4] == b"glTF"
+
+
+def test_assistant_couper_and_grand_format_tools(tmp_path, monkeypatch):
+    from elegoo_lab import assistant, config, grandformat
+
+    assert {"couper", "grand_format"} <= set(assistant.SCHEMAS) <= set(assistant.PROPS)
+    lib = config.MODELS_DIR
+    _figure(lib / "fig.stl")
+    r = assistant.run_tool("couper", {"hauteur": 300}, "fig.stl")
+    assert r["tient_sur_le_plateau"] and len(r["pieces"]) == 2 and r["plans_de_coupe"]
+    r = assistant.run_tool(
+        "grand_format",
+        {"hauteur": 300, "interdites": [{"axe": "Z", "de": 170, "a": 215}]},
+        "fig.stl",
+    )
+    assert all(not 170 <= x["mm"] <= 215 for x in r["plans_de_coupe"])
+    assert "hauteur" in assistant.run_tool("grand_format", {}, "fig.stl")["erreur"]
+    assert "zone" in assistant.run_tool("couper", {"interdites": [{"x": 1}]}, "fig.stl")["erreur"]
+    seen = {}
+
+    def fake_exec(src, h, zones, **kw):
+        seen.update(h=h, zones=zones, **kw)
+        return {"bilan": {"pieces": 2}, "gcode": ["a.gcode"], "alertes": [], "avertissements": []}
+
+    monkeypatch.setattr(grandformat, "executer", fake_exec)
+    r = assistant.run_tool(
+        "grand_format", {"hauteur": 300, "trancher": True, "remplissage": 150}, "fig.stl"
+    )
+    assert r["bilan"]["pieces"] == 2 and seen["h"] == 300 and seen["infill"] == 100
+
+
+def test_grand_format_api(web):
+    client, lib = web
+    _figure(lib / "fig.stl")
+    r = client.get("/lab/api/models/fig.stl/grand-format", params={"hauteur": 300})
+    assert r.status_code == 200 and r.json()["ok"] and len(r.json()["pieces"]) == 2
+    zones = '[{"axe":"Z","de":170,"a":215}]'
+    r = client.get(
+        "/lab/api/models/fig.stl/grand-format", params={"hauteur": 300, "interdites": zones}
+    )
+    assert r.status_code == 200
+    assert (
+        client.get("/lab/api/models/fig.stl/grand-format", params={"hauteur": 5}).status_code == 422
+    )
+    assert (
+        client.get(
+            "/lab/api/models/fig.stl/grand-format", params={"hauteur": 300, "interdites": "{"}
+        ).status_code
+        == 422
+    )
+    assert (
+        client.get("/lab/api/models/rien.stl/grand-format", params={"hauteur": 300}).status_code
+        == 404
+    )
+    g = client.get("/lab/api/models/fig.stl/grand-format.glb", params={"hauteur": 300})
+    assert g.status_code == 200 and g.content[:4] == b"glTF"
+    blocked = client.post(
+        "/lab/api/models/fig.stl/grand-format/trancher",
+        json={"hauteur": 300, "interdites": [{"axe": "Z", "de": 0, "a": 300}]},
+    )
+    assert blocked.status_code == 422 and "plan à corriger" in blocked.json()["detail"]
+
+
+@pytest.mark.slicing
+def test_grand_format_slices_every_piece_and_gives_the_balance(tmp_path):
+    from elegoo_lab import config, grandformat
+
+    src = _figure(config.MODELS_DIR / "fig.stl")
+    r = grandformat.executer(src, 300)
+    b = r["bilan"]
+    assert b["pieces"] == 2 and b["filament_g"] > 0 and b["cout_eur"] > 0 and b["duree_s"] > 0
+    assert b["chevilles"] >= 1 and len(r["gcode"]) >= 3  # two pieces + the dowels' plate
+    assert all((config.MODELS_DIR / g).exists() for g in r["gcode"])
+
+
+def test_cut_thin_wall_and_no_cut_needed():
+    import numpy as np
+
+    from elegoo_lab import cut
+
+    # nothing to cut: one piece, no plane, no alert
+    small = trimesh.creation.box((40, 40, 40))
+    res = cut.cut(np.asarray(small.vertices), np.asarray(small.faces), np.ones(12, int))
+    assert len(res.pieces) == 1 and not res.planes and not res.alerts
+    # a spindle narrowing fast on both sides of the cut: the hole stays inside the material at 5 mm
+    # but its wall is thinner than MIN_WALL_MM, so the dowel is kept and the thin wall is reported
+    spindle = trimesh.creation.revolve(np.array([[0, 1.7], [6.0, 15.0], [0, 28.3]]), sections=48)
+    res = cut.cut(
+        np.asarray(spindle.vertices),
+        np.asarray(spindle.faces),
+        np.ones(len(spindle.faces), int),
+        max_mm=20.0,
+        smart=False,
+    )
+    assert res.pin_count == 1 and res.pin_depths == [cut.PIN_DEPTH_SHORT]
+    assert any(a["type"] == "paroi_mince" for a in res.alerts)
+    # best_planes keeps its old contract: even spacing when no admissible sequence exists
+    solid = cut._to_manifold(np.asarray(small.vertices), np.asarray(small.faces))
+    assert cut.best_planes(solid, 2, 3, 20.0) == cut._even(solid, 2, 3)
+
+
+def test_grandformat_cache_edges_and_unposable_piece(tmp_path, monkeypatch):
+    import pytest
+
+    from elegoo_lab import grandformat, orient
+
+    src = _figure(tmp_path / "fig.stl")
+    with pytest.raises(ValueError, match="zone"):
+        grandformat.parse_zones([{"point": [1, 2]}])
+    for h in range(300, 320):  # more plans than the cache keeps
+        grandformat.plan(src, h)
+    assert len(grandformat._cache) <= 16
+    monkeypatch.setattr(orient, "best_pose", lambda v, f, m: None)
+    p = grandformat.plan(src, 330)
+    assert not p["ok"] and any("six poses" in a["message"] for a in p["alertes"])
+
+
+def test_grand_format_api_zones_must_be_a_list(web):
+    client, lib = web
+    _figure(lib / "fig.stl")
+    r = client.get(
+        "/lab/api/models/fig.stl/grand-format", params={"hauteur": 300, "interdites": "5"}
+    )
+    assert r.status_code == 422 and "liste" in r.json()["detail"]
+    r = client.get("/lab/api/models/fig.stl/grand-format.glb", params={"hauteur": 5})
+    assert r.status_code == 422
+
+
+@pytest.mark.slicing
+def test_grand_format_api_slices(web):
+    client, lib = web
+    _figure(lib / "fig.stl")
+    r = client.post("/lab/api/models/fig.stl/grand-format/trancher", json={"hauteur": 300})
+    assert r.status_code == 200, r.text
+    assert r.json()["bilan"]["pieces"] == 2 and r.json()["gcode"]

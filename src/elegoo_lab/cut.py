@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from typing import cast
+from typing import TYPE_CHECKING, Any, cast
 
 import manifold3d as mf
 import numpy as np
@@ -18,6 +18,9 @@ from scipy.spatial import ConvexHull, QhullError, cKDTree
 
 from . import config, mesh
 
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
 MARGIN_MM = 10.0  # keep pieces comfortably inside the bed
 PIN_D = 5.0  # dowel diameter
 PIN_DEPTH = 8.0  # hole depth on each side of a cut
@@ -25,6 +28,19 @@ PIN_DEPTH_SHORT = 5.0  # fallback where 8 mm would break through a thin wall
 PIERCE_TOLERANCE = 0.01  # share of a hole allowed outside the material (mesh noise)
 # radial play of the holes: config.dowel_play(), tuned with the dowel test piece
 WALL = 2.0  # material kept between a hole and the outer surface
+MIN_WALL_MM = (
+    1.2  # below this around a dowel hole, the wall is reported (and another depth tried first)
+)
+
+# A zone where no cut may pass: an axis-aligned box ((x0, y0, z0), (x1, y1, z1)); use +-inf for "any".
+# Coordinates are the model's own: X and Y from the centre of its footprint, Z from its base (mm).
+# A cut plane perpendicular to axis ``a`` at ``p`` crosses the box exactly when lo[a] <= p <= hi[a].
+Zone = tuple[tuple[float, float, float], tuple[float, float, float]]
+INF = float("inf")
+
+
+def alert(kind: str, message: str, *, blocking: bool = False) -> dict[str, Any]:
+    return {"type": kind, "message": message, "bloquante": blocking}
 
 
 @dataclass
@@ -42,6 +58,7 @@ class CutResult:
     planes: list[tuple[int, float]]  # (axis, position mm)
     pin_count: int
     pin_depths: list[float] = field(default_factory=list)
+    alerts: list[dict[str, Any]] = field(default_factory=list)
 
 
 def _to_manifold(v: np.ndarray, f: np.ndarray) -> mf.Manifold:
@@ -172,15 +189,30 @@ def section_profile(solid: mf.Manifold, axis: int) -> tuple[np.ndarray, np.ndarr
     return pos, area, islands
 
 
-def best_planes(solid: mf.Manifold, axis: int, count: int, max_mm: float) -> list[float]:
-    """``count - 1`` cut positions keeping every piece <= max_mm, at the most discreet places:
-    smallest section (neck, waist) and fewest islands cut through."""
+def _blocked(pos: np.ndarray, axis: int, zones: Sequence[Zone]) -> np.ndarray:
+    hit = np.zeros(len(pos), bool)
+    for lo, hi in zones:
+        hit |= (pos >= lo[axis]) & (pos <= hi[axis])
+    return hit
+
+
+def _even(solid: mf.Manifold, axis: int, count: int) -> list[float]:
+    lo, hi = solid.bounding_box()[axis], solid.bounding_box()[axis + 3]
+    return [lo + (hi - lo) * i / count for i in range(1, count)]
+
+
+def search_planes(
+    solid: mf.Manifold, axis: int, count: int, max_mm: float, forbidden: Sequence[Zone] = ()
+) -> list[float] | None:
+    """``count - 1`` cut positions keeping every piece <= max_mm, at the most discreet places
+    (smallest section, fewest islands), outside the forbidden zones; None if no such sequence."""
     lo, hi = solid.bounding_box()[axis], solid.bounding_box()[axis + 3]
     pos, area, islands = section_profile(solid, axis)
     cost = area + ISLAND_PENALTY * np.maximum(islands - 1, 0)
     cost[area <= 0] = np.inf  # never cut through empty space between parts (no gain, no dowel)
     ok = (pos - lo >= MIN_PIECE_MM) & (hi - pos >= MIN_PIECE_MM)
     cost[~ok] = np.inf
+    cost[_blocked(pos, axis, forbidden)] = np.inf
     n, k = len(pos), count - 1
     # mild preference for balanced pieces (≤ +15 % far from even spacing): a real narrowing still wins
     ideal = [lo + (hi - lo) * (c + 1) / count for c in range(k)]
@@ -197,14 +229,48 @@ def best_planes(solid: mf.Manifold, axis: int, count: int, max_mm: float) -> lis
                 i = prev[np.argmin(best[c - 1, prev])]
                 best[c, j], back[c, j] = best[c - 1, i] + cost_at[c][j], i
     last = np.where(hi - pos <= max_mm, best[k - 1], np.inf)
-    if not np.isfinite(last).any():  # no admissible sequence: fall back to even spacing
-        return [lo + (hi - lo) * i / count for i in range(1, count)]
+    if not np.isfinite(last).any():
+        return None
     j = int(np.argmin(last))
     out = [j]
     for c in range(k - 1, 0, -1):
         j = back[c, j]
         out.append(j)
     return sorted(float(pos[i]) for i in out)
+
+
+def best_planes(solid: mf.Manifold, axis: int, count: int, max_mm: float) -> list[float]:
+    """Like ``search_planes``; falls back to even spacing when no admissible sequence exists."""
+    return search_planes(solid, axis, count, max_mm) or _even(solid, axis, count)
+
+
+def fits(extents: Sequence[float] | np.ndarray, max_mm: float) -> bool:
+    """A piece fits if some axis-aligned lay-down has both plate sides <= max_mm and the height <= the bed."""
+    e = sorted(float(x) for x in extents)
+    return e[2] <= mesh.BED_MM and e[1] <= max_mm
+
+
+def check_pieces(pieces: Sequence[Piece], max_mm: float) -> list[dict[str, Any]]:
+    """Alerts about the pieces themselves: too big for the plate (blocking), too small (to glue)."""
+    out: list[dict[str, Any]] = []
+    for p in pieces:
+        ext = np.ptp(p.vertices, axis=0)
+        if not fits(ext, max_mm):
+            out.append(
+                alert(
+                    "trop_grande",
+                    f"{p.name} ({mesh.size_text(ext)}) ne tient pas sur le plateau, même posée à plat.",
+                    blocking=True,
+                )
+            )
+        elif ext.max() < MIN_PIECE_MM:
+            out.append(
+                alert(
+                    "trop_petite",
+                    f"{p.name} est très petite ({mesh.size_text(ext)}) : imprimée avec les chevilles, à coller.",
+                )
+            )
+    return out
 
 
 def cut(
@@ -215,41 +281,104 @@ def cut(
     max_mm: float = mesh.BED_MM - MARGIN_MM,
     name: str = "piece",
     smart: bool = True,
+    forbidden: Sequence[Zone] = (),
 ) -> CutResult:
     solid = _to_manifold(v, f)
     lo, hi = np.asarray(solid.bounding_box()[:3]), np.asarray(solid.bounding_box()[3:])
     planes = []
-    for a, k in plan(hi - lo, max_mm):
-        spots = (
-            best_planes(solid, a, k, max_mm)
-            if smart
-            else [lo[a] + (hi[a] - lo[a]) * i / k for i in range(1, k)]
+    alerts: list[dict[str, Any]] = []
+    origin = np.array([(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, lo[2]])
+    zones: list[Zone] = [
+        (
+            cast("tuple[float, float, float]", tuple(float(x) for x in np.add(z0, origin))),
+            cast("tuple[float, float, float]", tuple(float(x) for x in np.add(z1, origin))),
         )
+        for z0, z1 in forbidden
+    ]
+    for a, k in plan(hi - lo, max_mm):
+        if smart:
+            spots = search_planes(solid, a, k, max_mm, zones)
+            if spots is None and zones:  # one more piece may let the cuts avoid the zones
+                spots = search_planes(solid, a, k + 1, max_mm, zones)
+            if spots is None:
+                spots = _even(solid, a, k)
+                alerts.append(
+                    alert(
+                        "coupe_reguliere",
+                        f"Aucune coupe discrète possible sur l'axe {'XYZ'[a]} : coupe à intervalles réguliers.",
+                    )
+                )
+        else:
+            spots = [lo[a] + (hi[a] - lo[a]) * i / k for i in range(1, k)]
         planes += [(a, p) for p in spots]
     if not planes:
         return CutResult([Piece(name, v, f, slots)], None, [], 0)
+    for a, p in planes:
+        if _blocked(np.array([p]), a, zones)[0]:
+            alerts.append(
+                alert(
+                    "zone_interdite",
+                    f"La coupe {'XYZ'[a]} = {p - origin[a]:.0f} mm traverse une zone interdite : aucune autre position ne convient.",
+                    blocking=True,
+                )
+            )
 
     # drill dowel holes across each plane (computed on the uncut solid)
     holes: list[mf.Manifold] = []
     pins: list[float] = []  # pins: depth of each dowel's holes (mm on each side)
     r_hole = PIN_D / 2 + config.dowel_play()
+    thin = 0  # dowels whose wall stays under MIN_WALL_MM at both depths
+
+    def _cyl(p: np.ndarray, z: float, depth: float, r: float, inv: np.ndarray) -> mf.Manifold:
+        return (
+            mf.Manifold.cylinder(2 * depth, r, r, 48)
+            .translate([p[0], p[1], z - depth])
+            .transform(inv)
+        )
+
+    def _inside(c: mf.Manifold) -> bool:  # a hole must stay inside the material
+        return bool((c - solid).volume() <= PIERCE_TOLERANCE * c.volume())
+
     for axis, pos in planes:
         res = _pin_points(solid, axis, pos)
-        if res is None:
-            continue
-        pts, z, xf = res
-        inv = np.linalg.inv(np.r_[xf, [[0, 0, 0, 1]]])[:3]
-        for p in pts:
-            for depth in (PIN_DEPTH, PIN_DEPTH_SHORT):  # a hole must stay inside the material
-                cyl = (
-                    mf.Manifold.cylinder(2 * depth, r_hole, r_hole, 48)
-                    .translate([p[0], p[1], z - depth])
-                    .transform(inv)
-                )
-                if (cyl - solid).volume() <= PIERCE_TOLERANCE * cyl.volume():
-                    holes.append(cyl)
-                    pins.append(depth)
+        placed = 0
+        if res is not None:
+            pts, z, xf = res
+            inv = np.linalg.inv(np.r_[xf, [[0, 0, 0, 1]]])[:3]
+            for p in pts:
+                for strict in (
+                    True,
+                    False,
+                ):  # first demand a wall all round, then settle for the hole inside
+                    for depth in (PIN_DEPTH, PIN_DEPTH_SHORT):
+                        cyl = _cyl(p, z, depth, r_hole, inv)
+                        if not _inside(cyl):
+                            continue
+                        if strict and not _inside(_cyl(p, z, depth, r_hole + MIN_WALL_MM, inv)):
+                            continue
+                        holes.append(cyl)
+                        pins.append(depth)
+                        placed += 1
+                        thin += not strict
+                        break
+                    else:
+                        continue
                     break
+        if not placed:
+            alerts.append(
+                alert(
+                    "sans_cheville",
+                    f"Aucune cheville possible sur la coupe {'XYZ'[axis]} = {pos:.0f} mm "
+                    "(section trop fine) : les deux pièces seront à coller sans repère.",
+                )
+            )
+    if thin:
+        alerts.append(
+            alert(
+                "paroi_mince",
+                f"{thin} cheville(s) ont une paroi de moins de {MIN_WALL_MM:g} mm autour du trou.",
+            )
+        )
     if holes:
         solid = solid - mf.Manifold.batch_boolean(holes, mf.OpType.Add)
 
@@ -284,4 +413,5 @@ def cut(
             one = trimesh.creation.cylinder(radius=PIN_D / 2, height=length, sections=48)
             dowels.append(one.apply_translation([(k % cols) * 9, (k // cols) * 9, length / 2]))
         pin_mesh = cast("trimesh.Trimesh", trimesh.util.concatenate(dowels))
-    return CutResult(out, pin_mesh, planes, len(pins), pins)
+    alerts += check_pieces(out, max_mm)
+    return CutResult(out, pin_mesh, planes, len(pins), pins, alerts)
