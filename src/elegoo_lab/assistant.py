@@ -48,6 +48,9 @@ from . import (
 )
 
 API = "https://api.mistral.ai/v1/chat/completions"
+KEEPALIVE_S = (
+    10  # a live event at least this often while the brain works (mobile networks drop silence)
+)
 TOOL_ROUNDS = 6  # tool calls before the answer must come out: no runaway loops
 CLI_TIMEOUT = 300  # seconds per headless run: a Blender modelling round can be slow
 
@@ -947,7 +950,11 @@ def chat_events(
     th = threading.Thread(target=work, daemon=True)
     th.start()
     while True:
-        ev = q.get()
+        try:
+            ev = q.get(timeout=KEEPALIVE_S)
+        except queue.Empty:  # the brain thinks quietly: a phone drops a silent connection
+            yield {"type": "attente"}
+            continue
         yield ev
         if ev.get("type") in ("final", "erreur"):
             break

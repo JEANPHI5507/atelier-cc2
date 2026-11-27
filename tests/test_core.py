@@ -7426,3 +7426,21 @@ def test_photo_upload_and_piece_depuis_photo(web, monkeypatch):
         events = [json.loads(x[6:]) for x in st.iter_lines() if x.startswith("data: ")]
     assert f"« {name} »" in seen["msg"] and "piece_depuis_photo" in seen["msg"]
     assert events[0] == {"type": "image", "nom": r["controle_image"]}
+
+
+def test_live_journal_keeps_the_connection_alive_while_the_brain_thinks(monkeypatch):
+    """A phone drops a silent connection: while the brain works quietly, the journal sends a sign of life."""
+    import time
+
+    from elegoo_lab import assistant
+
+    monkeypatch.setattr(assistant, "KEEPALIVE_S", 0.05)
+
+    def slow_chat(name, message, history=None, conversation="", emit=None):
+        time.sleep(0.3)
+        return {"reply": "fini", "file": "", "outils": []}
+
+    monkeypatch.setattr(assistant, "chat", slow_chat)
+    events = list(assistant.chat_events("", "réfléchis", []))
+    assert events[-1]["type"] == "final" and events[-1]["reply"] == "fini"
+    assert sum(e["type"] == "attente" for e in events) >= 3

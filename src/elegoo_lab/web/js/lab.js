@@ -1579,7 +1579,11 @@ async function chatSend() {
     }
   } catch (e) {
     step.remove();
-    wait.innerHTML = `<span style="color:var(--bad)">${esc(e.message)}</span>`;
+    const cut = e instanceof TypeError || /network|fetch|load failed/i.test(e.message);   // the connection, not the brain
+    wait.innerHTML = cut
+      ? `<span style="color:var(--bad)">Connexion coupée pendant le travail.</span><small>L'assistant a peut-être continué sur le serveur : la bibliothèque est rechargée, regarde les nouveaux fichiers.</small>`
+      : `<span style="color:var(--bad)">${esc(e.message)}</span>`;
+    if (cut) loadFiles().catch(() => {});
   }
   chatBusy = false; $('chat-go').disabled = false;
 }

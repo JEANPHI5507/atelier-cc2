@@ -1480,7 +1480,9 @@
 "Fais-en une pièce : le plus grand côté mesure … mm, épaisseur 3 mm": "Make a part of it: the longest side is … mm, 3 mm thick",
 "✦ Assistant": "✦ Assistant",
 "Demander à l'assistant : créer une pièce, d'après une photo ou une description": "Ask the assistant: make a part from a photo or a description",
-"Aucun modèle choisi : décris une pièce à fabriquer (« un vase de 10 cm », « un crochet mural ») ou touche 📷 pour joindre la photo d'un objet plat posé sur une feuille, puis donne sa taille réelle.": "No model chosen: describe a part to make (“a 10 cm vase”, “a wall hook”) or tap 📷 to attach a photo of a flat object lying on a sheet of paper, then give its real size."
+"Aucun modèle choisi : décris une pièce à fabriquer (« un vase de 10 cm », « un crochet mural ») ou touche 📷 pour joindre la photo d'un objet plat posé sur une feuille, puis donne sa taille réelle.": "No model chosen: describe a part to make (“a 10 cm vase”, “a wall hook”) or tap 📷 to attach a photo of a flat object lying on a sheet of paper, then give its real size.",
+"Connexion coupée pendant le travail.": "Connection lost during the work.",
+"L'assistant a peut-être continué sur le serveur : la bibliothèque est rechargée, regarde les nouveaux fichiers.": "The assistant may have carried on on the server: the library was reloaded, look for new files."
 },
 "patterns": [
 [
