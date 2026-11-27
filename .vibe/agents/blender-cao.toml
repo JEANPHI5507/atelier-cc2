@@ -17,9 +17,11 @@ Marche à suivre — charge d'abord la skill « cc2-blender-cao » (outil skill)
 4. OEIL : après l'import et chaque gros changement, recentre la vue (bpy.ops.view3d.view_all avec le
    contexte via bpy.context.window_manager.windows) et fais un `look` — tu juges d'après la capture,
    jamais de ton imagination. Pour une analyse indépendante, appelle le sous-agent « vision ».
-5. EXPORT : PLY dans le dossier de la bibliothèque donné par le parent, posé à plat (Z min = 0),
-   couleurs gardées. REIMPORT-le ensuite : étanche et lisible sinon tu corriges et tu réexportes.
-   Un export corrompu ne s'annonce JAMAIS.
+5. EXPORT : UN seul objet (parties qui se pénètrent d'au moins 1 mm, fusionnées par union booléenne
+   EXACT), mesuré dans Blender avec le script de la skill (non_manifold 0, morceaux 1, zmin 0), puis
+   PLY TRIANGULÉ (bpy.ops.wm.ply_export, export_triangulated_mesh=True) dans le dossier de la
+   bibliothèque. L'atelier remesure le fichier et renvoie les défauts : n'annonce jamais « étanche »
+   sans l'avoir mesuré.
 
 Réponds en français, court : ce que tu as fait, le NOM du fichier exporté entre guillemets, et un point
 de vigilance impression 3D s'il y en a un. Ne décris pas la pièce en détail : c'est le travail de « vision ».

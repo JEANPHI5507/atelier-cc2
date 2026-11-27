@@ -202,7 +202,12 @@ def _trancher(src: Path, args: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
-FREE_TOOLS = ("catalogue_pieces", "creer_piece")  # tools that need no model open
+FREE_TOOLS = (  # tools that need no model open
+    "catalogue_pieces",
+    "creer_piece",
+    "extruder_profil",
+    "tourner_profil",
+)
 
 
 def _plain(text: str) -> str:
@@ -317,6 +322,69 @@ _QUOTED = re.compile(r"[«\"`“]\s*([^«»\"`“”\n]{1,120}?\." + _FILE_EXT +
 _BARE = re.compile(r"(?<![\w/.-])([\w+().-]{1,120}\." + _FILE_EXT + r")\b", re.I)
 
 
+def stability(m: Any) -> dict[str, Any]:
+    """Does the part stand on its own: is its centre of mass over the footprint (what touches the plate),
+    and by how many mm. A thin margin is a warning for a stand that will carry something."""
+    from scipy.spatial import ConvexHull, QhullError
+
+    v = np.asarray(m.vertices)
+    foot = v[v[:, 2] < v[:, 2].min() + 0.5][:, :2]
+    com = np.asarray(m.center_mass)[:2]
+    try:
+        hull = foot[ConvexHull(foot).vertices]
+    except (QhullError, ValueError):
+        return {"tient_debout": False, "marge_mm": 0.0}
+    a, b = hull, np.roll(hull, -1, axis=0)
+    edge = b - a
+    # signed distance to each edge (counter-clockwise hull: inside is on the left)
+    d = (edge[:, 0] * (com[1] - a[:, 1]) - edge[:, 1] * (com[0] - a[:, 0])) / (
+        np.linalg.norm(edge, axis=1) + 1e-12
+    )
+    margin = float(d.min())
+    return {"tient_debout": margin > 0, "marge_mm": round(margin, 1)}
+
+
+EXPORT_ROUNDS = 2  # correction rounds the brain gets when the file it exported does not hold
+
+
+def check_export(name: str) -> list[str]:
+    """What is wrong with a mesh the brain wrote itself (Blender…), checked by the workshop, never taken on
+    trust: unreadable, open or non-manifold, in several separate bodies, too big for the plate."""
+    path = config.MODELS_DIR / name
+    if path.suffix.lower() not in mesh.MESH_EXT:
+        return []
+    try:
+        m = mesh.load(path)
+    except (ValueError, OSError) as err:
+        return [f"illisible ({str(err)[:120]})"]
+    out = []
+    _, counts = np.unique(m.edges_sorted, axis=0, return_counts=True)
+    open_e, bad_e = int((counts == 1).sum()), int((counts > 2).sum())
+    if open_e or bad_e or not m.is_watertight:
+        out.append(
+            f"pas étanche : {open_e} arête(s) ouvertes, {bad_e} arête(s) partagées par plus de deux faces "
+            "(objets posés les uns sur les autres sans union booléenne)"
+        )
+    bodies = [b for b in m.split(only_watertight=False) if len(b.faces) >= 4]
+    if len(bodies) > 1:
+        out.append(
+            f"{len(bodies)} morceaux séparés au lieu d'un seul solide : les parties ne se touchent pas "
+            "ou ne sont pas fusionnées (union booléenne puis export)"
+        )
+    if m.is_watertight and m.volume < 0:
+        out.append(
+            "faces retournées (volume négatif) : recalcule les normales vers l'extérieur avant l'export"
+        )
+    if m.is_watertight and m.volume > 0 and not stability(m)["tient_debout"]:
+        out.append("elle bascule : son centre de gravité sort de la surface posée sur le plateau")
+    ext = m.extents
+    if ext.max() > mesh.BED_MM:
+        out.append(f"trop grande pour le plateau ({mesh.size_text(ext)})")
+    if float(m.bounds[0][2]) < -0.01 or float(m.bounds[0][2]) > 0.5:
+        out.append(f"pas posée sur le plateau (Z min = {float(m.bounds[0][2]):.2f} mm, il faut 0)")
+    return out
+
+
 def ghost_files(text: str) -> list[str]:
     """File names a reply presents that the library does not hold (a name the brain made up). A bare word
     counts as found when some library file ends with it (names with spaces are only partly matched).
@@ -331,11 +399,86 @@ def ghost_files(text: str) -> list[str]:
 
 
 NO_MODEL = (
-    "Aucun modèle n'est ouvert. Tu peux en créer un : « catalogue_pieces » puis « creer_piece » (pièces "
-    "sur mesure à partir de cotes), ou le modéliser dans Blender (skill cc2-blender-cao) et l'exporter dans "
+    "Aucun modèle n'est ouvert. Tu peux en créer un : « creer_piece » (pièces sur mesure à partir de "
+    "cotes), « extruder_profil » / « tourner_profil » (tu dessines le profil à plat en coordonnées, l'atelier "
+    "le rend solide — à préférer pour toute forme simple : support, équerre, crochet, vase), ou le modéliser dans Blender (skill cc2-blender-cao) et l'exporter dans "
     "la bibliothèque. Dès qu'un outil rend un « fichier », il devient le modèle courant et les autres outils "
     "(fiche, trancher, grand_format…) travaillent dessus."
 )
+
+
+PROFILE_MAX_POINTS = 400
+
+
+def _points(raw: Any, what: str) -> list[list[float]]:
+    if not isinstance(raw, list) or len(raw) < 3:
+        raise ValueError(f"{what} : au moins 3 points [[u, v], …]")
+    if len(raw) > PROFILE_MAX_POINTS:
+        raise ValueError(f"{what} : {PROFILE_MAX_POINTS} points au plus")
+    try:
+        pts = [[float(p[0]), float(p[1])] for p in raw]
+    except (TypeError, ValueError, IndexError) as err:
+        raise ValueError(f"{what} : chaque point est [u, v] en mm") from err
+    if pts[0] == pts[-1]:
+        pts = pts[:-1]  # a closed list repeats its first point
+    return pts
+
+
+def _profil(tool: str, args: dict[str, Any]) -> dict[str, Any]:
+    """A part drawn as a flat profile (the brain is good at coordinates) and made solid by the workshop:
+    extruded or turned, so always one closed solid."""
+    import manifold3d as mf
+    import trimesh
+
+    pts = _points(args.get("points"), "points")
+    if tool == "extruder_profil":
+        length = float(args.get("longueur") or 0)
+        if not 0.4 <= length <= mesh.BED_MM:
+            raise ValueError(f"longueur entre 0,4 et {mesh.BED_MM:.0f} mm")
+        rings = [pts] + [_points(t, "trou") for t in (args.get("trous") or [])]
+        section = mf.CrossSection(rings, mf.FillRule.EvenOdd)
+        if section.area() <= 0.01:
+            raise ValueError("ce contour n'enferme aucune surface (points dans le désordre ?)")
+        solid = section.extrude(length)
+        if (
+            args.get("vue") or "cote"
+        ) == "cote":  # (u, v, w) = (Y, Z, X): the side profile stands up
+            solid = solid.transform([[0, 0, 1, 0], [1, 0, 0, 0], [0, 1, 0, 0]])
+        tag = "profil"
+    else:
+        if any(p[0] < 0 for p in pts):
+            raise ValueError("le rayon (premier nombre de chaque point) ne peut pas être négatif")
+        angle = float(args.get("angle") or 360)
+        section = mf.CrossSection([pts], mf.FillRule.EvenOdd)
+        if section.area() <= 0.01:
+            raise ValueError("ce contour n'enferme aucune surface (points dans le désordre ?)")
+        solid = mf.Manifold.revolve(section, 96, max(1.0, min(360.0, angle)))
+        tag = "tour"
+    if solid.is_empty() or solid.status() != mf.Error.NoError:
+        raise ValueError("ce profil ne donne pas de solide (contour qui se croise ?)")
+    m = solid.to_mesh()
+    v = np.asarray(m.vert_properties)[:, :3].astype(float)
+    tm = trimesh.Trimesh(v, np.asarray(m.tri_verts), process=True)
+    lo, hi = tm.bounds
+    tm.apply_translation(
+        [-(lo[0] + hi[0]) / 2, -(lo[1] + hi[1]) / 2, -lo[2]]
+    )  # on the plate, centred
+    nom = re.sub(r"[^\w-]+", "_", str(args.get("nom") or "").strip())[:60] or tag
+    out = config.MODELS_DIR / f"{nom}.ply"
+    k = 1
+    while out.exists():
+        k += 1
+        out = config.MODELS_DIR / f"{nom} ({k}).ply"
+    tm.export(out)
+    size = [round(float(x), 1) for x in tm.extents]
+    return {
+        "fichier": out.name,
+        "taille_mm": size,
+        "volume_cm3": round(float(tm.volume) / 1000, 1),
+        "tient_sur_le_plateau": max(size) <= mesh.BED_MM,
+        "stabilite": stability(tm),
+        "c_est_fait": "un seul solide étanche, posé sur le plateau. Ne le recrée pas : réponds, ou travaille sur ce fichier.",
+    }
 
 
 def _plan_for_model(p: dict[str, Any]) -> dict[str, Any]:
@@ -430,6 +573,8 @@ SCHEMAS: dict[str, str] = {
     "creer_piece": "Fabriquer une pièce sur mesure (voir catalogue_pieces) et l'ajouter à la bibliothèque en 3MF, prête à trancher. `piece` = la clé du catalogue ("
     + ", ".join(parametric.KINDS)
     + "), `valeurs` = les réglages à changer (les autres gardent leur défaut ; cotes hors limites refusées avec la limite). Rends le nom du nouveau fichier et sa taille. Ne demande pas de modèle.",
+    "extruder_profil": "Fabriquer une pièce en dessinant son PROFIL à plat (polygone en mm), que l'atelier extrude d'un bloc : toujours un seul solide étanche, en quelques secondes, sans Blender. Idéal pour support, équerre, crochet, cale, plaque, lettre découpée. Le résultat donne « stabilite » (centre de gravité sur l'appui, marge en mm) : un support qui portera un objet penché doit avoir une base qui dépasse sous la charge, sinon élargis la base et refais. `points` = [[u, v], …] dans l'ordre du contour (pas de croisement), `longueur` = épaisseur d'extrusion en mm, `vue` = « cote » (profil vu de côté, u = profondeur Y, v = hauteur Z, extrudé sur la largeur X) ou « dessus » (contour vu de dessus, u = X, v = Y, extrudé en hauteur Z). `trous` = contours à retirer. Nouveau fichier.",
+    "tourner_profil": "Fabriquer une pièce ronde en faisant tourner un PROFIL autour de l'axe vertical : vase, bouton, pied, bague, bol. `points` = [[r, z], …] (r = rayon ≥ 0 en mm, z = hauteur), le contour fermé d'une demi-coupe ; `angle` en degrés (360 = tour complet). Un seul solide étanche, sans Blender. Nouveau fichier.",
     "couper": "Voir comment le modèle serait découpé en pièces à sa taille actuelle (ou à `hauteur`) : plans de coupe aux endroits discrets (cou, taille), pièces, poses, chevilles, alertes. `interdites` = zones où aucune coupe ne doit passer (visage, mains). Ne change rien et ne tranche rien.",
     "grand_format": "Module grand format : à partir de la hauteur finale voulue, redimensionne, coupe, choisit la meilleure pose de chaque pièce et vérifie que tout tient sur le plateau. Sans `trancher`, rend seulement le plan (pièces, plans, alertes) pour que l'utilisateur le valide sur l'aperçu. Avec trancher=true (SEULEMENT après que l'utilisateur a vu et validé le plan), tranche toutes les pièces et rend le bilan : pièces, durée, grammes, coût, chevilles.",
     "trancher": "Trancher avec OrcaSlicer (profils Elegoo CC2) maintenant : durée, filaments par bobine, températures. Peut prendre une minute. qualite = un profil de couches (ex. « 0.12mm Fine », « 0.20mm Standard »), remplissage = % infill, reglages = dictionnaire des réglages fins du profil (skill cc2-orcaslicer).",
@@ -480,6 +625,30 @@ PROPS: dict[str, dict[str, Any]] = {
             "type": "string",
             "description": "nom du fichier sans extension, sinon automatique",
         },
+    },
+    "extruder_profil": {
+        "points": {
+            "type": "array",
+            "items": {"type": "array", "items": {"type": "number"}},
+            "description": "[[u, v], …] mm, contour fermé",
+        },
+        "longueur": {"type": "number", "description": "épaisseur d'extrusion en mm"},
+        "vue": {"type": "string", "enum": ["cote", "dessus"]},
+        "trous": {
+            "type": "array",
+            "items": {"type": "array"},
+            "description": "contours à retirer, même repère",
+        },
+        "nom": {"type": "string", "description": "nom du fichier sans extension"},
+    },
+    "tourner_profil": {
+        "points": {
+            "type": "array",
+            "items": {"type": "array", "items": {"type": "number"}},
+            "description": "[[r, z], …] mm",
+        },
+        "angle": {"type": "number", "description": "degrés, 360 par défaut"},
+        "nom": {"type": "string", "description": "nom du fichier sans extension"},
     },
     "couper": {
         "vision": {
@@ -570,7 +739,11 @@ def run_tool(tool: str, args: dict[str, Any], name: str) -> dict[str, Any]:
         return {"erreur": f"outil inconnu « {tool} »"}
     if tool in FREE_TOOLS:  # no model needed: these make one
         try:
-            return _catalogue(args) if tool == "catalogue_pieces" else _creer_piece(args)
+            if tool == "catalogue_pieces":
+                return _catalogue(args)
+            if tool == "creer_piece":
+                return _creer_piece(args)
+            return _profil(tool, args)
         except (ValueError, OSError) as err:
             return {"erreur": str(err)[:300]}
     if not name:
@@ -862,6 +1035,7 @@ def chat_cli(
     outils: list[str] = []
     continued = 0
     checked = False  # one correction round when the reply names a file that does not exist
+    export_rounds = 0  # correction rounds spent on a broken export
     session: str = _CLI_SESSIONS.get(conversation, "") if conversation else ""
     base = (
         _scan_meshes()
@@ -1155,6 +1329,30 @@ def chat_cli(
                     maj = True
                     if emit:
                         emit({"type": "recharge", "fichier": cur})
+                faults = check_export(cur) if maj and cur else []
+                if faults and export_rounds < EXPORT_ROUNDS:
+                    export_rounds += 1
+                    if emit:
+                        emit(
+                            {
+                                "type": "etape",
+                                "texte": "l'atelier a contrôlé l'export : il le fait corriger",
+                            }
+                        )
+                    prompt = (
+                        f"CONTRÔLE DE L'ATELIER sur « {cur} » (mesuré par l'atelier, pas une supposition) : "
+                        + " ; ".join(faults)
+                        + ". La pièce n'est PAS imprimable en l'état. Corrige dans Blender (joindre les objets, "
+                        "union booléenne, trianguler, poser à Z = 0), réexporte sous le même nom, puis réponds "
+                        "selon le protocole en disant ce que tu as corrigé."
+                    )
+                    continue
+                if faults:
+                    reply += (
+                        f"\n\n⚠ Contrôle de l'atelier sur « {cur} » : "
+                        + " ; ".join(faults)
+                        + ". La pièce n'est pas encore imprimable."
+                    )
                 ghosts = ghost_files(reply)
                 if ghosts and not checked:
                     checked = True
