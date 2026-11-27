@@ -1477,7 +1477,10 @@
 "photo jointe": "photo attached",
 "contour trouvé": "outline found",
 "contour trouvé (rouge, trous en bleu) :": "outline found (red, holes in blue):",
-"Fais-en une pièce : le plus grand côté mesure … mm, épaisseur 3 mm": "Make a part of it: the longest side is … mm, 3 mm thick"
+"Fais-en une pièce : le plus grand côté mesure … mm, épaisseur 3 mm": "Make a part of it: the longest side is … mm, 3 mm thick",
+"✦ Assistant": "✦ Assistant",
+"Demander à l'assistant : créer une pièce, d'après une photo ou une description": "Ask the assistant: make a part from a photo or a description",
+"Aucun modèle choisi : décris une pièce à fabriquer (« un vase de 10 cm », « un crochet mural ») ou touche 📷 pour joindre la photo d'un objet plat posé sur une feuille, puis donne sa taille réelle.": "No model chosen: describe a part to make (“a 10 cm vase”, “a wall hook”) or tap 📷 to attach a photo of a flat object lying on a sheet of paper, then give its real size."
 },
 "patterns": [
 [

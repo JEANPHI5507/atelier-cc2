@@ -1000,7 +1000,7 @@ function clearSelection() {
   sel = null; $('prep').hidden = $('ready').hidden = true; $('nosel').hidden = false; $('chips').innerHTML = '';
   chatFree();
   if (current) dropCurrent(); hint('Choisis un modèle dans la bibliothèque', 'Glisser pour tourner · molette pour zoomer');
-  document.querySelectorAll('#mnav button:not([data-m="lib"])').forEach(b => b.disabled = true); $('mnext').hidden = true; mview('lib');
+  document.querySelectorAll('#mnav button[data-m="prep"]').forEach(b => b.disabled = true); $('mnext').hidden = true; mview('lib');   // « Aperçu » stays: the assistant lives there
 }
 
 /* selection */
@@ -1041,6 +1041,7 @@ async function select(f) {
   needs = {}; stockLeft = {};
   $('chat-sec').hidden = false;
   $('chat-in').placeholder = $('chat-in').dataset.ph || $('chat-in').placeholder;
+  if ($('chat-note').dataset.txt) $('chat-note').textContent = $('chat-note').dataset.txt;
   $('ia-note').hidden = true;
   if (chatSel !== f.name) { chatHist = []; $('chat-log').innerHTML = ''; chatConvNew(); $('chat-sug').hidden = false; }   // the conversation follows the model
   chatSel = f.name;
@@ -1474,6 +1475,12 @@ function chatPhotoShow() {
   if (chatPhoto) $('chat-att-x').onclick = () => { chatPhoto = null; chatPhotoShow(); };
 }
 $('chat-photo').onclick = () => $('chat-photo-in').click();
+$('ia-open').onclick = () => {   // the assistant from the library, phone included (it lives in the view column)
+  if (!sel) chatFree();
+  $('chat-sec').classList.remove('folded'); $('chat-fold').textContent = '▾';
+  if (phone.matches) mview('view');
+  $('chat-sec').scrollIntoView({ block: 'nearest' }); $('chat-in').focus();
+};
 $('chat-photo-in').onchange = async () => {
   const f = $('chat-photo-in').files[0]; $('chat-photo-in').value = '';
   if (!f) return;
@@ -1496,9 +1503,12 @@ function chatAdd(role, html, small) {
 /* no model open: the assistant can still make one (made-to-measure parts, Blender) */
 function chatFree() {
   $('chat-sec').hidden = false; $('chat-sug').hidden = true;
+  $('chat-sec').classList.remove('folded'); $('chat-fold').textContent = '▾';   // nothing else to see: open
   if (chatSel !== '') { chatHist = []; $('chat-log').innerHTML = ''; chatConvNew(); }
   chatSel = '';
   $('chat-in').placeholder = 'Décris la pièce à fabriquer : « une boîte de 100 × 60 mm avec couvercle »…';
+  $('chat-note').dataset.txt ??= $('chat-note').textContent;
+  $('chat-note').textContent = 'Aucun modèle choisi : décris une pièce à fabriquer (« un vase de 10 cm », « un crochet mural ») ou touche 📷 pour joindre la photo d\'un objet plat posé sur une feuille, puis donne sa taille réelle.';
 }
 async function chatSend() {
   const v = $('chat-in').value.trim();
@@ -1618,7 +1628,7 @@ async function workflowShow() {
     wf.appendChild(b);
   }
 }
-if (matchMedia('(max-width: 600px)').matches) { $('chat-sec').classList.add('folded'); $('chat-fold').textContent = '▴'; }
+if (sel && matchMedia('(max-width: 600px)').matches) { $('chat-sec').classList.add('folded'); $('chat-fold').textContent = '▴'; }
 
 /* plate, orientation, copies, advanced settings */
 let rotation = [0, 0, 0];
