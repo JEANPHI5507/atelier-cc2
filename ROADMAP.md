@@ -112,7 +112,7 @@
 | **R3.4** | 4E2 **Partage de Profils** | Exporter/importer les profils (couleurs, découpe) en JSON. | ⭐⭐ | 53D4CA **À faire** | [#18](https://github.com/JEANPHI5507/atelier-cc2/issues/18) | - | - |
 | **R3.5** | 4A7 **Support PrusaSlicer/Bambu Studio** | Alternative à OrcaSlicer pour plus de flexibilité. | ⭐⭐⭐⭐ | 53D4CA **À faire** | [#19](https://github.com/JEANPHI5507/atelier-cc2/issues/19) | - | - |
 | **R3.6** | 4DD **Journal des Maintenance** | Historique des actions de maintenance (nettoyage, calibration). | ⭐⭐ | 53D4CA **À faire** | [#20](https://github.com/JEANPHI5507/atelier-cc2/issues/20) | - | - |
-| **R3.7** | 4B8 **Vérification Niveau Filament** | Vérifier le niveau de filament avant de lancer une impression. | ⭐⭐ | 53D4CA **À faire** | [#21](https://github.com/JEANPHI5507/atelier-cc2/issues/21) | - | - |
+| **R3.7** | 🧵 **Vérification Niveau Filament** | Contrôle du stock rendu bloquant côté serveur (`POST /print/start` → 409 « stock insuffisant », `ignore_stock` pour passer outre), marge de sécurité « juste » (< 20 g ou < 10 %), nouveau calcul à chaque changement de bobine (`POST /print/stock`), case « Lancer quand même » ; le Workflow guidé passe par le dialogue de lancement. | ⭐⭐ | ✅ **Terminé** | [#21](https://github.com/JEANPHI5507/atelier-cc2/issues/21) | branche `ccr-258c821d-gx63ku` | 2026-11-27 |
 
 **Livrables Phase 3 :**
 - [ ] Support multi-imprimantes

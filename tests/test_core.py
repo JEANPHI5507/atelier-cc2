@@ -5808,6 +5808,14 @@ def test_web_live_sim_more_endpoints(tmp_path, monkeypatch):
             )
             assert r.status_code == 200, r.text
             assert client.get("/lab/api/bobines/check/cube.stl").status_code == 200
+            # R3.7: a file that needs more than spool 1 holds is refused, unless started anyway
+            from elegoo_lab import stock
+
+            stock.record_slice("gros.gcode", [200.0])  # ≈ 596 g, 500 g left on spool 1
+            r = client.post("/lab/api/print/stock", json={"filename": "gros.gcode"}, headers=hdrs)
+            assert r.status_code == 200 and r.json()["manques"][0]["tray"] == 0, r.text
+            r = client.post("/lab/api/print/start", json={"filename": "gros.gcode"}, headers=hdrs)
+            assert r.status_code == 409 and "stock insuffisant" in r.json()["detail"], r.text
             r = client.post(
                 "/lab/api/print/start", json={"filename": "cube_20mm.gcode"}, headers=hdrs
             )
@@ -6260,3 +6268,44 @@ def test_design_maquette_all_tabs_assets():
     tab = (web / "tableau.html").read_text(encoding="utf-8")
     assert ".card:hover { transform: translateY(-3px)" in tab  # page tableau.html
     assert ".btn:hover:not(:disabled) { transform: translateY(-1px); }" in tab
+
+
+# --- R3.7 : vérification du niveau de filament avant impression ---
+
+
+def test_stock_margin_and_refusal(tmp_path, monkeypatch):
+    from elegoo_lab import stock
+
+    monkeypatch.setattr(config, "MODELS_DIR", tmp_path)
+    stock.set_tray(0, restant_g=100)
+    stock.set_tray(1, restant_g=500)
+    g10 = stock.grams(10.0)  # ≈ 30 g
+    stock.record_slice("ok.gcode", [10.0])  # 30 g of 100 g: plenty
+    stock.record_slice("juste.gcode", [31.0])  # ≈ 92 g of 100 g: under the 20 g margin
+    stock.record_slice("long.gcode", [0.0, 155.0])  # ≈ 462 g of 500 g: under 10 % of 462 g
+    stock.record_slice("vide.gcode", [40.0, 200.0])  # 119 g > 100 g and 596 g > 500 g
+    ok, juste, long, vide = (stock.check(f"{f}.gcode") for f in ("ok", "juste", "long", "vide"))
+    assert abs(ok["trays"][0]["g"] - g10) < 0.1
+    assert not ok["manques"] and not ok["justes"] and stock.refusal(ok) is None
+    assert [t["tray"] for t in juste["justes"]] == [0] and stock.refusal(juste) is None
+    assert [t["tray"] for t in long["justes"]] == [1]
+    assert [t["tray"] for t in vide["manques"]] == [0, 1] and not vide["justes"]
+    why = stock.refusal(vide)
+    assert why.startswith("stock insuffisant : bobine 1 : il faut 119 g") and "bobine 2" in why
+    # the spool actually chosen counts: the same file fed from the full tray is fine
+    assert stock.check("juste.gcode", {0: 1})["justes"] == []
+    assert stock.refusal(None) is None  # never sliced here: nothing to say
+
+
+def test_print_start_stock_gate_and_assets():
+    """The start dialog rechecks the stock when spools change and asks for « Lancer quand même »."""
+    web = Path(__file__).resolve().parents[1] / "src" / "elegoo_lab" / "web"
+    html = (web / "index.html").read_text(encoding="utf-8")
+    js = (web / "js" / "lab.js").read_text(encoding="utf-8")
+    assert 'id="ln-force-row"' in html and 'id="ln-force"' in html
+    assert "recheckStock()" in js and "'/print/stock'" in js and "ignore_stock" in js
+    # the guided workflow no longer posts /print/start behind the dialog's back
+    assert js.count("api('/print/start'") == 1
+    en = json.loads((web / "i18n" / "en.json").read_text(encoding="utf-8"))
+    assert en["exact"]["Lancer quand même"] == "Start anyway"
+    assert any(p[0].startswith("stock insuffisant") for p in en["patterns"])

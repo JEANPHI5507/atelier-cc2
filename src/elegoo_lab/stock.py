@@ -25,6 +25,9 @@ TRAYS = 4
 SPOOL_G = 1000.0
 PRICE_KG = 20.0  # € per kg until the user says otherwise
 LOW_G = 100.0  # below this a spool is "presque vide"
+# the stock is an estimate (typed spool weight minus sliced grams): under this margin a print is "juste"
+MARGIN_G = 20.0
+MARGIN_PART = 0.10
 DIAMETER = 1.75
 DENSITY = {
     "PLA": 1.24,
@@ -221,6 +224,7 @@ def usage(
         tray = data["trays"][str(i)]
         g = grams(m + p, tray["matiere"])
         eur = g / 1000 * tray["prix_kg"]
+        manque = g > tray["restant_g"]
         out.append(
             {
                 "tray": i,
@@ -228,7 +232,9 @@ def usage(
                 "purge_g": round(grams(p, tray["matiere"]), 1),
                 "eur": round(eur, 2),
                 "restant_g": round(tray["restant_g"]),
-                "manque": g > tray["restant_g"],
+                "manque": manque,
+                # enough on paper, but within the estimate's error: worth a look before a long print
+                "juste": not manque and tray["restant_g"] - g < max(MARGIN_G, g * MARGIN_PART),
             }
         )
         total_g, total_eur = total_g + g, total_eur + eur
@@ -272,7 +278,18 @@ def check(gcode_name: str, route: dict | None = None) -> dict[str, Any] | None:
         rec["per_m"], rec["purge_m"], {str(k): v for k, v in route.items()} if route else None
     )
     u["manques"] = [t for t in u["trays"] if t["manque"]]
+    u["justes"] = [t for t in u["trays"] if t["juste"]]
     return u
+
+
+def refusal(u: dict[str, Any] | None) -> str | None:
+    """Why a print should not start on this stock, in one sentence (None when every spool holds enough)."""
+    if not u or not u.get("manques"):
+        return None
+    return "stock insuffisant : " + " ; ".join(
+        f"bobine {t['tray'] + 1} : il faut {t['g']:.0f} g, il reste environ {t['restant_g']:.0f} g"
+        for t in u["manques"]
+    )
 
 
 def consume(gcode_name: str, fraction: float, ref: str) -> list[dict[str, Any]]:

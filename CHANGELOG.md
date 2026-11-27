@@ -17,7 +17,11 @@ Les versions suivent la [Semantic Versioning](https://semver.org/) : `MAJOR.MINO
 
 ## 🚀 [Unreleased]
 
+### 🐛 Corrigé
+- Le bouton « Lancer l'impression » du Workflow guidé envoyait l'ordre sans contrôle (plateau, bobines, stock, imprimante occupée) ni envoi du fichier : il ouvre maintenant le dialogue de lancement
+
 ### ✨ Ajouté
+- R3.7 : vérification du niveau de filament avant impression — `POST /print/start` refuse (409) un lancement si une bobine n'a pas assez de filament, sauf `ignore_stock` ; alerte « marge faible » (< 20 g ou < 10 %) ; `POST /lab/api/print/stock` refait le calcul quand on change de bobine ; case « Lancer quand même » dans le dialogue
 - Ajout des outils de linting : ruff, mypy, black, isort
 - Configuration CI/CD améliorée avec linting automatisé
 - Fichiers de configuration : `.ruff.toml`, `.mypy.ini`, `.pre-commit-config.yaml`

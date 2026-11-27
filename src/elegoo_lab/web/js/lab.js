@@ -1515,7 +1515,11 @@ async function workflowShow() {
     { id: 'tranche', label: 'Trancher pour la CC2',
       run: async () => { const r = await api(`/models/${name}/prepare-print`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }); return r.gcode && r.gcode[0] ? nice(r.gcode[0]) : 'tranché'; } },
     { id: 'lance', label: "Lancer l'impression sur la CC2",
-      run: async () => { if (!w.gcode) throw new Error("tranche d'abord"); await api('/print/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filename: w.gcode }) }); return "envoyé à l'imprimante"; } },
+      // through the start dialog like any other launch: plate check, spool map, stock, printer busy
+      run: () => { if (!w.gcode) throw new Error("tranche d'abord"); return new Promise((ok, no) => {
+        $('launch').addEventListener('close', () => setTimeout(() => no(new Error('lancement annulé')), 0), { once: true });
+        launchFile(w.gcode, { upload: true, onStarted: () => ok("envoyé à l'imprimante") })
+          .then(() => { if (!$('launch').open) no(new Error('lancement impossible')); }); }); } },
   ];
   const box = chatAdd('assistant', `<b>Workflow guidé : ${esc(nice(sel.name))}</b><div class="wf"></div>`);
   const wf = box.querySelector('.wf');
@@ -1759,7 +1763,8 @@ function sendBlock(name) {
 }
 function stockLines(u) {
   if (!u) return '';
-  return (u.manques || []).map(t => `<div class="warnline">⚠ Bobine ${t.tray + 1} : il faut ${fmtG(t.g)}, il reste environ ${fmtG(t.restant_g)} sur la bobine. Change-la ou corrige son poids (onglet Imprimante).</div>`).join('');
+  return (u.manques || []).map(t => `<div class="warnline">⚠ Bobine ${t.tray + 1} : il faut ${fmtG(t.g)}, il reste environ ${fmtG(t.restant_g)} sur la bobine. Change-la ou corrige son poids (onglet Imprimante).</div>`).join('')
+    + (u.justes || u.trays?.filter(t => t.juste) || []).map(t => `<p class="note" style="margin:4px 0 0;color:var(--warn)">Bobine ${t.tray + 1} : marge faible (il faut ${fmtG(t.g)}, il reste environ ${fmtG(t.restant_g)}). Le stock est une estimation : vérifie la bobine avant une longue impression.</p>`).join('');
 }
 /* start dialog: the CC2's own options and which CANVAS spool feeds each colour */
 let launchCtx = null;
@@ -1786,23 +1791,42 @@ async function launchFile(name, { upload, button, onStarted }) {
       return tr && tr.type && t.type && tr.type.toUpperCase() !== t.type.toUpperCase() ? `${cname(t.colour)} tranchée en ${t.type}, mais la bobine ${tr.pos + 1} est du ${tr.type} : la CC2 peut refuser, et l'impression serait ratée. Re-tranche avec la bonne matière ou change de bobine.` : null; }).filter(Boolean);
     $('ln-warn').innerHTML = [...bad, ...(plan.warnings || [])].map(w => `<div class="warnline">⚠ ${esc(w)}</div>`).join('');
   };
-  $('ln-map').querySelectorAll('[data-map]').forEach(el => el.onchange = () => { $('ln-map').querySelector(`[data-sw="${el.dataset.map}"]`).style.background = sw(+el.value); checkTypes(); });
+  $('ln-map').querySelectorAll('[data-map]').forEach(el => el.onchange = () => { $('ln-map').querySelector(`[data-sw="${el.dataset.map}"]`).style.background = sw(+el.value); checkTypes(); recheckStock(); });
   checkTypes();
-  const st = plan.stock;
-  $('ln-stock').innerHTML = st?.trays ? `<p class="note" style="margin:0">Filament : ${fmtG(st.g)} · ${euro(st.eur)}</p>` + stockLines(st) : '';
+  renderStock(plan.stock);
   const o = plan.options;
   $('ln-level').checked = o.bedlevel_force && !plan.tools.some(t => /TPU/i.test(t.type)); $('ln-check').checked = o.printer_check; $('ln-video').checked = o.delay_video;
   document.querySelectorAll('#ln-layout button').forEach(b => b.classList.toggle('on', b.dataset.layout === o.print_layout));
-  $('ln-remember').checked = false; $('ln-go').disabled = !ctx.control;
+  $('ln-remember').checked = false;
   // a print already running: the CC2 would refuse, so offer the queue instead
   const now = await fetch('/status').then(r => r.json()).catch(() => null), busy = !!now && BUSY.has(now.print_status ?? 0);
-  $('ln-busy').hidden = !busy; if (busy) $('ln-go').disabled = true;
+  $('ln-busy').hidden = !busy; launchCtx.busy = busy; launchGate();
   if (!busy && ctx.control) plateCheck();
   $('ln-queue').onclick = () => api('/queue', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) })
     .then(q => { $('launch').close(); toast(`Ajouté à la file (${q.length}) : il se lancera depuis l'onglet Imprimante, plateau vidé`, 'ok'); })
     .catch(e => toast(e.message, 'bad'));
   $('ln-more').open = false; launchSummary();
   $('launch').showModal();
+}
+/* the colour -> spool map as picked in the dialog (null: the printer's own order) */
+function launchSlotMap() {
+  const { plan } = launchCtx;
+  return plan.tools.length && plan.trays.length ? plan.tools.map((t, i) => ({ t: t.t, tray_id: +$('ln-map').querySelector(`[data-map="${i}"]`).value })) : null;
+}
+/* not enough filament on a spool: starting needs a deliberate "anyway" (the stock is an estimate, so not a hard no) */
+function renderStock(st) {
+  launchCtx.short = !!st?.manques?.length;
+  $('ln-stock').innerHTML = st?.trays ? `<p class="note" style="margin:0">Filament : ${fmtG(st.g)} · ${euro(st.eur)}</p>` + stockLines(st) : '';
+  $('ln-force-row').hidden = !launchCtx.short; if (!launchCtx.short) $('ln-force').checked = false;
+  launchGate();
+}
+function launchGate() { const c = launchCtx || {}; $('ln-go').disabled = !ctx.control || !!c.busy || (!!c.short && !$('ln-force').checked); }
+$('ln-force').addEventListener('change', launchGate);
+let stockSeq = 0;
+async function recheckStock() {
+  const seq = ++stockSeq, { name } = launchCtx;
+  const st = await api('/print/stock', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filename: name, slot_map: launchSlotMap() }) }).catch(() => null);
+  if (seq === stockSeq && st && launchCtx?.name === name) renderStock(st.known === false ? null : st);
 }
 /* folded options, said in one line */
 function launchSummary() {
@@ -1831,9 +1855,9 @@ function colourName(hex) {
   return 'Rose';
 }
 $('ln-go').onclick = async () => {
-  const { name, upload, button, plan } = launchCtx, go = $('ln-go');
-  const slot_map = plan.tools.length && plan.trays.length ? plan.tools.map((t, i) => ({ t: t.t, tray_id: +$('ln-map').querySelector(`[data-map="${i}"]`).value })) : null;
-  const body = { filename: name, slot_map, bedlevel_force: $('ln-level').checked, printer_check: $('ln-check').checked, delay_video: $('ln-video').checked,
+  const { name, upload, button } = launchCtx, go = $('ln-go');
+  const slot_map = launchSlotMap();
+  const body = { filename: name, slot_map, ignore_stock: $('ln-force').checked, bedlevel_force: $('ln-level').checked, printer_check: $('ln-check').checked, delay_video: $('ln-video').checked,
     print_layout: document.querySelector('#ln-layout button.on')?.dataset.layout || 'A', remember: $('ln-remember').checked };
   go.disabled = true; go.innerHTML = '<span class="spin"></span>' + (upload ? 'Envoi…' : 'Lancement…');
   if (button) button.disabled = true;
@@ -1849,7 +1873,7 @@ $('ln-go').onclick = async () => {
     $('launch').close(); toast('Impression lancée : suis-la dans l\'onglet Imprimante', 'ok');
     launchCtx.onStarted?.();
   } catch (e) { toast('Lancement impossible : ' + e.message, 'bad'); }
-  go.disabled = false; go.innerHTML = '<svg class="i"><use href="#i-play"/></svg>Lancer l\'impression';
+  launchGate(); go.innerHTML = '<svg class="i"><use href="#i-play"/></svg>Lancer l\'impression';
   if (button) button.disabled = false;
 };
 function bindSend() {

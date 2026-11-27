@@ -20,9 +20,9 @@
 | Métrique | Valeur | % Completion |
 |----------|--------|--------------|
 | **Tâches Totales** | 39 | - |
-| **Tâches Terminées** | 18 | 46% |
+| **Tâches Terminées** | 19 | 49% |
 | **Tâches en Cours** | 0 | 0% |
-| **Tâches à Faire** | 21 | 54% |
+| **Tâches à Faire** | 20 | 51% |
 | **Tâches Bloquées** | 0 | 0% |
 
 ### 📈 **Statistiques de Code**
@@ -41,7 +41,7 @@
 |-------|--------|-----------|----------|--------------|
 | **Phase 1: Stabilité & Portabilité** | 6 | 6 | 0 | **100%** ✅ |
 | **Phase 2: Expérience Utilisateur** | 13 | 12 | 0 | **92%** |
-| **Phase 3: Fonctionnalités Avancées** | 7 | 0 | 0 | 0% |
+| **Phase 3: Fonctionnalités Avancées** | 7 | 1 | 0 | 14% |
 | **Phase 4: Performance & Optimisation** | 6 | 0 | 0 | 0% |
 | **Phase 5: Intégrations & Écosystème** | 7 | 0 | 0 | 0% |
 
@@ -63,7 +63,7 @@
 | R1.5 | Documentation des limites CC2 | ✅ **Terminé** | Vibe Code | [#4](https://github.com/JEANPHI5507/atelier-cc2/pull/4) | 2026-11-23 | 2026-11-23 |
 | R1.6 | Gestion des erreurs caméra | ✅ **Terminé** | Vibe Code | [#7](https://github.com/JEANPHI5507/atelier-cc2/pull/7) | 2026-11-23 | 2026-11-23 |
 
-**Prochaine Tâche Prioritaire** : R3.7 (vérification du niveau de filament avant impression), puis R2.8 (accessibilité, en attente de décision) ; INF.2 Docker Hub attend les secrets DOCKER_HUB_*.
+**Prochaine Tâche Prioritaire** : valider R2.13 et R3.7 sur le vrai matériel, puis R2.8 (accessibilité, en attente de décision) ; INF.2 Docker Hub attend les secrets DOCKER_HUB_*.
 
 ---
 
@@ -115,6 +115,8 @@
 | INF.4–8 | Linting avancé ruff (S603/S607/BLE001/B905/TC003/RET502/503) — 0 erreur, codecov.yml (patch informationnel) | Vibe Code | 2026-11-23 | [#9](https://github.com/JEANPHI5507/atelier-cc2/pull/9) |
 | INF.3 (Phase 2) | Couverture 80 % atteinte : 81 % local non-slicing (158 tests), consolidé CI au-dessus — +2 bugs `cc2 doctor` corrigés (#14) | Vibe Code | 2026-11-23 | [#11](https://github.com/JEANPHI5507/atelier-cc2/pull/11), [#12](https://github.com/JEANPHI5507/atelier-cc2/pull/12), [#13](https://github.com/JEANPHI5507/atelier-cc2/pull/13), [#14](https://github.com/JEANPHI5507/atelier-cc2/pull/14), [#15](https://github.com/JEANPHI5507/atelier-cc2/pull/15) |
 | R2.1 | Mode Débutant : bascule Débutant/Avancé persistée (config.toml), options avancées masquées en CSS, endpoints /lab/api/mode, i18n EN | Vibe Code | 2026-11-23 | [#17](https://github.com/JEANPHI5507/atelier-cc2/pull/17) |
+| R2.13 | App unifiée : barre latérale + tableau de bord live par défaut | Vibe Code | 2026-11-27 | [#38](https://github.com/JEANPHI5507/atelier-cc2/pull/38) |
+| R3.7 | Vérification du filament avant impression : refus serveur si stock insuffisant (sauf « Lancer quand même »), marge « juste », nouveau calcul au changement de bobine, Workflow guidé via le dialogue | Vibe Code | 2026-11-27 | branche ccr-258c821d-gx63ku |
 
 ---
 
@@ -136,7 +138,7 @@
 
 ### 🔥 **Pour les Mainteneurs**
 1. **Valider R2.13 sur le vrai matériel** (téléphone, tablette murale, impression réelle)
-2. **R3.7** : vérification du niveau de filament avant impression
+2. **R3.7** : tester le blocage « stock insuffisant » sur une vraie bobine presque vide
 3. **Publier l'image Docker** sur Docker Hub (secrets DOCKER_HUB_* à configurer)
 
 ---
