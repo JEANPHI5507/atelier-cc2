@@ -998,6 +998,7 @@ document.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
 });
 function clearSelection() {
   sel = null; $('prep').hidden = $('ready').hidden = true; $('nosel').hidden = false; $('chips').innerHTML = '';
+  chatFree();
   if (current) dropCurrent(); hint('Choisis un modèle dans la bibliothèque', 'Glisser pour tourner · molette pour zoomer');
   document.querySelectorAll('#mnav button:not([data-m="lib"])').forEach(b => b.disabled = true); $('mnext').hidden = true; mview('lib');
 }
@@ -1039,6 +1040,7 @@ async function select(f) {
   $('c-note').textContent = 'Détection des couleurs…'; $('c-list').innerHTML = $('c-spools').innerHTML = '';
   needs = {}; stockLeft = {};
   $('chat-sec').hidden = false;
+  $('chat-in').placeholder = $('chat-in').dataset.ph || $('chat-in').placeholder;
   $('ia-note').hidden = true;
   if (chatSel !== f.name) { chatHist = []; $('chat-log').innerHTML = ''; chatConvNew(); $('chat-sug').hidden = false; }   // the conversation follows the model
   chatSel = f.name;
@@ -1472,9 +1474,17 @@ function chatAdd(role, html, small) {
   $('chat-log').appendChild(d); $('chat-log').scrollTop = 1e9;
   return d;
 }
+/* no model open: the assistant can still make one (made-to-measure parts, Blender) */
+function chatFree() {
+  $('chat-sec').hidden = false; $('chat-sug').hidden = true;
+  if (chatSel !== '') { chatHist = []; $('chat-log').innerHTML = ''; chatConvNew(); }
+  chatSel = '';
+  $('chat-in').placeholder = 'Décris la pièce à fabriquer : « une boîte de 100 × 60 mm avec couvercle »…';
+}
 async function chatSend() {
   const v = $('chat-in').value.trim();
-  if (!v || !sel || chatBusy) return;
+  if (!v || chatBusy) return;
+  const model = sel && sel.ext !== 'gcode' ? sel : null;
   chatBusy = true; $('chat-go').disabled = true; $('chat-in').value = '';
   $('chat-sug').hidden = true;   // one real turn: the ready-made ideas step aside
   chatAdd('user', esc(v) + (cible.pt ? ` <small>— zone (${cible.pt.join(', ')})</small>` : ''));
@@ -1482,10 +1492,10 @@ async function chatSend() {
   const step = chatAdd('activity', '');
   const done = [];
   try {
-    const rsp = await fetch('/lab/api' + `/models/${encodeURIComponent(sel.name)}/assistant/stream`, {
+    const rsp = await fetch('/lab/api' + (model ? `/models/${encodeURIComponent(model.name)}/assistant/stream` : '/assistant/stream'), {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: v, history: chatHist, conversation: chatConv,
-                             zone: cible.pt ? { point: cible.pt, rayon: +$('chat-zone-r').value || 10 } : undefined })
+                             zone: model && cible.pt ? { point: cible.pt, rayon: +$('chat-zone-r').value || 10 } : undefined })
     });
     if (!rsp.ok || !rsp.body) {
       let msg = `code ${rsp.status}`;
@@ -1509,7 +1519,7 @@ async function chatSend() {
         } else if (ev.type === 'cli') {
           step.innerHTML = `via l'agent CLI : <code>${esc(ev.cible)}</code>`;
         } else if (ev.type === 'recharge') {          // the agent exported its own work (Blender…)
-          step.innerHTML = `l'agent a exporté la pièce : <code>${esc(ev.fichier)}</code>`;
+          step.innerHTML = `l'agent a exporté la pièce : <code>${esc(ev.fichier)}</code>`; chatSel = ev.fichier;
           await loadFiles();
           const f = files.find(x => x.name === ev.fichier);
           if (f && f.ext !== 'gcode') await select(f);
@@ -1528,7 +1538,8 @@ async function chatSend() {
     wait.innerHTML = esc(r.reply || '…').replace(/\n/g, '<br>') + (r.outils?.length ? `<small>${r.outils.join(' · ')}</small>` : '');
     chatHist.push({ role: 'user', content: v }, { role: 'assistant', content: r.reply || '' });
     chatHist = chatHist.slice(-10);
-    if (r.file && (r.file !== sel.name || r.maj)) {            // a new model, or the same one changed under the page
+    if (r.file && (!model || r.file !== model.name || r.maj)) {            // a new model, or the same one changed under the page
+      chatSel = r.file;   // the conversation goes on with the file the assistant made
       await loadFiles();
       const f = files.find(x => x.name === r.file);
       if (f && !/\.gcode$/i.test(f.name)) select(f);
@@ -1540,6 +1551,8 @@ async function chatSend() {
   }
   chatBusy = false; $('chat-go').disabled = false;
 }
+$('chat-in').dataset.ph = $('chat-in').placeholder;
+if (!sel) chatFree();
 $('chat-go').onclick = chatSend;
 $('chat-in').onkeydown = e => { if (e.key === 'Enter') chatSend(); };
 /* folded by default on a phone, so the piece stays visible */

@@ -1278,6 +1278,8 @@ def test_the_assistant_runs_on_the_local_cli(web, monkeypatch):
     # round 2 resumes the CLI session instead of resending the whole fiche and history
     assert calls[1][calls[1].index("--resume") + 1] == "S1"
     assert "--system-prompt-file" not in calls[1]
+    # vibe refuses --thinking / --model on a resumed session ("only applies to a new session"): new runs only
+    assert "--thinking" in calls[0] and "--thinking" not in calls[1] and "--model" not in calls[1]
     # headless mode: the native tools are off (the workshop does the files itself), MCP (Blender…) stays approved
     off = {t: i for i, t in enumerate(calls[0])}
     assert "bash" in calls[0]
@@ -6936,3 +6938,369 @@ def test_assistant_catalogue_and_creer_piece_need_no_model():
         ({"piece": "boite", "valeurs": [1]}, "objet"),
     ):
         assert needle in assistant.run_tool("creer_piece", bad, "")["erreur"], bad
+
+
+def test_the_assistant_works_with_no_model_open_and_makes_one(web, monkeypatch):
+    """No model selected: the CLI brain is told so, makes a part (creer_piece) and the conversation then
+    follows the new file; a model tool asked before any file exists gets a clear error, not a crash.
+    """
+    from elegoo_lab import assistant
+
+    client, lib = web
+    monkeypatch.setattr(assistant, "moteur", lambda: "cli")
+    monkeypatch.setattr(assistant, "cli_bin", lambda: "/tmp/bin/vibe")
+    prompts: list[str] = []
+
+    def out(obj: dict):
+        class Ok:
+            returncode = 0
+            stderr = ""
+            stdout = json.dumps(
+                [
+                    {
+                        "sessionId": "S9",
+                        "role": "assistant",
+                        "type": "message",
+                        "content": [{"type": "text", "text": json.dumps(obj, ensure_ascii=False)}],
+                    }
+                ]
+            )
+
+        return Ok()
+
+    seq = [
+        out({"outil": "fiche"}),  # no model yet: must come back as an error
+        out(
+            {
+                "outils": [
+                    {
+                        "outil": "creer_piece",
+                        "arguments": {"piece": "boite", "valeurs": {"longueur": 100}},
+                    },
+                    {"outil": "fiche"},
+                ]
+            }
+        ),
+        out({"reponse": "Boîte créée."}),
+    ]
+
+    def fake_run(cmd, **kw):
+        prompts.append(cmd[cmd.index("-p") + 1])
+        return seq.pop(0)
+
+    monkeypatch.setattr(assistant.subprocess, "run", fake_run)
+    r = client.post("/lab/api/assistant", json={"message": "fais-moi une boîte de 100 mm"})
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["reply"] == "Boîte créée." and d["outils"] == ["fiche", "creer_piece", "fiche"]
+    assert d["file"].startswith("boite") and (lib / d["file"]).exists()
+    assert "Aucun modèle n'est ouvert" in prompts[0]
+    assert (
+        "aucun modèle ouvert" in prompts[1]
+    )  # the first fiche came back as an error the brain reads
+    assert d["file"] in prompts[2]  # after creer_piece, the fiche ran on the new box
+    assert assistant.run_tool("fiche", {}, "")["erreur"].startswith("aucun modèle ouvert")
+    # the same with the live journal: the turn runs with no model ("")
+    seen = {}
+
+    def fake_chat(name, message, history=None, conversation="", emit=None):
+        seen["name"] = name
+        emit({"type": "outil", "outil": "catalogue_pieces"})
+        return {"reply": "Bonjour !", "file": "", "outils": ["catalogue_pieces"]}
+
+    monkeypatch.setattr(assistant, "chat", fake_chat)
+    with client.stream("POST", "/lab/api/assistant/stream", json={"message": "salut"}) as st:
+        events = [json.loads(x[6:]) for x in st.iter_lines() if x.startswith("data: ")]
+    assert seen["name"] == "" and events[0] == {"type": "outil", "outil": "catalogue_pieces"}
+    assert events[-1]["type"] == "final" and events[-1]["reply"] == "Bonjour !"
+
+
+def test_assistant_understands_approximate_piece_keys_and_unknown_settings():
+    from elegoo_lab import assistant
+
+    assert assistant.resolve_piece("boite") == ("boite", "")
+    for asked, key in (
+        ("boite_couvercle", "boite"),
+        ("Boîte avec couvercle", "boite"),
+        ("engrenages", "engrenage"),
+        ("porte-clés", "porte_cles"),
+    ):
+        got, note = assistant.resolve_piece(asked)
+        assert got == key and asked in note, asked
+    with pytest.raises(ValueError, match="clés : boite"):
+        assistant.resolve_piece("xyz")
+    r = assistant.run_tool(
+        "creer_piece", {"piece": "boite_couvercle", "valeurs": {"longueur": 90}}, ""
+    )
+    assert (
+        r["fichier"].startswith("boite")
+        and "compris comme" in r["note"]
+        and r["objets"] == ["boite", "couvercle"]
+    )
+    assert "Ne la recrée pas" in r["c_est_fait"]
+    bad = assistant.run_tool("creer_piece", {"piece": "boite", "valeurs": {"diametre": 3}}, "")
+    assert "réglage(s) inconnu(s)" in bad["erreur"] and "longueur" in bad["erreur"]
+    named = assistant.run_tool("creer_piece", {"piece": "boite", "nom": "boite_80x50"}, "")
+    assert named["fichier"] == "boite_80x50.3mf"  # the key is not doubled
+    line = assistant.catalogue_line()
+    assert line.startswith("boite = Boîte avec couvercle (longueur") and "engrenage" in line
+
+
+def test_assistant_flags_file_names_it_made_up(tmp_path, monkeypatch):
+    from elegoo_lab import assistant, config
+
+    monkeypatch.setattr(config, "MODELS_DIR", tmp_path)
+    (tmp_path / "Cloud Strife (1).3mf").write_text("x")
+    (tmp_path / "cube.stl").write_text("x")
+    text = (
+        "J'ai créé « boite_80x50.stl » et `toto.3mf`. Le modèle cube.stl est là, ainsi que "
+        "« Cloud Strife (1).3mf » et Strife (1).3mf."
+    )
+    assert assistant.ghost_files(text) == ["boite_80x50.stl", "toto.3mf"]
+    assert assistant.ghost_files("rien à signaler") == []
+
+
+def test_assistant_checks_announced_files_once_then_warns(tmp_path, monkeypatch):
+    """The CLI brain claims a file it never wrote: one correction round, then a visible warning."""
+    from elegoo_lab import assistant, config
+
+    monkeypatch.setattr(config, "MODELS_DIR", tmp_path)
+    monkeypatch.setattr(assistant, "cli_bin", lambda: "/tmp/bin/vibe")
+    prompts = []
+
+    def out(text):
+        class Ok:
+            returncode = 0
+            stderr = ""
+            stdout = json.dumps(
+                [
+                    {
+                        "sessionId": "G1",
+                        "role": "assistant",
+                        "type": "message",
+                        "content": [{"type": "text", "text": text}],
+                    }
+                ]
+            )
+
+        return Ok()
+
+    seq = [
+        out(json.dumps({"reponse": "Fait : « boite_magique.stl » est prêt."})),
+        out(json.dumps({"reponse": "C'est fait, « boite_magique.stl » est dans la bibliothèque."})),
+    ]
+
+    def fake_run(cmd, **kw):
+        prompts.append(cmd[cmd.index("-p") + 1])
+        return seq.pop(0)
+
+    monkeypatch.setattr(assistant.subprocess, "run", fake_run)
+    r = assistant.chat_cli("", "fais une boîte", [], "c1")
+    assert "VÉRIFICATION DE L'ATELIER" in prompts[1] and "boite_magique.stl" in prompts[1]
+    assert "⚠ Vérification de l'atelier" in r["reply"] and "boite_magique.stl" in r["reply"]
+    assert len(prompts) == 2
+
+
+def test_ply_with_quads_and_ngons_is_read(tmp_path):
+    """Blender exports quads and n-gons unless told otherwise; trimesh's binary reader refuses them."""
+    import struct
+
+    import numpy as np
+
+    from elegoo_lab import mesh
+
+    cube = [
+        (0, 0, 0),
+        (10, 0, 0),
+        (10, 10, 0),
+        (0, 10, 0),
+        (0, 0, 10),
+        (10, 0, 10),
+        (10, 10, 10),
+        (0, 10, 10),
+    ]
+    quads = [(0, 3, 2, 1), (4, 5, 6, 7), (0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7)]
+    head = (
+        "ply\nformat binary_little_endian 1.0\nelement vertex 8\nproperty float x\nproperty float y\n"
+        "property float z\nelement face 6\nproperty list uchar uint vertex_indices\nproperty uchar red\n"
+        "property uchar green\nproperty uchar blue\nend_header\n"
+    )
+    body = b"".join(struct.pack("<3f", *p) for p in cube)
+    body += b"".join(struct.pack("<B4I3B", 4, *q, 200, 10, 10) for q in quads)
+    (tmp_path / "b.ply").write_bytes(head.encode() + body)
+    m = mesh.load(tmp_path / "b.ply")
+    assert len(m.faces) == 12 and m.is_watertight and abs(m.volume - 1000) < 1e-6
+    assert tuple(m.visual.face_colors[0][:3]) == (200, 10, 10)
+    ascii_head = head.replace("binary_little_endian", "ascii")
+    text = "".join(f"{x} {y} {z}\n" for x, y, z in cube) + "".join(
+        f"4 {a} {b} {c} {d} 9 9 9\n" for a, b, c, d in quads
+    )
+    (tmp_path / "a.ply").write_text(ascii_head + text)
+    assert mesh.read_ply_polygons(tmp_path / "a.ply").is_watertight
+
+
+def test_profile_tools_make_closed_solids_and_say_if_they_stand(tmp_path, monkeypatch):
+    from elegoo_lab import assistant, config, mesh
+
+    monkeypatch.setattr(config, "MODELS_DIR", tmp_path)
+    stand = [
+        [0, 0],
+        [90, 0],
+        [90, 4],
+        [14, 4],
+        [14, 10],
+        [10, 10],
+        [10, 4],
+        [4, 4],
+        [60, 100],
+        [56, 102],
+        [0, 4],
+    ]
+    r = assistant.run_tool(
+        "extruder_profil", {"points": stand, "longueur": 80, "vue": "cote", "nom": "support"}, ""
+    )
+    assert (
+        r["fichier"] == "support.ply"
+        and r["tient_sur_le_plateau"]
+        and r["stabilite"]["tient_debout"]
+    )
+    m = mesh.load(tmp_path / "support.ply")
+    assert m.is_watertight and m.volume > 0 and len(m.split()) == 1
+    assert (
+        abs(m.extents[0] - 80) < 0.01
+        and abs(m.extents[2] - 102) < 0.01
+        and abs(m.bounds[0][2]) < 1e-6
+    )
+    assert assistant.check_export("support.ply") == []
+    plate = assistant.run_tool(
+        "extruder_profil",
+        {
+            "points": [[0, 0], [50, 0], [50, 30], [0, 30], [0, 0]],
+            "trous": [[[20, 10], [30, 10], [30, 20], [20, 20]]],
+            "longueur": 3,
+            "vue": "dessus",
+        },
+        "",
+    )
+    pm = mesh.load(tmp_path / plate["fichier"])
+    assert (
+        abs(pm.volume - (50 * 30 - 100) * 3) < 1 and abs(pm.extents[2] - 3) < 0.01
+    )  # the hole went through
+    vase = assistant.run_tool(
+        "tourner_profil",
+        {
+            "points": [
+                [0, 0],
+                [30, 0],
+                [30, 2],
+                [22, 60],
+                [25, 100],
+                [23, 100],
+                [20, 60],
+                [28, 2],
+                [0, 2],
+            ]
+        },
+        "",
+    )
+    vm = mesh.load(tmp_path / vase["fichier"])
+    assert vm.is_watertight and abs(vm.extents[0] - 60) < 0.5 and abs(vm.extents[2] - 100) < 0.01
+    tipping = assistant.run_tool(
+        "extruder_profil", {"points": [[0, 0], [10, 0], [80, 60], [70, 60]], "longueur": 10}, ""
+    )
+    assert not tipping["stabilite"]["tient_debout"]
+    assert any("bascule" in x for x in assistant.check_export(tipping["fichier"]))
+    for args, needle in (
+        ({"points": [[0, 0], [1, 1]], "longueur": 5}, "au moins 3"),
+        ({"points": [[0, 0], [10, 0], [10, 10]], "longueur": 0}, "longueur"),
+        ({"points": [[0, 0], [5, 5], [10, 10]], "longueur": 5}, "aucune surface"),
+        ({"points": [[0, 0], ["a", 0], [1, 1]], "longueur": 5}, "[u, v]"),
+    ):
+        assert needle in assistant.run_tool("extruder_profil", args, "")["erreur"], args
+    assert (
+        "négatif"
+        in assistant.run_tool("tourner_profil", {"points": [[-1, 0], [5, 0], [5, 5]]}, "")["erreur"]
+    )
+
+
+def test_check_export_finds_what_blender_gets_wrong(tmp_path, monkeypatch):
+    import numpy as np
+
+    from elegoo_lab import assistant, config
+
+    monkeypatch.setattr(config, "MODELS_DIR", tmp_path)
+    a = trimesh.creation.box((80, 40, 4))
+    a.apply_translation((0, 0, 2))
+    b = trimesh.creation.box((80, 4, 60))
+    b.apply_translation((0, 60, 30))  # a backrest standing apart from its base
+    trimesh.util.concatenate([a, b]).export(tmp_path / "deux.ply")
+    faults = assistant.check_export("deux.ply")
+    assert any("morceaux séparés" in x for x in faults)
+    inside_out = trimesh.creation.box((20, 20, 20))
+    inside_out.apply_translation((0, 0, 10))
+    inside_out.invert()
+    inside_out.export(tmp_path / "envers.stl")
+    assert any("retournées" in x for x in assistant.check_export("envers.stl"))
+    high = trimesh.creation.box((20, 20, 20))
+    high.apply_translation((0, 0, 15))
+    high.export(tmp_path / "haut.stl")
+    assert any("pas posée" in x for x in assistant.check_export("haut.stl"))
+    (tmp_path / "casse.ply").write_bytes(
+        b"ply\nformat binary_little_endian 1.0\nelement vertex 3\nend_header\n"
+    )
+    assert any("illisible" in x for x in assistant.check_export("casse.ply"))
+    assert assistant.check_export("notes.txt") == []
+    s = assistant.stability(trimesh.creation.box((20, 20, 20)))
+    assert s["tient_debout"] and np.isclose(s["marge_mm"], 10.0)
+
+
+def test_cli_brain_is_sent_back_to_fix_a_broken_export(tmp_path, monkeypatch):
+    """The brain exports a file in pieces: the workshop measures it, sends it back once with the faults,
+    the corrected export passes and the turn ends without a warning."""
+    from elegoo_lab import assistant, config
+
+    monkeypatch.setattr(config, "MODELS_DIR", tmp_path)
+    monkeypatch.setattr(assistant, "cli_bin", lambda: "/tmp/bin/vibe")
+    prompts = []
+
+    def out(text):
+        class Ok:
+            returncode = 0
+            stderr = ""
+            stdout = json.dumps(
+                [
+                    {
+                        "sessionId": "B1",
+                        "role": "assistant",
+                        "type": "message",
+                        "content": [{"type": "text", "text": text}],
+                    }
+                ]
+            )
+
+        return Ok()
+
+    def broken():
+        a = trimesh.creation.box((40, 40, 4))
+        a.apply_translation((0, 0, 2))
+        b = trimesh.creation.box((40, 4, 40))
+        b.apply_translation((0, 40, 20))
+        trimesh.util.concatenate([a, b]).export(tmp_path / "piece.ply")
+        return out(json.dumps({"reponse": "Exporté : « piece.ply », étanche et vérifié."}))
+
+    def fixed():
+        a = trimesh.creation.box((40, 40, 4))
+        a.apply_translation((0, 0, 2))
+        a.export(tmp_path / "piece.ply")
+        return out(json.dumps({"reponse": "Corrigé : « piece.ply » fusionné en un seul solide."}))
+
+    seq = [broken, fixed]
+
+    def fake_run(cmd, **kw):
+        prompts.append(cmd[cmd.index("-p") + 1])
+        return seq.pop(0)()
+
+    monkeypatch.setattr(assistant.subprocess, "run", fake_run)
+    r = assistant.chat_cli("", "modélise une pièce", [], "b1")
+    assert "CONTRÔLE DE L'ATELIER" in prompts[1] and "morceaux séparés" in prompts[1]
+    assert r["file"] == "piece.ply" and r["maj"] and "⚠" not in r["reply"]

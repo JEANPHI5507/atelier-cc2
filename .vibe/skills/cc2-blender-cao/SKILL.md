@@ -28,6 +28,13 @@ NE tire JAMAIS des sommets à la main pour effacer : remplis le creux avec UN vo
 - Formes libres : construis par extrusions, boules et soustractions (`bmesh`), pas par sculpt — le PLY doit rester étanche.
 - Travaille par étapes petites : après CHAQUE changement visible, exécute `bpy.ops.view3d.view_all` (contexte fenêtre via `bpy.context.window_manager.windows`) pour recentrer la vue — l'utilisateur te voit travailler — puis reviens : le journal de l'app montre chaque appel MCP.
 
+## 3 bis. Créer une pièce de zéro (aucun modèle à importer)
+
+- Pose la géométrie par le calcul, pas à l'œil : écris les coordonnées des points clés (charnière, appui, bord) avant de créer les objets, et vérifie-les par `get_scene_info` / bornes.
+- Chaque partie doit **pénétrer** sa voisine d'au moins 1 mm (pas seulement la toucher) : un dossier incliné commence DANS la base, un rebord est enfoncé dans la plaque. Deux objets qui se touchent sans se recouvrir donnent des arêtes partagées par 4 faces et des morceaux séparés.
+- Fusionne en UN seul objet par union booléenne (modificateur Boolean, opération UNION, solveur EXACT, appliqué), un objet à la fois, puis supprime les objets d'origine.
+- Rien sous Z = 0 : la pièce repose sur le plateau, sa plus grande face plane en bas.
+
 ## 4. Vérifier à l'œil
 
 - Après l'import et après chaque gros changement : `look` et JUGE d'après la capture, pas de ton imagination.
@@ -35,10 +42,38 @@ NE tire JAMAIS des sommets à la main pour effacer : remplis le creux avec UN vo
 
 ## 5. Export vers la bibliothèque — LE protocole
 
-- Export en PLY dans le dossier de la bibliothèque (le chemin est dans le message du début), posé à plat (Z min = 0 exactement), couleurs gardées.
-- APRÈS l'export : REIMPORT le fichier exporté, vérifie étanchéité (`mesh.is_watertight` ou équivalent bmesh) et lisibilité (au moins ~500 triangle pour une pièce réaliste), recentre la vue sur l'objet et fais un `look`.
-- Le résultat N'EST PAS BON → corrige et exporte de nouveau. Un export corrompu ou incomplet ne s'annonce JAMAIS.
-- Seulement s'il est bon : donne le nom du fichier exporté entre guillemets dans `reponse` — la vue 3D de l'application se recharge toute seule.
+L'atelier **remesure lui-même** chaque fichier que tu exportes (étanchéité, arêtes, morceaux, taille, Z min) et te renvoie les défauts : annoncer « étanche, vérifié » sans l'avoir mesuré ne sert à rien.
+
+1. UN seul objet maillé sélectionné (les autres supprimés ou désélectionnés), modificateurs appliqués.
+2. Mesure dans Blender, en UN appel `execute_code`, et affiche seulement ces nombres :
+
+```python
+import bpy, bmesh
+o = bpy.context.active_object
+bm = bmesh.new(); bm.from_mesh(o.data); bm.transform(o.matrix_world)
+bad = sum(1 for e in bm.edges if not e.is_manifold)
+seen, parts = set(), 0
+for v in bm.verts:
+    if v.index in seen: continue
+    parts += 1; stack = [v]
+    while stack:
+        w = stack.pop()
+        if w.index in seen: continue
+        seen.add(w.index); stack += [e.other_vert(w) for e in w.link_edges]
+zs = [v.co.z for v in bm.verts]
+print("non_manifold", bad, "morceaux", parts, "zmin", round(min(zs), 3), "dims", [round(x, 1) for x in o.dimensions])
+```
+
+   Il faut `non_manifold 0`, `morceaux 1`, `zmin 0.0`, et des dimensions ≤ 256 mm. Sinon : corrige (union, pénétration, recalage en Z) et remesure.
+3. Export **triangulé** dans le dossier de la bibliothèque (chemin donné au début) :
+
+```python
+bpy.ops.wm.ply_export(filepath=CHEMIN, export_selected_objects=True, apply_modifiers=True,
+                      export_triangulated_mesh=True, export_colors='SRGB', ascii_format=False)
+```
+
+4. Recentre la vue sur l'objet et fais un `look`.
+5. Seulement si les nombres sont bons : donne le nom du fichier exporté entre guillemets dans `reponse` — la vue 3D de l'application se recharge toute seule. Si l'atelier te renvoie un CONTRÔLE avec des défauts, corrige-les et réexporte sous le même nom.
 
 ## Pièges connus
 

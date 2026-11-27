@@ -1331,6 +1331,39 @@ def lab_router(cfg: config.Config) -> APIRouter:
                 503, f"Mistral injoignable ({type(err).__name__}) : réessaie"
             ) from err
 
+    @r.post("/assistant")
+    async def assistant_free(body: AssistantIn) -> dict[str, Any]:
+        """The assistant with no model open: it can make one (made-to-measure parts, Blender)."""
+        try:
+            return await asyncio.to_thread(
+                assistant.chat, "", body.message[:2000], body.history, body.conversation
+            )
+        except ValueError as err:
+            raise HTTPException(422, str(err)) from err
+        except httpx.HTTPError as err:
+            raise HTTPException(
+                503, f"Mistral injoignable ({type(err).__name__}) : réessaie"
+            ) from err
+
+    @r.post("/assistant/stream")
+    async def assistant_free_stream(body: AssistantIn) -> StreamingResponse:
+        """The same, as a live journal (server-sent events)."""
+
+        def journal():
+            try:
+                for ev in assistant.chat_events(
+                    "", body.message[:2000], body.history, body.conversation
+                ):
+                    yield f"data: {json.dumps(ev, ensure_ascii=False)}\n\n"
+            except ValueError as err:
+                yield f"data: {json.dumps({'type': 'erreur', 'texte': str(err)}, ensure_ascii=False)}\n\n"
+
+        return StreamingResponse(
+            journal(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
     @r.post("/models/{name}/assistant/stream")
     async def assistant_stream(
         name: str, body: AssistantIn, _request: Request

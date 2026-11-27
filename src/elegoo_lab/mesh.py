@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, cast
 
+import numpy as np
 import trimesh
 
 if TYPE_CHECKING:
@@ -49,8 +50,102 @@ UNITLESS_EXT = {".glb", ".gltf", ".obj", ".ply"}  # never STL/3MF: those come fr
 DEFAULT_AI_HEIGHT_MM = 60.0
 
 
+_PLY_TYPES = {
+    "char": "i1", "int8": "i1", "uchar": "u1", "uint8": "u1",
+    "short": "i2", "int16": "i2", "ushort": "u2", "uint16": "u2",
+    "int": "i4", "int32": "i4", "uint": "u4", "uint32": "u4",
+    "float": "f4", "float32": "f4", "double": "f8", "float64": "f8",
+}  # fmt: skip
+
+
+def read_ply_polygons(path: Path) -> trimesh.Trimesh:
+    """A PLY whose faces are not all triangles (Blender exports quads and n-gons unless told otherwise),
+    which trimesh's binary reader refuses: faces split into triangle fans, face/vertex colours kept.
+    """
+    raw = path.read_bytes()
+    end = raw.index(b"end_header") + len(b"end_header")
+    end = raw.index(b"\n", end) + 1
+    lines = raw[:end].decode("ascii", "replace").splitlines()
+    fmt = next(ln.split()[1] for ln in lines if ln.startswith("format"))
+    elements: list[tuple[str, int, list[tuple]]] = []
+    for ln in lines:
+        w = ln.split()
+        if w and w[0] == "element":
+            elements.append((w[1], int(w[2]), []))
+        elif w and w[0] == "property" and elements:
+            prop = ("list", w[2], w[3], w[4]) if w[1] == "list" else ("one", w[1], w[2])
+            elements[-1][2].append(prop)
+    order = "<" if fmt == "binary_little_endian" else ">"
+    body, pos = raw[end:], 0
+    tokens = body.split() if fmt == "ascii" else []
+    tk = 0
+    data: dict[str, dict[str, Any]] = {}
+    for name, count, props in elements:
+        cols: dict[str, Any] = {p[-1]: [] for p in props}
+        if fmt != "ascii" and all(p[0] == "one" for p in props):
+            dt = np.dtype([(p[2], order + _PLY_TYPES[p[1]]) for p in props])
+            arr = np.frombuffer(body, dt, count, pos)
+            pos += dt.itemsize * count
+            data[name] = {p[2]: arr[p[2]] for p in props}
+            continue
+        for _ in range(count):
+            for p in props:
+                if fmt == "ascii":
+                    if p[0] == "one":
+                        cols[p[2]].append(float(tokens[tk]))
+                        tk += 1
+                    else:
+                        n = int(tokens[tk])
+                        cols[p[3]].append([int(t) for t in tokens[tk + 1 : tk + 1 + n]])
+                        tk += 1 + n
+                    continue
+                if p[0] == "one":
+                    t = np.dtype(order + _PLY_TYPES[p[1]])
+                    cols[p[2]].append(np.frombuffer(body, t, 1, pos)[0])
+                    pos += t.itemsize
+                else:
+                    ct, it = np.dtype(order + _PLY_TYPES[p[1]]), np.dtype(order + _PLY_TYPES[p[2]])
+                    n = int(np.frombuffer(body, ct, 1, pos)[0])
+                    pos += ct.itemsize
+                    cols[p[3]].append(np.frombuffer(body, it, n, pos).tolist())
+                    pos += it.itemsize * n
+        data[name] = cols
+    vx = data["vertex"]
+    v = np.c_[np.asarray(vx["x"], float), np.asarray(vx["y"], float), np.asarray(vx["z"], float)]
+    fx = data.get("face", {})
+    polys = fx.get("vertex_indices") or fx.get("vertex_index") or []
+    tris, owner = [], []
+    for i, poly in enumerate(polys):
+        for k in range(1, len(poly) - 1):  # fan: fine for the convex faces CAD exports
+            tris.append((poly[0], poly[k], poly[k + 1]))
+            owner.append(i)
+    if not tris:
+        raise ValueError(f"{path.name}: no triangle mesh found")
+    kw: dict[str, Any] = {}
+    if all(c in fx for c in ("red", "green", "blue")):
+        rgb = np.c_[[np.asarray(fx[c], float)[owner] for c in ("red", "green", "blue")]].T
+        kw["face_colors"] = np.c_[rgb, np.full(len(rgb), 255)].astype(np.uint8)
+    elif all(c in vx for c in ("red", "green", "blue")):
+        rgb = np.c_[[np.asarray(vx[c], float) for c in ("red", "green", "blue")]].T
+        kw["vertex_colors"] = np.c_[rgb, np.full(len(rgb), 255)].astype(np.uint8)
+    return trimesh.Trimesh(v, np.asarray(tris, np.int64), **kw)
+
+
 def load(path: Path) -> trimesh.Trimesh:
-    scene = trimesh.load(path, force="mesh")
+    try:
+        scene = trimesh.load(path, force="mesh")
+    except (
+        ValueError,
+        IndexError,
+        KeyError,
+        UnboundLocalError,
+    ) as err:  # trimesh's PLY reader on odd files
+        if path.suffix.lower() != ".ply":
+            raise
+        try:
+            scene = read_ply_polygons(path)  # quads / n-gons from Blender
+        except (ValueError, IndexError, KeyError, StopIteration) as again:
+            raise ValueError(f"{path.name}: PLY illisible ({again or err})") from again
     if not isinstance(scene, trimesh.Trimesh) or len(scene.faces) == 0:
         raise ValueError(f"{path.name}: no triangle mesh found")
     return scene
