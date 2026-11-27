@@ -7,12 +7,27 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 import trimesh
 
-from . import colorize, colors, config, couches, cut, library, mesh, settings, slicer, thumbnail
+from . import (
+    colorize,
+    colors,
+    config,
+    couches,
+    cut,
+    library,
+    mesh,
+    orient,
+    settings,
+    slicer,
+    thumbnail,
+)
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 SLICEABLE_AS_IS = {".stl", ".obj"}
 
@@ -57,6 +72,16 @@ def bled_purge(src: Path) -> bool:
     return bool(BLED & set(r.get("issues", [])))
 
 
+VIVID = [
+    (66.0, 133, 244),
+    (52, 168, 83),
+    (251, 188, 5),
+    (171, 71, 188),
+    (255, 112, 67),
+    (0, 172, 193),
+    (141, 110, 99),
+    (120, 144, 156),
+]
 SMALL_PIECE_MM = 40.0  # cut pieces up to this size share the dowels' plate
 
 # What the part is for decides where the plastic goes. Measured on the CC2 profile (95 mm figurine,
@@ -205,6 +230,8 @@ def prepare_and_slice(
     scales: dict[int, float] | None = None,
     shift: tuple[float, float] | None = None,
     screen_thumbnail: bool = True,
+    forbidden: Sequence[cut.Zone] = (),
+    auto_pose: bool = False,
 ) -> dict[str, Any]:
     """``mapping``: source colour index -> slot (1..4); colours not listed keep the suggested slot.
     ``palette``: the loaded spools' colours (slot 1 first): the model is repainted with them first.
@@ -301,6 +328,8 @@ def prepare_and_slice(
             rotate=rotate,
             palette=palette,
             smart_flush=flush,
+            forbidden=forbidden,
+            auto_pose=auto_pose,
         )
 
     target, slot_hex = src, None
@@ -550,6 +579,8 @@ def _split_and_slice(
     rotate: tuple[float, ...] | None = None,
     palette: colors.Palette | None = None,
     smart_flush: bool | None = None,
+    forbidden: Sequence[cut.Zone] = (),
+    auto_pose: bool = False,
 ) -> dict[str, Any]:
     """Cut a too-big model into pieces with dowel holes; one G-code per piece plus one for the dowels."""
     if smart_flush is None:
@@ -558,7 +589,7 @@ def _split_and_slice(
         src, slots, height_mm=height_mm, rotate=rotate, palette=palette
     )
     slot_hex = _real_colours(slot_hex, slot_colours, len(slot_hex))
-    res = cut.cut(v, f, face_slots, name=src.stem)
+    res = cut.cut(v, f, face_slots, name=src.stem, forbidden=forbidden)
     n = len(slot_hex)
     layer_level = _layer_mode(advanced, usage)
     sup_on, sup_ov = support_overrides(supports, plate_only)
@@ -569,6 +600,12 @@ def _split_and_slice(
         p
     ) in res.pieces:  # tiny pieces (spike tips…) go on the dowels' plate instead of a print each
         verts, laid = cut.rest_flat(p.vertices, p.faces)
+        if (
+            auto_pose
+        ):  # the best of the six positions (fewest overhangs, firm footing) that fits the plate
+            posed = orient.best_pose(p.vertices, p.faces, mesh.BED_MM - cut.MARGIN_MM)
+            if posed is not None:
+                verts, laid = posed["vertices"], posed["id"] != "debout"
         (small if np.ptp(verts, axis=0).max() <= SMALL_PIECE_MM else big).append((p, verts, laid))
     for p, verts, laid in big:
         target = out_dir / f"{p.name}.3mf"
@@ -669,6 +706,8 @@ def _split_and_slice(
         "pins": pins,
         "planes": [{"axis": "XYZ"[a], "mm": round(float(pos), 1)} for a, pos in res.planes],
         "total_m": round(total, 2),
+        "alerts": res.alerts,
+        "pin_count": res.pin_count,
         "warnings": warnings
         + [
             f"Découpé en {len(pieces) + len(small)} pièces"
@@ -692,14 +731,19 @@ def cut_preview(
     mapping: dict[int, int] | None = None,
     height_mm: float | None = None,
     palette: colors.Palette | None = None,
+    forbidden: Sequence[cut.Zone] = (),
+    explode: float = 0.3,
+    show_planes: bool = False,
+    distinct: bool = False,
 ) -> tuple[dict[str, Any], trimesh.Trimesh]:
-    """Where the model would be cut, plus an exploded, tinted view of the pieces (Y-up for the viewer)."""
+    """Where the model would be cut, plus a tinted view of the pieces, pushed apart by ``explode``
+    (Y-up for the viewer). ``show_planes`` adds a translucent disc-like quad on every cut plane."""
     info = colors.analyze(src, palette)
     slots = {c["index"]: (mapping or {}).get(c["index"], c["slot"]) for c in info["colours"]}
     if not height_mm and mesh.info(src).get("unitless"):
         height_mm = mesh.DEFAULT_AI_HEIGHT_MM
     v, f, face_slots, slot_hex = colors.solid(src, slots, height_mm=height_mm, palette=palette)
-    res = cut.cut(v, f, face_slots, name=src.stem)
+    res = cut.cut(v, f, face_slots, name=src.stem, forbidden=forbidden)
     rgb = {i + 1: colors._rgb(h) for i, h in enumerate(slot_hex)}
     tints = [
         np.array(t)
@@ -714,16 +758,42 @@ def cut_preview(
     centre = v.mean(axis=0)
     vs, fs, cs, off = [], [], [], 0
     for i, p in enumerate(res.pieces):
-        shift = (p.vertices.mean(axis=0) - centre) * 0.3  # explode outwards
+        shift = (p.vertices.mean(axis=0) - centre) * explode  # explode outwards
         vs.append(p.vertices + shift)
         fs.append(p.faces + off)
         off += len(p.vertices)
         base = np.array([rgb.get(int(s), np.array([200.0, 200, 200])) for s in p.slots])
-        cs.append(np.clip(base * tints[i % len(tints)], 0, 255))
-    allv = np.vstack(vs)
-    allv = np.c_[allv[:, 0], allv[:, 2], -allv[:, 1]]  # Z-up -> Y-up
+        if distinct:  # one clear colour per piece, to see how the model is divided
+            base = np.tile(VIVID[i % len(VIVID)], (len(p.faces), 1))
+        cs.append(np.clip(base * tints[i % len(tints)] if not distinct else base, 0, 255))
     rgba = np.c_[np.vstack(cs), np.full(off and sum(len(x) for x in fs), 255)].astype(np.uint8)
-    view = trimesh.Trimesh(allv, np.vstack(fs), face_colors=rgba, process=False)
+    allf = np.vstack(fs)
+    allv = np.vstack(vs)
+    if (
+        show_planes and res.planes
+    ):  # one translucent red quad per plane, a little larger than the model
+        lo, hi = v.min(axis=0), v.max(axis=0)
+        for axis, pos in res.planes:
+            a, b = [k for k in range(3) if k != axis]
+            quad = np.zeros((4, 3))
+            quad[:, axis] = pos
+            corners = ((lo[a], lo[b]), (hi[a], lo[b]), (hi[a], hi[b]), (lo[a], hi[b]))
+            for i, (ca, cb) in enumerate(corners):
+                quad[i, a] = ca - 5 if ca == lo[a] else ca + 5
+                quad[i, b] = cb - 5 if cb == lo[b] else cb + 5
+            allf = np.vstack(
+                [
+                    allf,
+                    [
+                        [len(allv), len(allv) + 1, len(allv) + 2],
+                        [len(allv), len(allv) + 2, len(allv) + 3],
+                    ],
+                ]
+            )
+            allv = np.vstack([allv, quad])
+            rgba = np.vstack([rgba, np.tile([229, 57, 53, 90], (2, 1)).astype(np.uint8)])
+    allv = np.c_[allv[:, 0], allv[:, 2], -allv[:, 1]]  # Z-up -> Y-up
+    view = trimesh.Trimesh(allv, allf, face_colors=rgba, process=False)
     summary = {
         "planes": [{"axis": "XYZ"[a], "mm": round(float(pos), 1)} for a, pos in res.planes],
         "pieces": [
@@ -731,6 +801,7 @@ def cut_preview(
             for p in res.pieces
         ],
         "pins": res.pin_count,
+        "alerts": res.alerts,
     }
     return summary, view
 

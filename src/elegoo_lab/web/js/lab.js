@@ -1188,6 +1188,55 @@ async function showCut() {
 }
 $('height').oninput = sizeNote; $('split').onchange = sizeNote;
 
+/* large format: the plan is seen (coloured pieces, cut planes) before anything is sliced */
+let gfKey = '';
+function gfArgs() {
+  const h = +$('gf-height').value;
+  if (!h) throw new Error('indique la hauteur finale voulue');
+  const zones = $('gf-zones').value.split(',').map(t => t.trim()).filter(Boolean).map(t => {
+    const m = t.match(/^(\d+(?:[.,]\d+)?)\s*[-–]\s*(\d+(?:[.,]\d+)?)$/);
+    if (!m) throw new Error(`zone illisible : « ${t} » (écris de-à en mm, ex. 150-190)`);
+    return { axe: 'Z', de: +m[1].replace(',', '.'), a: +m[2].replace(',', '.') };
+  });
+  return { hauteur: h, interdites: zones };
+}
+const gfStale = () => { gfKey = ''; $('gf-slice').disabled = true; };
+['gf-height', 'gf-zones'].forEach(id => $(id).addEventListener('input', gfStale));
+$('gf-preview').onclick = async () => {
+  const f = sel, out = $('gf-out');
+  if (!f) return;
+  try {
+    const a = gfArgs(), q = `hauteur=${a.hauteur}&interdites=${encodeURIComponent(JSON.stringify(a.interdites))}`;
+    out.textContent = 'calcul de la découpe…';
+    const p = await api(`/models/${encodeURIComponent(f.name)}/grand-format?${q}`);
+    if (sel !== f) return;
+    out.innerHTML = `<b>${p.pieces.length} pièce${p.pieces.length > 1 ? 's' : ''}</b> pour ${sizeTxt(p.taille_mm)}, ${p.chevilles} cheville${p.chevilles > 1 ? 's' : ''}`
+      + (p.plans.length ? ` · coupes : ${p.plans.map(x => `${x.axe} = ${x.mm} mm`).join(', ')}` : '')
+      + `<ul>${p.pieces.map(x => `<li>${esc(x.nom)} : ${sizeTxt(x.taille_mm)}${x.pose ? ` · ${esc(x.pose)}` : ''}</li>`).join('')}</ul>`
+      + p.alertes.map(x => `<p class="w ${x.bloquante ? 'bad' : 'warn'}">${esc(x.message)}</p>`).join('');
+    gfKey = q; $('gf-slice').disabled = !p.ok;
+    if (!renderer) return;
+    const g = await new GLTFLoader().loadAsync(`/lab/api/models/${encodeURIComponent(f.name)}/grand-format.glb?${q}`);
+    if (gfKey !== q) return;
+    g.scene.traverse(o => { if (o.isMesh) { o.geometry.computeVertexNormals(); o.material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .55, transparent: true }); } });
+    g.scene.rotation.x = Math.PI / 2; previewKey = 'gf';
+    dropCurrent(); show(g.scene); frame(g.scene);
+  } catch (e) { gfStale(); out.textContent = 'Aperçu impossible : ' + e.message; }
+};
+$('gf-slice').onclick = async () => {
+  const f = sel, btn = $('gf-slice'), out = $('gf-out');
+  if (!f || !gfKey) return;
+  btn.disabled = true; out.textContent = 'tranchage de toutes les pièces… (peut durer plusieurs minutes)';
+  try {
+    const r = await api(`/models/${encodeURIComponent(f.name)}/grand-format/trancher`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...gfArgs(), usage: printUsage === 'profil' ? 'decoratif' : printUsage, supports: $('supports').value === 'aucun' ? false : $('supports').value }) });
+    const b = r.bilan;
+    out.innerHTML = `<b>Bilan</b> : ${b.pieces} pièce${b.pieces > 1 ? 's' : ''} · ${esc(b.duree)} · ${b.filament_g} g · ${b.cout_eur} € · ${b.chevilles} cheville${b.chevilles > 1 ? 's' : ''} à coller`
+      + (r.alertes.length ? `<ul>${r.alertes.map(x => `<li>${esc(x.message)}</li>`).join('')}</ul>` : '');
+    toast('Grand format tranché', 'ok'); loadFiles();
+  } catch (e) { out.textContent = 'Tranchage impossible : ' + e.message; }
+  finally { btn.disabled = !gfKey; }
+};
+
 /* print advisor */
 let adviceTimer = 0, adviceSeq = 0;
 function scheduleAdvice() { clearTimeout(adviceTimer); adviceTimer = setTimeout(loadAdvice, 600); }

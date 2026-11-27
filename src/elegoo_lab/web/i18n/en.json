@@ -1449,7 +1449,16 @@
 "✓ Corrections appliquées (réglages avancés ouverts ci-dessous).": "✓ Fixes applied (advanced settings open below).",
 "✓ Plateau vide (vérifié à la caméra)": "✓ Plate empty (checked by the camera)",
 "✓ Plateau vide mémorisé : il sera vérifié avant chaque impression.": "✓ Empty plate remembered: it will be checked before each print.",
-"🎯 Workflow guidé": "🎯 Guided workflow"
+"🎯 Workflow guidé": "🎯 Guided workflow",
+"Grand format : hauteur finale, découpe et bilan": "Large format: final height, cutting and summary",
+"Hauteur finale voulue (mm, 20 à 1500)": "Wanted final height (mm, 20 to 1500)",
+"Zones où ne pas couper (hauteurs en mm, séparées par des virgules)": "Where not to cut (heights in mm, comma-separated)",
+"ex. 150-190, 230-260 (visage, mains)": "e.g. 150-190, 230-260 (face, hands)",
+"Voir l'aperçu": "See the preview",
+"Trancher toutes les pièces": "Slice all the pieces",
+"tranchage de toutes les pièces… (peut durer plusieurs minutes)": "slicing all the pieces… (can take several minutes)",
+"Grand format tranché": "Large format sliced",
+"indique la hauteur finale voulue": "enter the wanted final height"
 },
 "patterns": [
 [
@@ -2331,6 +2340,54 @@
 [
 "IA: {}",
 "AI: {}"
+],
+[
+"Aucune coupe discrète possible sur l'axe {} : coupe à intervalles réguliers.",
+"No discreet cut possible along axis {}: cutting at even intervals."
+],
+[
+"La coupe {} = {} mm traverse une zone interdite : aucune autre position ne convient.",
+"The {} = {} mm cut goes through a forbidden zone: no other position works."
+],
+[
+"Aucune cheville possible sur la coupe {} = {} mm (section trop fine) : les deux pièces seront à coller sans repère.",
+"No dowel possible on the {} = {} mm cut (section too thin): the two pieces will be glued without alignment."
+],
+[
+"{} cheville(s) ont une paroi de moins de {} mm autour du trou.",
+"{} dowel(s) have a wall thinner than {} mm around the hole."
+],
+[
+"{} ({}) ne tient pas sur le plateau, même posée à plat.",
+"{} ({}) does not fit on the plate, even laid flat."
+],
+[
+"{} est très petite ({}) : imprimée avec les chevilles, à coller.",
+"{} is very small ({}): printed with the dowels, to be glued."
+],
+[
+"{} ne tient dans aucune des six poses.",
+"{} fits in none of the six positions."
+],
+[
+"hauteur finale entre {} et {} mm (reçu {})",
+"final height between {} and {} mm (got {})"
+],
+[
+"plan à corriger avant de trancher : {}",
+"plan to fix before slicing: {}"
+],
+[
+"zone illisible : « {} » (écris de-à en mm, ex. 150-190)",
+"unreadable zone: “{}” (write from-to in mm, e.g. 150-190)"
+],
+[
+"Aperçu impossible : {}",
+"Preview impossible: {}"
+],
+[
+"Tranchage impossible : {}",
+"Slicing impossible: {}"
 ],
 [
 "{} : {}",

@@ -203,6 +203,15 @@ class BackupAutoIn(BaseModel):
     vers: str | None = None
 
 
+class GrandFormatIn(BaseModel):
+    hauteur: float
+    interdites: list[dict[str, Any]] = []  # zones where no cut may pass (grandformat.parse_zones)
+    usage: str = "decoratif"
+    supports: bool | str = False
+    quality: str = slicer.DEFAULT_QUALITY
+    infill: int | None = None
+
+
 class PrepareIn(BaseModel):
     mapping: dict[int, int] = {}  # source colour index -> CANVAS slot (1..4)
     filaments: list[str] = ["PLA"]  # filament per slot
@@ -939,6 +948,63 @@ def lab_router(cfg: config.Config) -> APIRouter:
         try:
             return (await asyncio.to_thread(_cut, name, height, map, pal))[0]
         except ValueError as err:
+            raise HTTPException(422, str(err)) from err
+
+    def _zones_arg(interdites: str | None) -> list[dict[str, Any]]:
+        try:
+            z = json.loads(interdites) if interdites else []
+        except ValueError as err:
+            raise HTTPException(422, "interdites : JSON illisible") from err
+        if not isinstance(z, list):
+            raise HTTPException(422, "interdites : une liste de zones")
+        return z
+
+    @r.get("/models/{name}/grand-format")
+    async def grand_format_plan(
+        name: str, hauteur: float, interdites: str | None = None
+    ) -> dict[str, Any]:
+        """Large format, step 1: pieces, cut planes, positions and alerts for this final height."""
+        from . import grandformat
+
+        try:
+            return await asyncio.to_thread(
+                grandformat.plan, _model_path(name), hauteur, _zones_arg(interdites)
+            )
+        except ValueError as err:
+            raise HTTPException(422, str(err)) from err
+
+    @r.get("/models/{name}/grand-format.glb")
+    async def grand_format_glb(
+        name: str, hauteur: float, interdites: str | None = None
+    ) -> Response:
+        """The same plan as a 3D view: one colour per piece, a translucent quad on each cut plane."""
+        from . import grandformat
+
+        try:
+            _, glb = await asyncio.to_thread(
+                grandformat.preview, _model_path(name), hauteur, _zones_arg(interdites)
+            )
+        except ValueError as err:
+            raise HTTPException(422, str(err)) from err
+        return Response(glb, media_type="model/gltf-binary")
+
+    @r.post("/models/{name}/grand-format/trancher")
+    async def grand_format_slice(name: str, body: GrandFormatIn) -> dict[str, Any]:
+        """Large format, step 2 (after the plan was seen): slice every piece, return the balance."""
+        from . import grandformat
+
+        try:
+            return await asyncio.to_thread(
+                grandformat.executer,
+                _model_path(name),
+                body.hauteur,
+                body.interdites,
+                usage=body.usage,
+                supports=body.supports,
+                quality=body.quality,
+                infill=body.infill,
+            )
+        except (ValueError, slicer.SliceError) as err:
             raise HTTPException(422, str(err)) from err
 
     orient_cache: dict[tuple, list[dict[str, Any]]] = {}

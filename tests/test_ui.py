@@ -863,3 +863,35 @@ def test_all_tabs_premium_design(page, site):
     page.click("#t-gal")
     page.wait_for_selector("#gal:not([hidden])")
     assert page.errors == []
+
+
+def test_large_format_needs_the_preview_before_slicing(page, site):
+    """Grand format: the slice button stays locked until the plan was seen, and a plan with a blocking alert keeps it locked."""
+    body = trimesh.creation.box((80, 80, 180))
+    body.apply_translation((0, 0, 90))
+    neck = trimesh.creation.cylinder(radius=10, height=30, sections=48)
+    neck.apply_translation((0, 0, 195))
+    head = trimesh.creation.box((70, 70, 90))
+    head.apply_translation((0, 0, 255))
+    trimesh.boolean.union([body, neck, head], engine="manifold").export(site["lib"] / "figure.stl")
+    page.reload()
+    page.wait_for_selector("#files .file[data-n='figure.stl']")
+    page.click("#files .file[data-n='figure.stl']")
+    page.click("#gf summary")
+    assert page.is_disabled("#gf-slice")
+    page.click("#gf-preview")  # no height yet
+    page.wait_for_selector("#gf-out:has-text('indique la hauteur finale')")
+    page.fill("#gf-height", "300")
+    page.click("#gf-preview")
+    page.wait_for_selector("#gf-out:has-text('2 pièces')", timeout=60000)
+    assert page.is_enabled("#gf-slice")
+    page.fill("#gf-height", "310")  # the plan seen is no longer this one
+    assert page.is_disabled("#gf-slice")
+    page.fill("#gf-zones", "0-300")  # no place left to cut
+    page.click("#gf-preview")
+    page.wait_for_selector("#gf-out:has-text('zone interdite')", timeout=60000)
+    assert page.is_disabled("#gf-slice")
+    page.fill("#gf-zones", "n'importe quoi")
+    page.click("#gf-preview")
+    page.wait_for_selector("#gf-out:has-text('zone illisible')")
+    assert page.errors == []
