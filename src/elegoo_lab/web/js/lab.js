@@ -1168,6 +1168,7 @@ function sizeNote() {
   $('split-note').innerHTML = n < 2 ? '' : `${sizeTxt(dims)} : plus grand que le plateau → <b>environ ${n} pièces</b>${$('split').checked ? ' · <a href="#" id="see-cut">voir la découpe</a>' : ' (découpe désactivée : le tranchage sera refusé)'}.`;
   const link = $('see-cut'); if (link) link.onclick = ev => { ev.preventDefault(); showCut(); };
 }
+const planTxt = p => `${p.axis} = ${p.mm} mm${p.angle ? ` (∠${p.angle > 0 ? '+' : ''}${p.angle}° → ${p.toward})` : ''}`;
 async function showCut() {
   if (!sel) return;
   const q = `height=${+$('height').value || ''}&map=${encodeURIComponent(mapString())}&pal=${encodeURIComponent(palString())}`, f = sel;
@@ -1175,7 +1176,7 @@ async function showCut() {
   try {
     const plan = await api(`/models/${encodeURIComponent(f.name)}/cut-plan?${q}`);
     if (sel !== f) return;
-    $('split-note').innerHTML = `Coupes aux endroits les plus fins : ${plan.planes.map(p => `${p.axis} = ${p.mm} mm`).join(', ')} → <b>${plan.pieces.length} pièces</b>, ${plan.pins} chevilles. `
+    $('split-note').innerHTML = `Coupes aux endroits les plus fins : ${plan.planes.map(planTxt).join(', ')} → <b>${plan.pieces.length} pièces</b>, ${plan.pins} chevilles. `
       + plan.pieces.map((p, i) => `Pièce ${i + 1} : ${sizeTxt(p.size_mm)}`).join(' · ') + ' · <a href="#" id="see-model">revoir le modèle</a>';
     $('see-model').onclick = ev => { ev.preventDefault(); previewKey = ''; preview(sel, mapString()); sizeNote(); };
     if (!renderer) return;
@@ -1198,21 +1199,22 @@ function gfArgs() {
     if (!m) throw new Error(`zone illisible : « ${t} » (écris de-à en mm, ex. 150-190)`);
     return { axe: 'Z', de: +m[1].replace(',', '.'), a: +m[2].replace(',', '.') };
   });
-  return { hauteur: h, interdites: zones };
+  return { hauteur: h, interdites: zones, biais: $('gf-biais').checked, vision: $('gf-vision').checked };
 }
 const gfStale = () => { gfKey = ''; $('gf-slice').disabled = true; };
-['gf-height', 'gf-zones'].forEach(id => $(id).addEventListener('input', gfStale));
+['gf-height', 'gf-zones', 'gf-biais', 'gf-vision'].forEach(id => $(id).addEventListener('input', gfStale));
 $('gf-preview').onclick = async () => {
   const f = sel, out = $('gf-out');
   if (!f) return;
   try {
-    const a = gfArgs(), q = `hauteur=${a.hauteur}&interdites=${encodeURIComponent(JSON.stringify(a.interdites))}`;
-    out.textContent = 'calcul de la découpe…';
+    const a = gfArgs(), q = `hauteur=${a.hauteur}&biais=${a.biais}&vision=${a.vision}&interdites=${encodeURIComponent(JSON.stringify(a.interdites))}`;
+    out.textContent = a.vision ? 'l\'IA regarde le modèle et choisit les coupes… (environ une minute)' : 'calcul de la découpe…';
     const p = await api(`/models/${encodeURIComponent(f.name)}/grand-format?${q}`);
     if (sel !== f) return;
     out.innerHTML = `<b>${p.pieces.length} pièce${p.pieces.length > 1 ? 's' : ''}</b> pour ${sizeTxt(p.taille_mm)}, ${p.chevilles} cheville${p.chevilles > 1 ? 's' : ''}`
-      + (p.plans.length ? ` · coupes : ${p.plans.map(x => `${x.axe} = ${x.mm} mm`).join(', ')}` : '')
+      + (p.plans.length ? ` · coupes : ${p.plans.map(x => `${x.axe} = ${x.mm} mm${x.angle ? ` (∠${x.angle > 0 ? '+' : ''}${x.angle}° → ${x.vers})` : ''}`).join(', ')}` : '')
       + `<ul>${p.pieces.map(x => `<li>${esc(x.nom)} : ${sizeTxt(x.taille_mm)}${x.pose ? ` · ${esc(x.pose)}` : ''}</li>`).join('')}</ul>`
+      + (p.vision ? `<p class="note">${p.vision.utilisee ? 'Avis de l\'IA suivi' : 'Avis de l\'IA non suivi'} : ${esc(p.vision.commentaire || '')}</p>${p.vision.repli ? `<p class="w warn">${esc(p.vision.repli)}</p>` : ''}` : '')
       + p.alertes.map(x => `<p class="w ${x.bloquante ? 'bad' : 'warn'}">${esc(x.message)}</p>`).join('');
     gfKey = q; $('gf-slice').disabled = !p.ok;
     if (!renderer) return;
@@ -1786,7 +1788,7 @@ function renderPieces(r) {
   $('result').innerHTML = `<div class="result"><div class="stats"><div class="stat"><div class="v">${r.pieces.length}</div><div class="k">pièces</div></div>
     <div class="stat"><div class="v">${dur(time)}</div><div class="k">au total</div></div><div class="stat"><div class="v">${r.usage ? fmtG(r.usage.g) : r.total_m + ' m'}</div><div class="k">${r.usage ? 'filament · ' + euro(r.usage.eur) : 'filament'}</div></div></div>
     ${stockLines(r.usage)}
-    <p class="note">Coupes : ${r.planes.map(p => `${p.axis} = ${p.mm} mm`).join(', ')}. Imprime les pièces une par une, puis assemble-les avec les chevilles et un peu de colle.</p>
+    <p class="note">Coupes : ${r.planes.map(planTxt).join(', ')}. Imprime les pièces une par une, puis assemble-les avec les chevilles et un peu de colle.</p>
     ${r.pieces.map((p, i) => row(`Pièce ${i + 1}`, p, `${sizeTxt(p.size_mm)} · `)).join('')}
     ${r.pins ? row(r.pins.small_pieces ? `Petites pièces (${r.pins.small_pieces}) + ${r.pins.count} chevilles` : `${r.pins.count} chevilles`, r.pins, r.pins.count ? `Ø ${r.pins.diameter_mm} × ${r.pins.length_mm} mm · ` : '') : ''}
     ${r.warnings.map(w => `<div class="warnline">⚠ ${esc(w)}</div>`).join('')}

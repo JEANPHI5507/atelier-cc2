@@ -199,12 +199,21 @@ def _plan_for_model(p: dict[str, Any]) -> dict[str, Any]:
         "chevilles": p["chevilles"],
         "alertes": [{"message": a["message"], "bloquante": a["bloquante"]} for a in p["alertes"]],
         "tient_sur_le_plateau": p["ok"],
+        **({"vision": p["vision"]} if "vision" in p else {}),
     }
 
 
 def _couper(src: Path, args: dict[str, Any]) -> dict[str, Any]:
     height = args.get("hauteur") or float(mesh.info(src)["size_mm"][2])
-    return _plan_for_model(grandformat.plan(src, float(height), args.get("interdites")))
+    return _plan_for_model(
+        grandformat.plan(
+            src,
+            float(height),
+            args.get("interdites"),
+            args.get("biais") is not False,
+            bool(args.get("vision")),
+        )
+    )
 
 
 def _grand_format(src: Path, args: dict[str, Any]) -> dict[str, Any]:
@@ -212,14 +221,19 @@ def _grand_format(src: Path, args: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("donne la hauteur finale voulue en mm")
     height = float(args["hauteur"])
     zones = args.get("interdites")
+    biais = args.get("biais") is not False
     if not args.get("trancher"):
-        return _plan_for_model(grandformat.plan(src, height, zones))
+        return _plan_for_model(
+            grandformat.plan(src, height, zones, biais, bool(args.get("vision")))
+        )
     usage = args.get("usage") or printprep.suggest_usage(src)
     infill = args.get("remplissage")
     res = grandformat.executer(
         src,
         height,
         zones,
+        biais,
+        bool(args.get("vision")),
         usage=usage if usage in printprep.USAGES else "decoratif",
         supports=args.get("supports") or False,
         quality=args.get("qualite") or slicer.DEFAULT_QUALITY,
@@ -300,6 +314,14 @@ PROPS: dict[str, dict[str, Any]] = {
         },
     },
     "couper": {
+        "vision": {
+            "type": "boolean",
+            "description": "faire choisir les coupes par la vision (images numérotées) parmi les candidates ; le code revérifie. Plus lent (~1 min), faux par défaut",
+        },
+        "biais": {
+            "type": "boolean",
+            "description": "plans de coupe en biais (15°, 30°) en plus des plans droits, vrai par défaut",
+        },
         "hauteur": {
             "type": "number",
             "description": "hauteur finale en mm, sinon la taille actuelle",
@@ -311,6 +333,14 @@ PROPS: dict[str, dict[str, Any]] = {
         },
     },
     "grand_format": {
+        "vision": {
+            "type": "boolean",
+            "description": "faire choisir les coupes par la vision (images numérotées) parmi les candidates ; le code revérifie. Plus lent (~1 min), faux par défaut",
+        },
+        "biais": {
+            "type": "boolean",
+            "description": "plans de coupe en biais (15°, 30°) en plus des plans droits, vrai par défaut",
+        },
         "hauteur": {"type": "number", "description": "hauteur finale voulue en mm (20 à 1500)"},
         "interdites": {
             "type": "array",

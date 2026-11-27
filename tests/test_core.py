@@ -6405,8 +6405,8 @@ def test_assistant_couper_and_grand_format_tools(tmp_path, monkeypatch):
     assert "zone" in assistant.run_tool("couper", {"interdites": [{"x": 1}]}, "fig.stl")["erreur"]
     seen = {}
 
-    def fake_exec(src, h, zones, **kw):
-        seen.update(h=h, zones=zones, **kw)
+    def fake_exec(src, h, zones, biais, vision, **kw):
+        seen.update(h=h, zones=zones, biais=biais, vision=vision, **kw)
         return {"bilan": {"pieces": 2}, "gcode": ["a.gcode"], "alertes": [], "avertissements": []}
 
     monkeypatch.setattr(grandformat, "executer", fake_exec)
@@ -6414,6 +6414,11 @@ def test_assistant_couper_and_grand_format_tools(tmp_path, monkeypatch):
         "grand_format", {"hauteur": 300, "trancher": True, "remplissage": 150}, "fig.stl"
     )
     assert r["bilan"]["pieces"] == 2 and seen["h"] == 300 and seen["infill"] == 100
+    assert seen["biais"] is True
+    assistant.run_tool(
+        "grand_format", {"hauteur": 300, "trancher": True, "biais": False}, "fig.stl"
+    )
+    assert seen["biais"] is False
 
 
 def test_grand_format_api(web):
@@ -6520,3 +6525,378 @@ def test_grand_format_api_slices(web):
     r = client.post("/lab/api/models/fig.stl/grand-format/trancher", json={"hauteur": 300})
     assert r.status_code == 200, r.text
     assert r.json()["bilan"]["pieces"] == 2 and r.json()["gcode"]
+
+
+# --- slanted cut planes ------------------------------------------------------------------------------
+
+
+def _slanted_neck():
+    """Two blocks joined by a neck leaning 30° toward +Y: the narrowest section is across the neck."""
+    import math
+
+    import numpy as np
+
+    low = trimesh.creation.box((80, 80, 80))
+    low.apply_translation((0, 0, 40))
+    d = np.array([0, math.sin(math.radians(30)), math.cos(math.radians(30))])
+    neck = trimesh.creation.cylinder(radius=10, height=200, sections=48)
+    neck.apply_transform(trimesh.geometry.align_vectors([0, 0, 1], d))
+    neck.apply_translation(np.array([0, 0, 80]) + d * 100)
+    up = trimesh.creation.box((80, 80, 80))
+    up.apply_translation(np.array([0, 0, 80]) + d * 200 + [0, 0, 40])
+    return trimesh.boolean.union([low, neck, up], engine="manifold")
+
+
+def test_plane_geometry_and_zone_hits():
+    import numpy as np
+
+    from elegoo_lab import cut
+
+    p = cut.make_plane(2, 100.0, 1, 30.0, np.array([0.0, 10.0, 0.0]))
+    n = p.normal()
+    assert np.allclose(n, [0, 0.5, 0.8660254]) and abs(np.linalg.norm(n) - 1) < 1e-9
+    assert p.pos == pytest.approx((100 - 0.5 * 10) / 0.8660254)
+    assert "∠+30" in p.label(np.zeros(3)) and "Y" in p.label(np.zeros(3))
+    flat = cut.make_plane(1, 50.0, -1, 0.0, np.zeros(3))
+    assert (
+        flat.normal().tolist() == [0, 1, 0]
+        and flat.pos == flat.d == 50.0
+        and "∠" not in flat.label(np.zeros(3))
+    )
+    box = ((-cut.INF, -cut.INF, 100.0), (cut.INF, cut.INF, 120.0))
+    d = np.array([50.0, 95.0, 125.0, 200.0])
+    # a band over the whole of X and Y is crossed by every slanted plane (it climbs across the model)
+    assert cut._hits(n, d, [box]).all()
+    small = ((-5.0, -5.0, 100.0), (5.0, 5.0, 120.0))  # n.x over this box runs from 84.1 to 106.4
+    assert cut._hits(n, d, [small]).tolist() == [False, True, False, False]
+    assert cut._hits(n, np.array([90.0, 100.0]), [small]).tolist() == [True, True]
+
+
+def test_oblique_cut_goes_through_the_slanted_neck():
+    import numpy as np
+
+    from elegoo_lab import cut
+
+    m = _slanted_neck()
+    v, f = np.asarray(m.vertices), np.asarray(m.faces)
+    slots = np.ones(len(f), int)
+    plain = cut.cut(v, f, slots)
+    assert all(c.angle == 0 for c in plain.cuts)
+    res = cut.cut(v, f, slots, oblique=True)
+    (c,) = res.cuts
+    assert (
+        c.angle in (15.0, 30.0) and c.lean == 1 and c.angle > 0
+    )  # leaning with the neck, toward +Y
+    assert res.pin_count >= 1 and len(res.pieces) == 2
+    for p in res.pieces:
+        assert trimesh.Trimesh(p.vertices, p.faces, process=False).is_watertight
+        assert cut.fits(np.ptp(p.vertices, axis=0), 246.0)
+    assert not any(a["bloquante"] for a in res.alerts)
+    # the slanted cut really is cheaper than the aligned one through the same neck
+    solid = cut._to_manifold(v, f)
+    aligned = cut._aligned_cost(solid, 2, 2, 246.0, [])
+    slanted = cut._slanted(
+        solid,
+        2,
+        2,
+        246.0,
+        [],
+        1,
+        c.angle,
+        (np.array(solid.bounding_box()[:3]) + solid.bounding_box()[3:]) / 2,
+    )
+    assert aligned and slanted and slanted[1] < cut.OBLIQUE_GAIN * aligned[1]
+
+
+def test_oblique_falls_back_to_aligned_cuts_when_a_piece_stays_too_big(monkeypatch):
+    import numpy as np
+
+    from elegoo_lab import cut
+
+    m = _slanted_neck()
+    v, f = np.asarray(m.vertices), np.asarray(m.faces)
+    real = cut.check_pieces
+    seen = []
+
+    def strict(pieces, max_mm):  # pretend every slanted result leaves a piece too big
+        out = real(pieces, max_mm)
+        seen.append(1)
+        return [*out, cut.alert("trop_grande", "x", blocking=True)] if len(seen) == 1 else out
+
+    monkeypatch.setattr(cut, "check_pieces", strict)
+    res = cut.cut(v, f, np.ones(len(f), int), oblique=True)
+    assert all(c.angle == 0 for c in res.cuts)
+    assert any(a["type"] == "biais_abandonne" for a in res.alerts)
+
+
+def test_grand_format_reports_the_lean_and_can_turn_it_off(tmp_path):
+    import numpy as np
+
+    from elegoo_lab import grandformat
+
+    src = tmp_path / "cou.stl"
+    _slanted_neck().export(src)
+    on = grandformat.plan(src, 333)
+    off = grandformat.plan(src, 333, biais=False)
+    assert on["plans"][0]["angle"] > 0 and on["plans"][0]["vers"] == "Y"
+    assert "angle" not in off["plans"][0]
+    assert on["ok"] and off["ok"]
+    _, glb = grandformat.preview(src, 333)
+    assert glb[:4] == b"glTF"
+    assert np.isclose(grandformat.plan(src, 333)["taille_mm"][2], 333.0, atol=1)
+
+
+# --- vision: numbered candidate cuts, vibe's choice, checked again by the code ---------------------------
+
+
+def _neck_file(tmp_path):
+    src = tmp_path / "cou.stl"
+    _slanted_neck().export(src)
+    return src
+
+
+def test_candidates_are_numbered_drawn_and_include_the_codes_plan(tmp_path):
+    import numpy as np
+    from PIL import Image
+
+    from elegoo_lab import cut, grandformat, visioncoupe
+
+    src = _neck_file(tmp_path)
+    v, f, slots = grandformat._solid(src, 333)
+    res = cut.cut(v, f, slots, oblique=True)
+    cands, needs = cut.candidates(v, f, oblique=True, include=res.cuts)
+    assert needs == {2: 2} and len(cands) >= 3
+    assert all(c in [x.plane for x in cands] for c in res.cuts)  # the code's own choice is on offer
+    assert any(c.plane.angle for c in cands)  # and slanted ones
+    assert [c.plane.pos for c in cands] == sorted(c.plane.pos for c in cands)
+    numbered = visioncoupe.number(cands)
+    paths = visioncoupe.render(v, f, numbered, tmp_path)
+    assert [p.name for p in paths] == ["coupes_face.png", "coupes_cote.png"]
+    im = np.asarray(Image.open(paths[1]).convert("RGB"))
+    assert im.shape == (720, 720, 3)
+    red = visioncoupe.COLOURS[0]
+    assert (
+        np.abs(im.astype(int) - red).sum(axis=2) < 30
+    ).sum() > 200  # candidate 1's coloured line is there
+    text = visioncoupe.prompt(numbered, paths, 333, needs, np.zeros(3), "")
+    assert "1 coupe(s) sur l'axe Z" in text and str(paths[0]) in text and '"choix"' in text
+
+
+def test_vision_reply_validation():
+    import numpy as np
+
+    from elegoo_lab import cut, visioncoupe
+
+    def cand(axis, pos, lean=-1, angle=0.0):
+        return cut.Candidate(cut.make_plane(axis, pos, lean, angle, np.zeros(3)), 100.0, 1, 100.0)
+
+    nb = visioncoupe.number(
+        [cand(2, 80), cand(2, 160), cand(2, 200, 1, 15.0), cand(0, 50), cand(2, 240)]
+    )
+    prefer, avoid, why = visioncoupe.validate(
+        {"choix": [2], "refus": [{"id": 1, "raison": "x"}, 4, {"id": 2}]}, nb
+    )
+    assert why == "" and [p.pos for p in prefer] == [160]
+    assert [p.pos for p in avoid] == [80, 50]  # a plane both chosen and refused counts as chosen
+    both, _, _ = visioncoupe.validate(
+        {"choix": ["1", 2, 2]}, nb
+    )  # numbers as text, duplicates ignored
+    assert [p.pos for p in both] == [80, 160]
+    mixed, _, _ = visioncoupe.validate(
+        {"choix": [3, 1, 4]}, nb
+    )  # parallel cuts per axis: the first decides
+    assert [round(p.d) for p in mixed] == [200, 50]
+    for reply, needle in (
+        ({}, "choix"),
+        ({"choix": []}, "choix"),
+        ({"choix": ["x"]}, "illisible"),
+        ({"choix": [9]}, "n'existe pas"),
+    ):
+        got = visioncoupe.validate(reply, nb)
+        assert got[:2] == ([], []) and needle in got[2], (reply, got)
+
+
+def test_wishes_steer_the_search_but_never_break_the_plate_limit():
+    import numpy as np
+
+    from elegoo_lab import cut
+
+    m = trimesh.creation.box((60, 60, 400))
+    m.apply_translation((0, 0, 200))
+    sub = m.subdivide()
+    v, f = np.asarray(sub.vertices), np.asarray(sub.faces)
+    slots = np.ones(len(f), int)
+    centre = np.array([0.0, 0.0, 200.0])
+    plain = cut.cut(v, f, slots)
+    want = cut.make_plane(2, 190.0, -1, 0.0, centre)
+    liked = cut.cut(v, f, slots, prefer=[want])
+    assert abs(liked.planes[0][1] - 190) <= cut.PREFER_MM and len(liked.pieces) == 2
+    assert not any(a["bloquante"] for a in liked.alerts)
+    far = cut.make_plane(2, 100.0, -1, 0.0, centre)  # would leave a piece of 300 mm: not honoured
+    kept = cut.cut(v, f, slots, prefer=[far])
+    assert abs(kept.planes[0][1] - 100) > cut.PREFER_MM and not any(
+        a["bloquante"] for a in kept.alerts
+    )
+    away = cut.cut(v, f, slots, avoid=[cut.make_plane(2, plain.planes[0][1], -1, 0.0, centre)])
+    assert abs(away.planes[0][1] - plain.planes[0][1]) >= cut.AVOID_MM
+    slanted = cut.make_plane(2, 200.0, 0, 15.0, centre)
+    lean = cut.cut(v, f, slots, prefer=[slanted])
+    assert lean.cuts[0].angle == 15.0 and lean.cuts[0].lean == 0
+
+
+def test_grand_format_with_vision_follows_wishes_and_falls_back(tmp_path, monkeypatch):
+    from elegoo_lab import grandformat, visioncoupe
+
+    src = _neck_file(tmp_path)
+    code_only = grandformat.plan(src, 333, vision=False)
+    assert "vision" not in code_only
+
+    def reply_with(ids, refus=(), **extra):
+        return lambda text, workdir: (
+            {
+                "modele": "un pion",
+                "choix": ids,
+                "refus": [{"id": i, "raison": "r"} for i in refus],
+                "commentaire": "ok",
+                **extra,
+            },
+            "",
+        )
+
+    monkeypatch.setattr(
+        visioncoupe, "ask", reply_with([4], refus=[2, 3])
+    )  # Z = 158: feasible, not the code's 166
+    p = grandformat.plan(src, 333, vision=True)
+    assert (
+        p["vision"]["utilisee"]
+        and p["vision"]["choix"] == [4]
+        and p["vision"]["commentaire"] == "ok"
+    )
+    assert p["vision"]["gardees"] == 1 == p["vision"]["voulues"]
+    assert p["ok"] and len(p["pieces"]) == 2 and p["plans"][0]["mm"] != code_only["plans"][0]["mm"]
+    planes = grandformat.chosen_planes(src, 333, vision=True)
+    assert planes and len(planes) == 1
+    s, glb = grandformat.preview(
+        src, 333, vision=True
+    )  # the picture shows the plan the vision steered
+    assert glb[:4] == b"glTF" and s["vision"]["utilisee"]
+    # an unreadable reply: the code's plan stands, with the reason
+    monkeypatch.setattr(visioncoupe, "ask", lambda text, workdir: ({}, "le CLI n'a pas répondu"))
+    p = grandformat.plan(src, 333, vision=True, biais=False)
+    assert not p["vision"]["utilisee"] and "n'a pas répondu" in p["vision"]["repli"]
+    assert grandformat.chosen_planes(src, 333, vision=True, biais=False) is None
+    assert p["plans"] == grandformat.plan(src, 333, biais=False)["plans"]
+    # a wish no plan on the plate can honour: the plan still fits, and the reply says it was not followed
+    big = trimesh.creation.box((60, 60, 600))
+    big.apply_translation((0, 0, 300))
+    big_src = tmp_path / "grand.stl"
+    big.export(big_src)
+    monkeypatch.setattr(visioncoupe, "ask", reply_with([1]))
+    q = grandformat.plan(big_src, 600, vision=True)
+    assert q["ok"] and not any(a["bloquante"] for a in q["alertes"])
+    assert q["vision"]["voulues"] == 1 and (
+        q["vision"]["utilisee"] or "plateau" in q["vision"]["repli"]
+    )
+
+
+def test_vision_call_uses_the_configured_model_and_reads_files_only(tmp_path, monkeypatch):
+    import subprocess
+
+    from elegoo_lab import assistant, config, visioncoupe
+
+    monkeypatch.setattr(assistant, "cli_bin", lambda: "/usr/bin/vibe")
+    seen = {}
+
+    def fake_run(args, **kw):
+        seen["args"], seen["cwd"] = args, kw["cwd"]
+        msg = [
+            {
+                "role": "assistant",
+                "type": "message",
+                "content": [{"text": '```json\n{"choix": [1]}\n```'}],
+            }
+        ]
+        return subprocess.CompletedProcess(args, 0, stdout=__import__("json").dumps(msg), stderr="")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    assert visioncoupe.settings() == {}
+    reply, err = visioncoupe.ask("décris", tmp_path)
+    assert reply == {"choix": [1]} and err == ""
+    a = seen["args"]
+    assert (
+        a[a.index("--enabled-tools") + 1] == "read_file"
+        and "--model" not in a
+        and seen["cwd"] == str(tmp_path)
+    )
+    config.CONFIG_FILE.write_text('[vision]\nmodele = "pixtral"\ndelai_s = 30\n')
+    visioncoupe.ask("x", tmp_path)
+    assert seen["args"][seen["args"].index("--model") + 1] == "pixtral"
+    monkeypatch.setattr(assistant, "cli_bin", lambda: None)
+    assert "introuvable" in visioncoupe.ask("x", tmp_path)[1]
+    monkeypatch.setattr(assistant, "cli_bin", lambda: "/usr/bin/vibe")
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda *a, **k: subprocess.CompletedProcess(a, 1, stdout="", stderr="401 unauthorized"),
+    )
+    assert "vibe login" in visioncoupe.ask("x", tmp_path)[1]
+
+    def slow(*a, **k):
+        raise subprocess.TimeoutExpired("vibe", 1)
+
+    monkeypatch.setattr(subprocess, "run", slow)
+    assert "n'a pas répondu" in visioncoupe.ask("x", tmp_path)[1]
+
+
+def test_explicit_planes_are_cut_and_checked():
+    import numpy as np
+
+    from elegoo_lab import cut
+
+    m = trimesh.creation.box((60, 60, 300))
+    m.apply_translation((0, 0, 150))
+    v, f = np.asarray(m.subdivide().vertices), np.asarray(m.subdivide().faces)
+    slots = np.ones(len(f), int)
+    centre = np.array([0.0, 0.0, 150.0])
+    one = cut.cut(v, f, slots, planes=[cut.make_plane(2, 100.0, -1, 0.0, centre)])
+    assert [round(p) for _, p in one.planes] == [100] and len(one.pieces) == 2
+    far = cut.cut(v, f, slots, planes=[cut.make_plane(2, 40.0, -1, 0.0, centre)])
+    assert any(
+        a["type"] == "trop_grande" and a["bloquante"] for a in far.alerts
+    )  # 260 mm left: the checks still run
+    leaning = cut.cut(v, f, slots, planes=[cut.make_plane(2, 150.0, 0, 15.0, centre)])
+    assert len(leaning.pieces) == 2 and leaning.cuts[0].angle == 15.0
+
+
+def test_several_far_apart_objects_block_the_plan_but_touching_parts_do_not(tmp_path):
+    import numpy as np
+
+    from elegoo_lab import cut, grandformat
+
+    a = trimesh.creation.box((40, 40, 300))
+    a.apply_translation((0, 0, 150))
+    b = trimesh.creation.box((40, 40, 300))
+    b.apply_translation((200, 0, 150))  # 160 mm away from the first
+    both = trimesh.util.concatenate([a, b])
+    v, f = np.asarray(both.vertices), np.asarray(both.faces)
+    res = cut.cut(v, f, np.ones(len(f), int))
+    assert any(x["type"] == "plusieurs_objets" and x["bloquante"] for x in res.alerts)
+    assert "2 objets séparés" in next(
+        x["message"] for x in res.alerts if x["type"] == "plusieurs_objets"
+    )
+    src = tmp_path / "deux.stl"
+    both.export(src)
+    plan = grandformat.plan(src, 300)
+    assert not plan["ok"]
+    with __import__("pytest").raises(ValueError, match="plan à corriger"):
+        grandformat.executer(src, 300)
+    # a loose part touching the main one, or a speck, is no separate object
+    c = trimesh.creation.box((40, 40, 300))
+    c.apply_translation((20, 0, 150))  # overlaps the first
+    speck = trimesh.creation.box((2, 2, 2))
+    speck.apply_translation((500, 0, 1))
+    joined = trimesh.util.concatenate([a, c, speck])
+    res = cut.cut(
+        np.asarray(joined.vertices), np.asarray(joined.faces), np.ones(len(joined.faces), int)
+    )
+    assert not any(x["type"] == "plusieurs_objets" for x in res.alerts)

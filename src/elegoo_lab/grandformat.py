@@ -10,13 +10,14 @@ footprint, Z from its base, mm) — see ``cut.Zone``. Specs accepted from the as
 
 from __future__ import annotations
 
+import json
 import re
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 import trimesh
 
-from . import colors, config, cut, mesh, orient, printprep, stock
+from . import colors, config, cut, mesh, orient, printprep, stock, visioncoupe
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -25,6 +26,9 @@ MIN_HEIGHT_MM = 20.0
 MAX_HEIGHT_MM = 1500.0
 CLICK_RADIUS_MM = 15.0
 _cache: dict[tuple, dict[str, Any]] = {}
+_chosen: dict[tuple, list[cut.Plane] | None] = (
+    {}
+)  # the planes behind a cached plan (vision's choice)
 
 
 def parse_zones(specs: list[dict[str, Any]] | None) -> list[cut.Zone]:
@@ -77,19 +81,55 @@ def _solid(src: Path, hauteur_mm: float) -> tuple[np.ndarray, np.ndarray, np.nda
 
 
 def plan(
-    src: Path, hauteur_mm: float, interdites: list[dict[str, Any]] | None = None
+    src: Path,
+    hauteur_mm: float,
+    interdites: list[dict[str, Any]] | None = None,
+    biais: bool = True,
+    vision: bool = False,
 ) -> dict[str, Any]:
     """Pieces, cut planes, positions and alerts for this height. Slices nothing. ``ok`` is False while
-    an alert blocks (a piece that cannot fit the plate, a cut forced through a forbidden zone)."""
+    an alert blocks (a piece that cannot fit the plate, a cut forced through a forbidden zone).
+    ``vision``: the vision model picks among numbered candidate cuts; the code checks its choice again and
+    keeps its own plan, saying why, when the choice does not hold."""
     hauteur_mm = _check_height(hauteur_mm)
     zones = parse_zones(interdites)
     st = src.stat()
-    key = (str(src), st.st_mtime_ns, st.st_size, hauteur_mm, tuple(map(repr, zones)))
+    key = (str(src), st.st_mtime_ns, st.st_size, hauteur_mm, tuple(map(repr, zones)), biais, vision)
     if key in _cache:
         return _cache[key]
     v, f, face_slots = _solid(src, hauteur_mm)
-    res = cut.cut(v, f, face_slots, name=src.stem, forbidden=zones)
+    res = cut.cut(v, f, face_slots, name=src.stem, forbidden=zones, oblique=biais)
     limit = mesh.BED_MM - cut.MARGIN_MM
+    chosen: list[cut.Plane] | None = None
+    seen: dict[str, Any] | None = None
+    if vision and res.cuts:
+        cands, needs = cut.candidates(v, f, forbidden=zones, oblique=biais, include=res.cuts)
+        asked = visioncoupe.choose(v, f, cands, hauteur_mm, needs, _zones_text(interdites))
+        seen = asked["info"]
+        if asked["prefer"] or asked["avoid"]:
+            tried = cut.cut(
+                v,
+                f,
+                face_slots,
+                name=src.stem,
+                forbidden=zones,
+                oblique=biais,
+                prefer=asked["prefer"],
+                avoid=asked["avoid"],
+            )
+            bad = [a["message"] for a in tried.alerts if a["bloquante"]]
+            kept = [p for p in asked["prefer"] if any(_same_plane(p, c) for c in tried.cuts)]
+            if bad:
+                seen["repli"] = "le contrôle refuse ce plan : " + " ; ".join(bad)
+            else:
+                res, chosen = tried, tried.cuts
+                seen["utilisee"] = bool(kept)
+                seen["gardees"] = len(kept)
+                seen["voulues"] = len(asked["prefer"])
+                if not kept:
+                    seen["repli"] = (
+                        "aucune des coupes préférées ne laisse toutes les pièces sur le plateau"
+                    )
     alerts = list(res.alerts)
     pieces = []
     for p in res.pieces:
@@ -118,22 +158,73 @@ def plan(
     out = {
         "hauteur_mm": hauteur_mm,
         "taille_mm": np.ptp(v, axis=0).round(1).tolist(),
-        "plans": [
-            {"axe": "XYZ"[a], "mm": round(float(pos - origin[a]), 1)} for a, pos in res.planes
-        ],
+        "plans": [_plane_json(c, origin) for c in res.cuts],
         "pieces": pieces,
         "chevilles": res.pin_count,
         "alertes": alerts,
         "ok": not any(a["bloquante"] for a in alerts),
     }
+    if seen is not None:
+        out["vision"] = seen
     _cache[key] = out
+    _chosen[key] = chosen
     while len(_cache) > 16:
+        _chosen.pop(next(iter(_cache)), None)
         _cache.pop(next(iter(_cache)))
     return out
 
 
+def _same_plane(a: cut.Plane, b: cut.Plane) -> bool:
+    return (a.axis, a.lean, a.angle) == (b.axis, b.lean, b.angle) and abs(
+        a.d - b.d
+    ) <= cut.PREFER_MM + 1
+
+
+def _zones_text(interdites: list[dict[str, Any]] | None) -> str:
+    if not interdites:
+        return ""
+    return (
+        "Zones où aucune coupe ne doit passer (déjà exclues des candidats) : "
+        + json.dumps(interdites, ensure_ascii=False)
+        + ".\n"
+    )
+
+
+def chosen_planes(
+    src: Path,
+    hauteur_mm: float,
+    interdites: list[dict[str, Any]] | None = None,
+    biais: bool = True,
+    vision: bool = False,
+) -> list[cut.Plane] | None:
+    """The planes the vision picked for this plan (None: the code's own search stands)."""
+    plan(src, hauteur_mm, interdites, biais, vision)
+    st = src.stat()
+    key = (
+        str(src),
+        st.st_mtime_ns,
+        st.st_size,
+        _check_height(hauteur_mm),
+        tuple(map(repr, parse_zones(interdites))),
+        biais,
+        vision,
+    )
+    return _chosen.get(key)
+
+
+def _plane_json(c: cut.Plane, origin: np.ndarray) -> dict[str, Any]:
+    out: dict[str, Any] = {"axe": "XYZ"[c.axis], "mm": round(float(c.pos - origin[c.axis]), 1)}
+    if c.angle:
+        out.update(angle=c.angle, vers="XYZ"[c.lean])
+    return out
+
+
 def preview(
-    src: Path, hauteur_mm: float, interdites: list[dict[str, Any]] | None = None
+    src: Path,
+    hauteur_mm: float,
+    interdites: list[dict[str, Any]] | None = None,
+    biais: bool = True,
+    vision: bool = False,
 ) -> tuple[dict[str, Any], bytes]:
     """The plan and a GLB: one colour per piece (slightly apart) and a translucent quad on each cut plane."""
     hauteur_mm = _check_height(hauteur_mm)
@@ -144,8 +235,12 @@ def preview(
         explode=0.08,
         show_planes=True,
         distinct=True,
+        oblique=biais,
+        planes=chosen_planes(src, hauteur_mm, interdites, biais, vision),
     )
-    return plan(src, hauteur_mm, interdites), cast("bytes", view.export(file_type="glb"))
+    return plan(src, hauteur_mm, interdites, biais, vision), cast(
+        "bytes", view.export(file_type="glb")
+    )
 
 
 _TIME = re.compile(r"(?:(\d+)d)?\s*(?:(\d+)h)?\s*(?:(\d+)m)?\s*(?:(\d+)s)?")
@@ -169,11 +264,13 @@ def executer(
     src: Path,
     hauteur_mm: float,
     interdites: list[dict[str, Any]] | None = None,
+    biais: bool = True,
+    vision: bool = False,
     **options: Any,
 ) -> dict[str, Any]:
     """Slice every piece (and the plate of dowels). Refuses while the plan has a blocking alert.
     ``options`` go to ``printprep.prepare_and_slice`` (usage, supports, quality, infill, …)."""
-    p = plan(src, hauteur_mm, interdites)
+    p = plan(src, hauteur_mm, interdites, biais, vision)
     if not p["ok"]:
         raise ValueError(
             "plan à corriger avant de trancher : "
@@ -186,6 +283,8 @@ def executer(
         split=True,
         forbidden=parse_zones(interdites),
         auto_pose=True,
+        oblique=biais,
+        planes=chosen_planes(src, hauteur_mm, interdites, biais, vision),
         screen_thumbnail=False,
         **options,
     )
