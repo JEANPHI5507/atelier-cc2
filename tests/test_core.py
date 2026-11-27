@@ -1278,6 +1278,8 @@ def test_the_assistant_runs_on_the_local_cli(web, monkeypatch):
     # round 2 resumes the CLI session instead of resending the whole fiche and history
     assert calls[1][calls[1].index("--resume") + 1] == "S1"
     assert "--system-prompt-file" not in calls[1]
+    # vibe refuses --thinking / --model on a resumed session ("only applies to a new session"): new runs only
+    assert "--thinking" in calls[0] and "--thinking" not in calls[1] and "--model" not in calls[1]
     # headless mode: the native tools are off (the workshop does the files itself), MCP (Blender…) stays approved
     off = {t: i for i, t in enumerate(calls[0])}
     assert "bash" in calls[0]
