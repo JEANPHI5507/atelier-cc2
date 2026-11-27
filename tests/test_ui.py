@@ -876,3 +876,42 @@ def test_all_tabs_premium_design(page, site):
     page.click("#t-gal")
     page.wait_for_selector("#gal:not([hidden])")
     assert page.errors == []
+
+
+def test_launch_dialog_checks_filament_stock(page, site, monkeypatch):
+    """R3.7: not enough filament on the chosen spool blocks « Lancer » until « Lancer quand même »;
+    picking another spool redoes the check."""
+    from elegoo_lab import config, stock
+
+    g = site["lib"] / "long.gcode"  # one white PLA tool, 200 m ≈ 596 g
+    g.write_text(
+        "; filament_colour = #FFFFFF\n; filament_type = PLA\n; filament used [mm] = 200000\n"
+        "G1 X10 Y10 Z0.2 E1\n"
+    )
+    monkeypatch.setattr(config, "MODELS_DIR", site["lib"])
+    stock.record_slice("long.gcode", [200.0])
+    for i in range(1, 4):  # whatever earlier tests left: the other spools are full
+        api(site, f"/lab/api/bobines/{i}", {"poids_g": 1000, "restant_g": 1000})
+    api(site, "/lab/api/bobines/0", {"poids_g": 1000, "restant_g": 100})
+    try:
+        page.reload()
+        page.wait_for_selector("#files .file[data-n='long.gcode']")
+        page.click("#files .file[data-n='long.gcode']")
+        page.click("#r-body [data-send='start']")
+        page.wait_for_selector("#launch[open] #ln-stock .warnline")
+        assert "Bobine 1" in page.inner_text("#ln-stock")
+        assert page.is_visible("#ln-force-row") and page.is_disabled("#ln-go")
+        page.check("#ln-force")
+        assert page.is_enabled("#ln-go") or page.is_visible("#ln-busy")
+        # another spool, full: no warning any more, no "anyway" to tick
+        other = page.eval_on_selector(
+            "#ln-map select", "s => [...s.options].map(o => o.value).find(v => v !== s.value)"
+        )
+        page.select_option("#ln-map select", other)
+        page.wait_for_selector("#ln-stock .warnline", state="detached")
+        assert page.is_hidden("#ln-force-row")
+        page.click("#launch [data-close]")
+        assert page.errors == []
+    finally:
+        api(site, "/lab/api/bobines/0", {"restant_g": 1000})
+        g.unlink(missing_ok=True)

@@ -1449,7 +1449,11 @@
 "✓ Corrections appliquées (réglages avancés ouverts ci-dessous).": "✓ Fixes applied (advanced settings open below).",
 "✓ Plateau vide (vérifié à la caméra)": "✓ Plate empty (checked by the camera)",
 "✓ Plateau vide mémorisé : il sera vérifié avant chaque impression.": "✓ Empty plate remembered: it will be checked before each print.",
-"🎯 Workflow guidé": "🎯 Guided workflow"
+"🎯 Workflow guidé": "🎯 Guided workflow",
+"Lancer quand même": "Start anyway",
+"(le stock est une estimation : je sais qu'il reste assez de filament)": "(the stock is an estimate: I know there is enough filament left)",
+"lancement annulé": "start cancelled",
+"lancement impossible": "cannot start"
 },
 "patterns": [
 [
@@ -2339,6 +2343,14 @@
 [
 "{} · {}",
 "{} · {}"
+],
+[
+"Bobine {} : marge faible (il faut {}, il reste environ {}). Le stock est une estimation : vérifie la bobine avant une longue impression.",
+"Spool {}: low margin ({} needed, about {} left). The stock is an estimate: check the spool before a long print."
+],
+[
+"stock insuffisant : bobine {} : il faut {} g, il reste environ {} g",
+"not enough filament: spool {}: {} g needed, about {} g left"
 ]
 ]
 }

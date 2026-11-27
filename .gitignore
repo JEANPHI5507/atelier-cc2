@@ -16,3 +16,9 @@ demo/
 
 # plateau Elegoo (AGPL, fourni avec OrcaSlicer) : copié par `make plateau`
 src/elegoo_lab/web/vendor/cc2/
+
+# artefacts locaux (couverture, captures collées)
+.coverage
+.coverage.*
+htmlcov/
+/*.png

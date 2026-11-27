@@ -261,6 +261,14 @@ class LaunchIn(BaseModel):
     delay_video: bool | None = None
     slot_map: list[dict[str, int]] | None = None
     remember: bool = False
+    ignore_stock: bool = (
+        False  # the user saw "stock insuffisant" and starts anyway (the stock is an estimate)
+    )
+
+
+class StockCheckIn(BaseModel):
+    filename: str
+    slot_map: list[dict[str, int]] | None = None
 
 
 class RenameIn(BaseModel):
@@ -1462,12 +1470,27 @@ def lab_router(cfg: config.Config) -> APIRouter:
         out = await asyncio.to_thread(
             launch.plan, path if path.suffix == ".gcode" else None, await _canvas(request)
         )
-        pos = {t["tray_id"]: t.get("pos", t["tray_id"]) for t in out.get("trays", [])}
         out["stock"] = stock.check(
-            Path(name).name,
-            {m["t"]: pos.get(m["tray_id"], m["tray_id"]) for m in out.get("slot_map", [])},
+            Path(name).name, _stock_route(out.get("slot_map"), out.get("trays", []))
         )
         return out
+
+    def _stock_route(
+        slot_map: list[dict[str, Any]] | None, trays: list[dict[str, Any]]
+    ) -> dict[int, int] | None:
+        """File filament -> CANVAS place (0-3) for the stock count, from a colour -> spool map."""
+        if not slot_map:
+            return None
+        pos = {int(t["tray_id"]): int(t.get("pos", t["tray_id"])) for t in trays}
+        return {int(m["t"]): pos.get(int(m["tray_id"]), int(m["tray_id"])) for m in slot_map}
+
+    @r.post("/print/stock")
+    async def print_stock(body: StockCheckIn, request: Request) -> dict[str, Any]:
+        """The start dialog's stock check again, after the user picked other spools."""
+        canvas = await _canvas(request)
+        return stock.check(
+            Path(body.filename).name, _stock_route(body.slot_map, spools.loaded(canvas or {}))
+        ) or {"known": False}
 
     @r.post("/print/start")
     async def print_start(body: LaunchIn, request: Request) -> dict[str, Any]:
@@ -1493,6 +1516,15 @@ def lab_router(cfg: config.Config) -> APIRouter:
             for m in body.slot_map or []:
                 if canvas is not None and int(m["tray_id"]) not in loaded:
                     raise ValueError(f"la bobine {m['tray_id']} n'est pas chargée dans le CANVAS")
+            if not body.ignore_stock and (
+                why := stock.refusal(
+                    stock.check(
+                        Path(body.filename).name,
+                        _stock_route(body.slot_map, spools.loaded(canvas or {})),
+                    )
+                )
+            ):
+                raise HTTPException(409, why)
             payload = launch.params(
                 launch.printer_name(body.filename),
                 opts,
@@ -1516,15 +1548,9 @@ def lab_router(cfg: config.Config) -> APIRouter:
                 f"l'imprimante refuse le lancement (code {code.group(1) if code else '?'}) : impression "
                 "déjà en cours, fichier absent ou bobine choisie vide",
             ) from err
-        pos = {
-            int(t["tray_id"]): int(t.get("pos", t["tray_id"])) for t in spools.loaded(canvas or {})
-        }
         stock.record_route(
             Path(body.filename).name,
-            {
-                int(m["t"]): pos.get(int(m["tray_id"]), int(m["tray_id"]))
-                for m in body.slot_map or []
-            },
+            _stock_route(body.slot_map, spools.loaded(canvas or {})) or {},
         )
         return {"ok": True, "sent": payload}
 
