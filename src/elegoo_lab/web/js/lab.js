@@ -1465,7 +1465,26 @@ async function watchCanvas() {
 setInterval(watchCanvas, 15000);
 
 /* the assistant: the CLI brain acting through the workshop's own tools (repair, size, turn, shape, slice…) */
-let chatHist = [], chatSel = null, chatBusy = false, chatConv = '';
+let chatHist = [], chatSel = null, chatBusy = false, chatConv = '', chatPhoto = null;
+/* a photo for the assistant (a flat object to copy, a sketch): uploaded at once, sent with the next message */
+function chatPhotoShow() {
+  const box = $('chat-att');
+  box.hidden = !chatPhoto;
+  box.innerHTML = chatPhoto ? `<img src="/lab/api/croquis/${encodeURIComponent(chatPhoto)}" alt=""><span>Photo jointe</span><button class="btn ghost" id="chat-att-x" type="button" aria-label="Retirer la photo">✕</button>` : '';
+  if (chatPhoto) $('chat-att-x').onclick = () => { chatPhoto = null; chatPhotoShow(); };
+}
+$('chat-photo').onclick = () => $('chat-photo-in').click();
+$('chat-photo-in').onchange = async () => {
+  const f = $('chat-photo-in').files[0]; $('chat-photo-in').value = '';
+  if (!f) return;
+  const fd = new FormData(); fd.append('file', f);
+  try {
+    const r = await api('/croquis', { method: 'POST', body: fd });
+    chatPhoto = r.name; chatPhotoShow();
+    if (!$('chat-in').value.trim()) $('chat-in').value = 'Fais-en une pièce : le plus grand côté mesure … mm, épaisseur 3 mm';
+    $('chat-in').focus();
+  } catch (e) { toast('Photo refusée : ' + e.message, 'bad'); }
+};
 function chatConvNew() { chatConv = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())); }
 function chatAdd(role, html, small) {
   const d = document.createElement('div');
@@ -1487,14 +1506,15 @@ async function chatSend() {
   const model = sel && sel.ext !== 'gcode' ? sel : null;
   chatBusy = true; $('chat-go').disabled = true; $('chat-in').value = '';
   $('chat-sug').hidden = true;   // one real turn: the ready-made ideas step aside
-  chatAdd('user', esc(v) + (cible.pt ? ` <small>— zone (${cible.pt.join(', ')})</small>` : ''));
+  const photo = chatPhoto; chatPhoto = null; chatPhotoShow();
+  chatAdd('user', esc(v) + (photo ? `<br><img class="chat-img" src="/lab/api/croquis/${encodeURIComponent(photo)}" alt="photo jointe">` : '') + (cible.pt ? ` <small>— zone (${cible.pt.join(', ')})</small>` : ''));
   const wait = chatAdd('assistant', '<i style="color:var(--dim)">…</i>');
   const step = chatAdd('activity', '');
   const done = [];
   try {
     const rsp = await fetch('/lab/api' + (model ? `/models/${encodeURIComponent(model.name)}/assistant/stream` : '/assistant/stream'), {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: v, history: chatHist, conversation: chatConv,
+      body: JSON.stringify({ message: v, history: chatHist, conversation: chatConv, photo: photo || undefined,
                              zone: model && cible.pt ? { point: cible.pt, rayon: +$('chat-zone-r').value || 10 } : undefined })
     });
     if (!rsp.ok || !rsp.body) {
@@ -1523,6 +1543,8 @@ async function chatSend() {
           await loadFiles();
           const f = files.find(x => x.name === ev.fichier);
           if (f && f.ext !== 'gcode') await select(f);
+        } else if (ev.type === 'image') {           // the outline the workshop found, drawn on the photo
+          chatAdd('activity', `contour trouvé (rouge, trous en bleu) :<br><img class="chat-img" src="/lab/api/croquis/${encodeURIComponent(ev.nom)}" alt="contour trouvé">`);
         } else if (ev.type === 'etape') {
           step.innerHTML = esc(ev.texte) + '…';
         } else if (ev.type === 'erreur') {

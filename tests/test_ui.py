@@ -907,3 +907,19 @@ def test_the_assistant_is_there_with_no_model_selected(page):
         "() => !document.getElementById('chat-in').placeholder.startsWith('Décris la pièce')"
     )
     assert page.errors == []
+
+
+def test_a_photo_can_be_joined_to_the_assistant(page, tmp_path):
+    """📷 uploads the photo at once and shows it above the message; ✕ takes it back."""
+    from PIL import Image
+
+    p = tmp_path / "objet.jpg"
+    Image.new("RGB", (400, 300), (230, 230, 230)).save(p)
+    page.wait_for_selector("#chat-sec:not([hidden])")
+    page.set_input_files("#chat-photo-in", str(p))
+    page.wait_for_selector("#chat-att:not([hidden]) img")
+    assert "Photo jointe" in page.inner_text("#chat-att")
+    assert "plus grand côté" in page.input_value("#chat-in")
+    page.click("#chat-att-x")
+    page.wait_for_selector("#chat-att[hidden]", state="attached")
+    assert page.errors == []

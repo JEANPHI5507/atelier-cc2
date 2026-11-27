@@ -36,6 +36,7 @@ import numpy as np
 from . import (
     colors,
     config,
+    contour,
     forme,
     grandformat,
     mesh,
@@ -207,6 +208,7 @@ FREE_TOOLS = (  # tools that need no model open
     "creer_piece",
     "extruder_profil",
     "tourner_profil",
+    "piece_depuis_photo",
 )
 
 
@@ -401,7 +403,8 @@ def ghost_files(text: str) -> list[str]:
 NO_MODEL = (
     "Aucun modèle n'est ouvert. Tu peux en créer un : « creer_piece » (pièces sur mesure à partir de "
     "cotes), « extruder_profil » / « tourner_profil » (tu dessines le profil à plat en coordonnées, l'atelier "
-    "le rend solide — à préférer pour toute forme simple : support, équerre, crochet, vase), ou le modéliser dans Blender (skill cc2-blender-cao) et l'exporter dans "
+    "le rend solide — à préférer pour toute forme simple : support, équerre, crochet, vase), « piece_depuis_photo » "
+    "(une photo jointe d'un objet plat), ou le modéliser dans Blender (skill cc2-blender-cao) et l'exporter dans "
     "la bibliothèque. Dès qu'un outil rend un « fichier », il devient le modèle courant et les autres outils "
     "(fiche, trancher, grand_format…) travaillent dessus."
 )
@@ -478,6 +481,45 @@ def _profil(tool: str, args: dict[str, Any]) -> dict[str, Any]:
         "tient_sur_le_plateau": max(size) <= mesh.BED_MM,
         "stabilite": stability(tm),
         "c_est_fait": "un seul solide étanche, posé sur le plateau. Ne le recrée pas : réponds, ou travaille sur ce fichier.",
+    }
+
+
+def _depuis_photo(args: dict[str, Any]) -> dict[str, Any]:
+    """Photo of a flat object -> outline (code) -> extruded part; the check picture is kept for a look."""
+    name = Path(str(args.get("photo") or "")).name
+    src = contour.photos_dir() / name
+    if not name or not src.is_file():
+        raise ValueError(
+            f"photo « {name} » introuvable : demande à l'utilisateur de la joindre (bouton photo)"
+        )
+    if not isinstance(args.get("cote_mm"), (int, float)):
+        raise ValueError(
+            "donne la taille réelle du plus grand côté de l'objet (cote_mm) : demande-la"
+        )
+    inv = args.get("inverser")
+    o = contour.extract(
+        src,
+        float(args["cote_mm"]),
+        holes=args.get("trous") is not False,
+        invert=inv if isinstance(inv, bool) else None,
+    )
+    check = src.with_name(f"{src.stem}_controle.png")
+    check.write_bytes(o.preview)
+    made = _profil(
+        "extruder_profil",
+        {
+            "points": o.outer,
+            "trous": o.holes,
+            "longueur": float(args.get("epaisseur_mm") or 3),
+            "vue": "dessus",
+            "nom": args.get("nom") or src.stem,
+        },
+    )
+    return {
+        **made,
+        "contour": contour.summary(o),
+        "controle": str(check),
+        "controle_image": check.name,
     }
 
 
@@ -574,6 +616,7 @@ SCHEMAS: dict[str, str] = {
     + ", ".join(parametric.KINDS)
     + "), `valeurs` = les réglages à changer (les autres gardent leur défaut ; cotes hors limites refusées avec la limite). Rends le nom du nouveau fichier et sa taille. Ne demande pas de modèle.",
     "extruder_profil": "Fabriquer une pièce en dessinant son PROFIL à plat (polygone en mm), que l'atelier extrude d'un bloc : toujours un seul solide étanche, en quelques secondes, sans Blender. Idéal pour support, équerre, crochet, cale, plaque, lettre découpée. Le résultat donne « stabilite » (centre de gravité sur l'appui, marge en mm) : un support qui portera un objet penché doit avoir une base qui dépasse sous la charge, sinon élargis la base et refais. `points` = [[u, v], …] dans l'ordre du contour (pas de croisement), `longueur` = épaisseur d'extrusion en mm, `vue` = « cote » (profil vu de côté, u = profondeur Y, v = hauteur Z, extrudé sur la largeur X) ou « dessus » (contour vu de dessus, u = X, v = Y, extrudé en hauteur Z). `trous` = contours à retirer. Nouveau fichier.",
+    "piece_depuis_photo": "Fabriquer une pièce plate d'après une PHOTO jointe par l'utilisateur (objet ou dessin posé à plat, vu de dessus, sur un fond uni) : l'atelier trouve le contour (trous compris), le met à l'échelle et l'extrude. `photo` = le nom de la photo jointe, `cote_mm` = la taille RÉELLE du plus grand côté de l'objet (demande-la si l'utilisateur ne l'a pas dite), `epaisseur_mm`. Rend le fichier et `controle` : l'image du contour tracé sur la photo, regarde-la (read_file) pour vérifier avant d'annoncer. `inverser` = true si l'objet est plus clair que le fond et que le contour est faux.",
     "tourner_profil": "Fabriquer une pièce ronde en faisant tourner un PROFIL autour de l'axe vertical : vase, bouton, pied, bague, bol. `points` = [[r, z], …] (r = rayon ≥ 0 en mm, z = hauteur), le contour fermé d'une demi-coupe ; `angle` en degrés (360 = tour complet). Un seul solide étanche, sans Blender. Nouveau fichier.",
     "couper": "Voir comment le modèle serait découpé en pièces à sa taille actuelle (ou à `hauteur`) : plans de coupe aux endroits discrets (cou, taille), pièces, poses, chevilles, alertes. `interdites` = zones où aucune coupe ne doit passer (visage, mains). Ne change rien et ne tranche rien.",
     "grand_format": "Module grand format : à partir de la hauteur finale voulue, redimensionne, coupe, choisit la meilleure pose de chaque pièce et vérifie que tout tient sur le plateau. Sans `trancher`, rend seulement le plan (pièces, plans, alertes) pour que l'utilisateur le valide sur l'aperçu. Avec trancher=true (SEULEMENT après que l'utilisateur a vu et validé le plan), tranche toutes les pièces et rend le bilan : pièces, durée, grammes, coût, chevilles.",
@@ -639,6 +682,17 @@ PROPS: dict[str, dict[str, Any]] = {
             "items": {"type": "array"},
             "description": "contours à retirer, même repère",
         },
+        "nom": {"type": "string", "description": "nom du fichier sans extension"},
+    },
+    "piece_depuis_photo": {
+        "photo": {"type": "string", "description": "nom de la photo jointe"},
+        "cote_mm": {"type": "number", "description": "taille réelle du plus grand côté, mm"},
+        "epaisseur_mm": {
+            "type": "number",
+            "description": "épaisseur de la pièce, mm (3 par défaut)",
+        },
+        "trous": {"type": "boolean", "description": "garder les trous (vrai par défaut)"},
+        "inverser": {"type": "boolean", "description": "l'objet est plus clair que le fond"},
         "nom": {"type": "string", "description": "nom du fichier sans extension"},
     },
     "tourner_profil": {
@@ -743,6 +797,8 @@ def run_tool(tool: str, args: dict[str, Any], name: str) -> dict[str, Any]:
                 return _catalogue(args)
             if tool == "creer_piece":
                 return _creer_piece(args)
+            if tool == "piece_depuis_photo":
+                return _depuis_photo(args)
             return _profil(tool, args)
         except (ValueError, OSError) as err:
             return {"erreur": str(err)[:300]}
@@ -1149,9 +1205,8 @@ def chat_cli(
         # MCP servers (Blender…) stay approved
         off = [
             x
-            for k in (
+            for k in (  # read_file stays: the brain looks at the photos and check pictures
                 "bash",
-                "read_file",
                 "write_file",
                 "edit",
                 "sleep",
@@ -1275,6 +1330,8 @@ def chat_cli(
                     if emit:
                         emit({"type": "outil", "outil": tool})
                     out = run_tool(tool, dict(args), cur)
+                    if emit and out.get("controle_image"):
+                        emit({"type": "image", "nom": out["controle_image"]})
                     vu[sig] = json.dumps(out, ensure_ascii=False)[:2500]
                     fresh = out.get("fichier") or out.get("name")
                     if fresh and fresh != cur and config.MODELS_DIR.joinpath(fresh).exists():
@@ -1715,6 +1772,8 @@ def chat_api(
             if emit:
                 emit({"type": "outil", "outil": fname})
             out = run_tool(fname, dict(args_c), cur)
+            if emit and out.get("controle_image"):
+                emit({"type": "image", "nom": out["controle_image"]})
             res = json.dumps(out, ensure_ascii=False)[:4000]
             vu[sig] = res
             fresh = out.get("fichier") or out.get("name")

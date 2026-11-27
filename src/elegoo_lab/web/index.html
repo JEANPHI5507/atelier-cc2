@@ -162,7 +162,8 @@
           <label>rayon <input id="chat-zone-r" type="number" min="2" max="80" value="10"> mm</label>
           <button id="chat-zone-x" title="Retirer la zone ciblée">✕</button>
         </div>
-        <div class="chat-row"><input id="chat-in" type="text" placeholder="Ex. : perce un trou de 6 mm pour un aimant en haut" autocomplete="off"><button class="btn primary" id="chat-go">Envoyer</button></div>
+        <div class="chat-att" id="chat-att" hidden></div>
+        <div class="chat-row"><button class="btn ghost" id="chat-photo" type="button" title="Joindre une photo (objet ou dessin posé à plat)" aria-label="Joindre une photo">📷</button><input id="chat-photo-in" type="file" accept="image/jpeg,image/png,image/webp" hidden><input id="chat-in" type="text" placeholder="Ex. : perce un trou de 6 mm pour un aimant en haut" autocomplete="off"><button class="btn primary" id="chat-go">Envoyer</button></div>
       </div>
     </div>
 

@@ -7304,3 +7304,125 @@ def test_cli_brain_is_sent_back_to_fix_a_broken_export(tmp_path, monkeypatch):
     r = assistant.chat_cli("", "modélise une pièce", [], "b1")
     assert "CONTRÔLE DE L'ATELIER" in prompts[1] and "morceaux séparés" in prompts[1]
     assert r["file"] == "piece.ply" and r["maj"] and "⚠" not in r["reply"]
+
+
+# --- photo of a flat object -> part ------------------------------------------------------------------
+
+
+def _key_photo(path, *, angle=12, dark=True, contrast=165, touch=False):
+    """A key on a sheet of paper, photographed at an angle: head ring with a hole, shaft, four teeth."""
+    import numpy as np
+    from PIL import Image, ImageDraw, ImageFilter
+
+    rng = np.random.default_rng(1)
+    paper, ink = (235, 70) if dark else (40, 40 + contrast)
+    if not dark:
+        paper, ink = 40, 40 + contrast
+    else:
+        ink = paper - contrast
+    bg = (paper + rng.normal(0, 5, (1200, 1600))).clip(0, 255)
+    img = Image.fromarray(bg.astype(np.uint8)).convert("RGB")
+    d = ImageDraw.Draw(img)
+    c = (ink, ink, ink + 5)
+    left = -100 if touch else 300
+    d.ellipse((left, 400, left + 400, 800), fill=c)
+    d.ellipse((left + 130, 530, left + 270, 670), fill=(paper,) * 3)
+    d.rectangle((680, 560, 1400, 640), fill=c)
+    for x in (1100, 1180, 1260, 1340):
+        d.rectangle((x, 640, x + 40, 700), fill=c)
+    img = img.rotate(angle, resample=Image.BICUBIC, fillcolor=(paper,) * 3).filter(
+        ImageFilter.GaussianBlur(1.5)
+    )
+    img.save(path, quality=88)
+    return path
+
+
+def test_outline_from_a_photo_scales_straightens_and_finds_the_hole(tmp_path):
+    import numpy as np
+
+    from elegoo_lab import contour
+
+    o = contour.extract(_key_photo(tmp_path / "cle.jpg"), 60)
+    assert o.size_mm[0] == 60.0 and 20 < o.size_mm[1] < 24  # straightened: the key lies along X
+    assert len(o.holes) == 1 and not o.warnings and 10 < len(o.outer) <= contour.MAX_POINTS
+    hole = np.asarray(o.holes[0])
+    assert 6 < np.ptp(hole[:, 0]) < 9  # the eye: 140 px of a 1100 px key ≈ 7.6 mm
+    assert o.preview[:8] == b"\x89PNG\r\n\x1a\n"
+    light = contour.extract(
+        _key_photo(tmp_path / "clair.jpg", dark=False), 60
+    )  # a pale key on a dark table
+    assert light.size_mm[0] == 60.0 and len(light.holes) == 1
+    no_hole = contour.extract(tmp_path / "cle.jpg", 60, holes=False)
+    assert no_hole.holes == []
+    faint = contour.extract(_key_photo(tmp_path / "pale.jpg", contrast=25), 60)
+    assert any("contraste" in w for w in faint.warnings)
+    cut = contour.extract(_key_photo(tmp_path / "bord.jpg", angle=0, touch=True), 60)
+    assert any("bord" in w for w in cut.warnings)
+    with pytest.raises(ValueError, match="plus grand côté"):
+        contour.extract(tmp_path / "cle.jpg", 0.5)
+
+
+def test_photo_upload_and_piece_depuis_photo(web, monkeypatch):
+    import io
+
+    from PIL import Image
+
+    from elegoo_lab import assistant, contour, mesh
+
+    client, lib = web
+    _key_photo(lib / "src.jpg")
+    up = client.post(
+        "/lab/api/croquis",
+        files={"file": ("cle.jpg", (lib / "src.jpg").read_bytes(), "image/jpeg")},
+    )
+    assert up.status_code == 200
+    name = up.json()["name"]
+    assert name.startswith("photo_") and (contour.photos_dir() / name).is_file()
+    assert client.get(f"/lab/api/croquis/{name}").status_code == 200
+    assert client.get("/lab/api/croquis/../secret.jpg").status_code == 404
+    bad = client.post("/lab/api/croquis", files={"file": ("x.heic", b"....", "image/heic")})
+    assert bad.status_code == 400 and "JPEG" in bad.json()["detail"]
+    junk = client.post("/lab/api/croquis", files={"file": ("x.jpg", b"not an image", "image/jpeg")})
+    assert junk.status_code == 400 and "lisible" in junk.json()["detail"]
+    big = Image.new("RGB", (4000, 3000), (200, 200, 200))
+    buf = io.BytesIO()
+    big.save(buf, format="PNG")
+    small = client.post(
+        "/lab/api/croquis", files={"file": ("grand.png", buf.getvalue(), "image/png")}
+    ).json()["name"]
+    assert max(Image.open(contour.photos_dir() / small).size) == 2000
+    r = assistant.run_tool(
+        "piece_depuis_photo", {"photo": name, "cote_mm": 60, "epaisseur_mm": 3, "nom": "cle"}, ""
+    )
+    assert (
+        r["fichier"] == "cle.ply" and r["contour"]["trous"] == 1 and r["stabilite"]["tient_debout"]
+    )
+    m = mesh.load(lib / "cle.ply")
+    assert (
+        m.is_watertight
+        and len(m.split()) == 1
+        and abs(m.extents[2] - 3) < 0.01
+        and abs(m.extents[0] - 60) < 0.01
+    )
+    assert (contour.photos_dir() / r["controle_image"]).is_file()
+    assert assistant.check_export("cle.ply") == []
+    for args, needle in (
+        ({"photo": "rien.jpg", "cote_mm": 60}, "introuvable"),
+        ({"photo": name}, "taille réelle"),
+    ):
+        assert needle in assistant.run_tool("piece_depuis_photo", args, "")["erreur"]
+    # the message carries the photo to the brain
+    seen = {}
+
+    def fake_chat(name_, message, history=None, conversation="", emit=None):
+        seen["msg"] = message
+        emit({"type": "image", "nom": r["controle_image"]})
+        return {"reply": "ok", "file": "", "outils": []}
+
+    monkeypatch.setattr(assistant, "chat", fake_chat)
+    with client.stream(
+        "POST", "/lab/api/assistant/stream", json={"message": "fais-en une pièce", "photo": name}
+    ) as st:
+        events = [json.loads(x[6:]) for x in st.iter_lines() if x.startswith("data: ")]
+    assert f"« {name} »" in seen["msg"] and "piece_depuis_photo" in seen["msg"]
+    assert events[0] == {"type": "image", "nom": r["controle_image"]}

@@ -164,6 +164,7 @@ class AssistantIn(BaseModel):
     zone: dict[str, Any] | None = (
         None  # the spot the user picked in the 3D view: {point: [x, y, z] mm (file axes), rayon}
     )
+    photo: str | None = None  # a photo the user joined (name in the library's .croquis folder)
 
 
 class PartIn(BaseModel):
@@ -1297,6 +1298,20 @@ def lab_router(cfg: config.Config) -> APIRouter:
         """The message plus, when the user picked a spot in the 3D view, that spot spelled out in the
         model file's own axes as heard from a sighted helper (x, y, z left as loaded, rayon in mm).
         """
+        from . import contour
+
+        if body.photo:
+            ph = contour.photos_dir() / Path(body.photo).name
+            if ph.is_file():
+                body = body.model_copy(
+                    update={
+                        "message": body.message[:2000]
+                        + f"\n[PHOTO jointe par l'utilisateur : « {ph.name} », chemin {ph} — regarde-la "
+                        "(read_file). Pour en faire une pièce plate : piece_depuis_photo avec photo = "
+                        f"« {ph.name} » et la taille réelle du plus grand côté.]",
+                        "photo": None,
+                    }
+                )
         pt, z = (body.zone or {}).get("point"), body.zone or {}
         if not (
             isinstance(pt, list) and len(pt) == 3 and all(isinstance(v, (int, float)) for v in pt)
@@ -1331,12 +1346,34 @@ def lab_router(cfg: config.Config) -> APIRouter:
                 503, f"Mistral injoignable ({type(err).__name__}) : réessaie"
             ) from err
 
+    @r.post("/croquis")
+    async def croquis_upload(file: UploadFile = File(...)) -> dict[str, str]:
+        """A photo for the assistant (a flat object to copy, a sketch): kept in the library's .croquis."""
+        from . import contour
+
+        try:
+            out = await asyncio.to_thread(
+                contour.save_photo, await file.read(), file.filename or "photo.jpg"
+            )
+        except ValueError as err:
+            raise HTTPException(400, str(err)) from err
+        return {"name": out.name}
+
+    @r.get("/croquis/{name}")
+    def croquis_file(name: str) -> FileResponse:
+        from . import contour
+
+        p = contour.photos_dir() / Path(name).name
+        if not p.is_file() or p.suffix.lower() not in {".jpg", ".png"}:
+            raise HTTPException(404, "photo introuvable")
+        return FileResponse(p)
+
     @r.post("/assistant")
     async def assistant_free(body: AssistantIn) -> dict[str, Any]:
         """The assistant with no model open: it can make one (made-to-measure parts, Blender)."""
         try:
             return await asyncio.to_thread(
-                assistant.chat, "", body.message[:2000], body.history, body.conversation
+                assistant.chat, "", _assistant_msg(body), body.history, body.conversation
             )
         except ValueError as err:
             raise HTTPException(422, str(err)) from err
@@ -1352,7 +1389,7 @@ def lab_router(cfg: config.Config) -> APIRouter:
         def journal():
             try:
                 for ev in assistant.chat_events(
-                    "", body.message[:2000], body.history, body.conversation
+                    "", _assistant_msg(body), body.history, body.conversation
                 ):
                     yield f"data: {json.dumps(ev, ensure_ascii=False)}\n\n"
             except ValueError as err:
