@@ -1278,6 +1278,8 @@ def test_the_assistant_runs_on_the_local_cli(web, monkeypatch):
     # round 2 resumes the CLI session instead of resending the whole fiche and history
     assert calls[1][calls[1].index("--resume") + 1] == "S1"
     assert "--system-prompt-file" not in calls[1]
+    # vibe refuses --thinking / --model on a resumed session ("only applies to a new session"): new runs only
+    assert "--thinking" in calls[0] and "--thinking" not in calls[1] and "--model" not in calls[1]
     # headless mode: the native tools are off (the workshop does the files itself), MCP (Blender…) stays approved
     off = {t: i for i, t in enumerate(calls[0])}
     assert "bash" in calls[0]
@@ -6936,3 +6938,164 @@ def test_assistant_catalogue_and_creer_piece_need_no_model():
         ({"piece": "boite", "valeurs": [1]}, "objet"),
     ):
         assert needle in assistant.run_tool("creer_piece", bad, "")["erreur"], bad
+
+
+def test_the_assistant_works_with_no_model_open_and_makes_one(web, monkeypatch):
+    """No model selected: the CLI brain is told so, makes a part (creer_piece) and the conversation then
+    follows the new file; a model tool asked before any file exists gets a clear error, not a crash.
+    """
+    from elegoo_lab import assistant
+
+    client, lib = web
+    monkeypatch.setattr(assistant, "moteur", lambda: "cli")
+    monkeypatch.setattr(assistant, "cli_bin", lambda: "/tmp/bin/vibe")
+    prompts: list[str] = []
+
+    def out(obj: dict):
+        class Ok:
+            returncode = 0
+            stderr = ""
+            stdout = json.dumps(
+                [
+                    {
+                        "sessionId": "S9",
+                        "role": "assistant",
+                        "type": "message",
+                        "content": [{"type": "text", "text": json.dumps(obj, ensure_ascii=False)}],
+                    }
+                ]
+            )
+
+        return Ok()
+
+    seq = [
+        out({"outil": "fiche"}),  # no model yet: must come back as an error
+        out(
+            {
+                "outils": [
+                    {
+                        "outil": "creer_piece",
+                        "arguments": {"piece": "boite", "valeurs": {"longueur": 100}},
+                    },
+                    {"outil": "fiche"},
+                ]
+            }
+        ),
+        out({"reponse": "Boîte créée."}),
+    ]
+
+    def fake_run(cmd, **kw):
+        prompts.append(cmd[cmd.index("-p") + 1])
+        return seq.pop(0)
+
+    monkeypatch.setattr(assistant.subprocess, "run", fake_run)
+    r = client.post("/lab/api/assistant", json={"message": "fais-moi une boîte de 100 mm"})
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["reply"] == "Boîte créée." and d["outils"] == ["fiche", "creer_piece", "fiche"]
+    assert d["file"].startswith("boite") and (lib / d["file"]).exists()
+    assert "Aucun modèle n'est ouvert" in prompts[0]
+    assert (
+        "aucun modèle ouvert" in prompts[1]
+    )  # the first fiche came back as an error the brain reads
+    assert d["file"] in prompts[2]  # after creer_piece, the fiche ran on the new box
+    assert assistant.run_tool("fiche", {}, "")["erreur"].startswith("aucun modèle ouvert")
+    # the same with the live journal: the turn runs with no model ("")
+    seen = {}
+
+    def fake_chat(name, message, history=None, conversation="", emit=None):
+        seen["name"] = name
+        emit({"type": "outil", "outil": "catalogue_pieces"})
+        return {"reply": "Bonjour !", "file": "", "outils": ["catalogue_pieces"]}
+
+    monkeypatch.setattr(assistant, "chat", fake_chat)
+    with client.stream("POST", "/lab/api/assistant/stream", json={"message": "salut"}) as st:
+        events = [json.loads(x[6:]) for x in st.iter_lines() if x.startswith("data: ")]
+    assert seen["name"] == "" and events[0] == {"type": "outil", "outil": "catalogue_pieces"}
+    assert events[-1]["type"] == "final" and events[-1]["reply"] == "Bonjour !"
+
+
+def test_assistant_understands_approximate_piece_keys_and_unknown_settings():
+    from elegoo_lab import assistant
+
+    assert assistant.resolve_piece("boite") == ("boite", "")
+    for asked, key in (
+        ("boite_couvercle", "boite"),
+        ("Boîte avec couvercle", "boite"),
+        ("engrenages", "engrenage"),
+        ("porte-clés", "porte_cles"),
+    ):
+        got, note = assistant.resolve_piece(asked)
+        assert got == key and asked in note, asked
+    with pytest.raises(ValueError, match="clés : boite"):
+        assistant.resolve_piece("xyz")
+    r = assistant.run_tool(
+        "creer_piece", {"piece": "boite_couvercle", "valeurs": {"longueur": 90}}, ""
+    )
+    assert (
+        r["fichier"].startswith("boite")
+        and "compris comme" in r["note"]
+        and r["objets"] == ["boite", "couvercle"]
+    )
+    assert "Ne la recrée pas" in r["c_est_fait"]
+    bad = assistant.run_tool("creer_piece", {"piece": "boite", "valeurs": {"diametre": 3}}, "")
+    assert "réglage(s) inconnu(s)" in bad["erreur"] and "longueur" in bad["erreur"]
+    named = assistant.run_tool("creer_piece", {"piece": "boite", "nom": "boite_80x50"}, "")
+    assert named["fichier"] == "boite_80x50.3mf"  # the key is not doubled
+    line = assistant.catalogue_line()
+    assert line.startswith("boite = Boîte avec couvercle (longueur") and "engrenage" in line
+
+
+def test_assistant_flags_file_names_it_made_up(tmp_path, monkeypatch):
+    from elegoo_lab import assistant, config
+
+    monkeypatch.setattr(config, "MODELS_DIR", tmp_path)
+    (tmp_path / "Cloud Strife (1).3mf").write_text("x")
+    (tmp_path / "cube.stl").write_text("x")
+    text = (
+        "J'ai créé « boite_80x50.stl » et `toto.3mf`. Le modèle cube.stl est là, ainsi que "
+        "« Cloud Strife (1).3mf » et Strife (1).3mf."
+    )
+    assert assistant.ghost_files(text) == ["boite_80x50.stl", "toto.3mf"]
+    assert assistant.ghost_files("rien à signaler") == []
+
+
+def test_assistant_checks_announced_files_once_then_warns(tmp_path, monkeypatch):
+    """The CLI brain claims a file it never wrote: one correction round, then a visible warning."""
+    from elegoo_lab import assistant, config
+
+    monkeypatch.setattr(config, "MODELS_DIR", tmp_path)
+    monkeypatch.setattr(assistant, "cli_bin", lambda: "/tmp/bin/vibe")
+    prompts = []
+
+    def out(text):
+        class Ok:
+            returncode = 0
+            stderr = ""
+            stdout = json.dumps(
+                [
+                    {
+                        "sessionId": "G1",
+                        "role": "assistant",
+                        "type": "message",
+                        "content": [{"type": "text", "text": text}],
+                    }
+                ]
+            )
+
+        return Ok()
+
+    seq = [
+        out(json.dumps({"reponse": "Fait : « boite_magique.stl » est prêt."})),
+        out(json.dumps({"reponse": "C'est fait, « boite_magique.stl » est dans la bibliothèque."})),
+    ]
+
+    def fake_run(cmd, **kw):
+        prompts.append(cmd[cmd.index("-p") + 1])
+        return seq.pop(0)
+
+    monkeypatch.setattr(assistant.subprocess, "run", fake_run)
+    r = assistant.chat_cli("", "fais une boîte", [], "c1")
+    assert "VÉRIFICATION DE L'ATELIER" in prompts[1] and "boite_magique.stl" in prompts[1]
+    assert "⚠ Vérification de l'atelier" in r["reply"] and "boite_magique.stl" in r["reply"]
+    assert len(prompts) == 2

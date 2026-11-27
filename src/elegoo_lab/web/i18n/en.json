@@ -1468,7 +1468,8 @@
 "aucune des coupes préférées ne laisse toutes les pièces sur le plateau": "none of the preferred cuts leaves every piece on the plate",
 "le CLI vibe est introuvable": "the vibe CLI cannot be found",
 "pas de liste « choix » dans la réponse": "no “choix” list in the reply",
-"réponse sans JSON lisible": "reply without readable JSON"
+"réponse sans JSON lisible": "reply without readable JSON",
+"Décris la pièce à fabriquer : « une boîte de 100 × 60 mm avec couvercle »…": "Describe the part to make: “a 100 × 60 mm box with a lid”…"
 },
 "patterns": [
 [

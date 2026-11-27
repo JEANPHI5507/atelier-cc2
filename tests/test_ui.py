@@ -895,3 +895,15 @@ def test_large_format_needs_the_preview_before_slicing(page, site):
     page.click("#gf-preview")
     page.wait_for_selector("#gf-out:has-text('zone illisible')")
     assert page.errors == []
+
+
+def test_the_assistant_is_there_with_no_model_selected(page):
+    """Nothing selected: the assistant offers to make a part; picking a model gives the usual assistant back."""
+    page.wait_for_selector("#chat-sec:not([hidden])")
+    assert "Décris la pièce à fabriquer" in page.get_attribute("#chat-in", "placeholder")
+    assert page.is_hidden("#chat-sug")
+    page.click("#files .file[data-n='cube.stl']")
+    page.wait_for_function(
+        "() => !document.getElementById('chat-in').placeholder.startsWith('Décris la pièce')"
+    )
+    assert page.errors == []
