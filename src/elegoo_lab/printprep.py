@@ -72,6 +72,13 @@ def bled_purge(src: Path) -> bool:
     return bool(BLED & set(r.get("issues", [])))
 
 
+def plane_json(c: cut.Plane) -> dict[str, Any]:
+    out: dict[str, Any] = {"axis": "XYZ"[c.axis], "mm": round(float(c.pos), 1)}
+    if c.angle:
+        out.update(angle=c.angle, toward="XYZ"[c.lean])
+    return out
+
+
 VIVID = [
     (66.0, 133, 244),
     (52, 168, 83),
@@ -232,6 +239,7 @@ def prepare_and_slice(
     screen_thumbnail: bool = True,
     forbidden: Sequence[cut.Zone] = (),
     auto_pose: bool = False,
+    oblique: bool = False,
 ) -> dict[str, Any]:
     """``mapping``: source colour index -> slot (1..4); colours not listed keep the suggested slot.
     ``palette``: the loaded spools' colours (slot 1 first): the model is repainted with them first.
@@ -330,6 +338,7 @@ def prepare_and_slice(
             smart_flush=flush,
             forbidden=forbidden,
             auto_pose=auto_pose,
+            oblique=oblique,
         )
 
     target, slot_hex = src, None
@@ -581,6 +590,7 @@ def _split_and_slice(
     smart_flush: bool | None = None,
     forbidden: Sequence[cut.Zone] = (),
     auto_pose: bool = False,
+    oblique: bool = False,
 ) -> dict[str, Any]:
     """Cut a too-big model into pieces with dowel holes; one G-code per piece plus one for the dowels."""
     if smart_flush is None:
@@ -589,7 +599,7 @@ def _split_and_slice(
         src, slots, height_mm=height_mm, rotate=rotate, palette=palette
     )
     slot_hex = _real_colours(slot_hex, slot_colours, len(slot_hex))
-    res = cut.cut(v, f, face_slots, name=src.stem, forbidden=forbidden)
+    res = cut.cut(v, f, face_slots, name=src.stem, forbidden=forbidden, oblique=oblique)
     n = len(slot_hex)
     layer_level = _layer_mode(advanced, usage)
     sup_on, sup_ov = support_overrides(supports, plate_only)
@@ -704,7 +714,7 @@ def _split_and_slice(
         "mode": mode,
         "pieces": pieces,
         "pins": pins,
-        "planes": [{"axis": "XYZ"[a], "mm": round(float(pos), 1)} for a, pos in res.planes],
+        "planes": [plane_json(c) for c in res.cuts],
         "total_m": round(total, 2),
         "alerts": res.alerts,
         "pin_count": res.pin_count,
@@ -735,6 +745,7 @@ def cut_preview(
     explode: float = 0.3,
     show_planes: bool = False,
     distinct: bool = False,
+    oblique: bool = False,
 ) -> tuple[dict[str, Any], trimesh.Trimesh]:
     """Where the model would be cut, plus a tinted view of the pieces, pushed apart by ``explode``
     (Y-up for the viewer). ``show_planes`` adds a translucent disc-like quad on every cut plane."""
@@ -743,7 +754,7 @@ def cut_preview(
     if not height_mm and mesh.info(src).get("unitless"):
         height_mm = mesh.DEFAULT_AI_HEIGHT_MM
     v, f, face_slots, slot_hex = colors.solid(src, slots, height_mm=height_mm, palette=palette)
-    res = cut.cut(v, f, face_slots, name=src.stem, forbidden=forbidden)
+    res = cut.cut(v, f, face_slots, name=src.stem, forbidden=forbidden, oblique=oblique)
     rgb = {i + 1: colors._rgb(h) for i, h in enumerate(slot_hex)}
     tints = [
         np.array(t)
@@ -773,14 +784,34 @@ def cut_preview(
         show_planes and res.planes
     ):  # one translucent red quad per plane, a little larger than the model
         lo, hi = v.min(axis=0), v.max(axis=0)
-        for axis, pos in res.planes:
+        for cp in res.cuts:
+            axis, pos = cp.axis, cp.pos
             a, b = [k for k in range(3) if k != axis]
             quad = np.zeros((4, 3))
-            quad[:, axis] = pos
-            corners = ((lo[a], lo[b]), (hi[a], lo[b]), (hi[a], hi[b]), (lo[a], hi[b]))
-            for i, (ca, cb) in enumerate(corners):
-                quad[i, a] = ca - 5 if ca == lo[a] else ca + 5
-                quad[i, b] = cb - 5 if cb == lo[b] else cb + 5
+            if (
+                cp.angle
+            ):  # a slanted plane: a square in its own plane, as large as the model's diagonal
+                n = cp.normal()
+                mid = (lo + hi) / 2
+                mid = mid + (cp.d - n @ mid) * n
+                u = np.cross(n, [1.0, 0, 0] if abs(n[0]) < 0.9 else [0, 1.0, 0])
+                u /= np.linalg.norm(u)
+                w = np.cross(n, u)
+                r = np.linalg.norm(hi - lo) / 2 + 5
+                quad = np.array(
+                    [
+                        mid - r * u - r * w,
+                        mid + r * u - r * w,
+                        mid + r * u + r * w,
+                        mid - r * u + r * w,
+                    ]
+                )
+            else:
+                quad[:, axis] = pos
+                corners = ((lo[a], lo[b]), (hi[a], lo[b]), (hi[a], hi[b]), (lo[a], hi[b]))
+                for i, (ca, cb) in enumerate(corners):
+                    quad[i, a] = ca - 5 if ca == lo[a] else ca + 5
+                    quad[i, b] = cb - 5 if cb == lo[b] else cb + 5
             allf = np.vstack(
                 [
                     allf,
@@ -795,7 +826,7 @@ def cut_preview(
     allv = np.c_[allv[:, 0], allv[:, 2], -allv[:, 1]]  # Z-up -> Y-up
     view = trimesh.Trimesh(allv, allf, face_colors=rgba, process=False)
     summary = {
-        "planes": [{"axis": "XYZ"[a], "mm": round(float(pos), 1)} for a, pos in res.planes],
+        "planes": [plane_json(c) for c in res.cuts],
         "pieces": [
             {"name": p.name, "size_mm": np.ptp(p.vertices, axis=0).round(1).tolist()}
             for p in res.pieces

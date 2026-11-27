@@ -43,6 +43,46 @@ def alert(kind: str, message: str, *, blocking: bool = False) -> dict[str, Any]:
     return {"type": kind, "message": message, "bloquante": blocking}
 
 
+OBLIQUE_DEG = (15.0, -15.0, 30.0, -30.0)  # slanted cuts tried besides the aligned ones
+OBLIQUE_GAIN = (
+    0.9  # a slanted cut must beat the best aligned one by 10 %: aligned planes are steadier
+)
+
+
+@dataclass(frozen=True)
+class Plane:
+    """A cut plane ``normal . x = d``: perpendicular to ``axis``, or leaning ``angle`` degrees toward
+    axis ``lean`` (-1 when aligned). ``pos`` is where it crosses the model's centre line along ``axis``.
+    """
+
+    axis: int
+    pos: float
+    d: float
+    lean: int = -1
+    angle: float = 0.0
+
+    def normal(self) -> np.ndarray:
+        n = np.zeros(3)
+        n[self.axis] = math.cos(math.radians(self.angle))
+        if self.lean >= 0:
+            n[self.lean] = math.sin(math.radians(self.angle))
+        return n
+
+    def label(self, origin: np.ndarray) -> str:
+        text = f"{'XYZ'[self.axis]} = {self.pos - origin[self.axis]:.0f} mm"
+        if self.lean >= 0:
+            text += f" (∠{self.angle:+g}° → {'XYZ'[self.lean]})"
+        return text
+
+
+def make_plane(axis: int, d: float, lean: int, angle: float, centre: np.ndarray) -> Plane:
+    """The plane of offset ``d`` along its normal, with its crossing of the centre line worked out."""
+    if lean < 0:
+        return Plane(axis, float(d), float(d))
+    c, s = math.cos(math.radians(angle)), math.sin(math.radians(angle))
+    return Plane(axis, float((d - s * centre[lean]) / c), float(d), lean, float(angle))
+
+
 @dataclass
 class Piece:
     name: str
@@ -59,6 +99,7 @@ class CutResult:
     pin_count: int
     pin_depths: list[float] = field(default_factory=list)
     alerts: list[dict[str, Any]] = field(default_factory=list)
+    cuts: list[Plane] = field(default_factory=list)  # the planes in full (slant included)
 
 
 def _to_manifold(v: np.ndarray, f: np.ndarray) -> mf.Manifold:
@@ -100,6 +141,14 @@ def _to_z(axis: int) -> np.ndarray:
     return cast("np.ndarray", np.c_[r, np.zeros(3)])
 
 
+def _frame(axis: int, lean: int = -1, angle: float = 0.0) -> np.ndarray:
+    """3x4 transform bringing the normal of that plane onto +Z."""
+    if lean < 0:
+        return _to_z(axis)
+    n = Plane(axis, 0.0, 0.0, lean, angle).normal()
+    return cast("np.ndarray", trimesh.geometry.align_vectors(n, [0, 0, 1])[:3, :4])
+
+
 def _inside(points: np.ndarray, rings: list[np.ndarray]) -> np.ndarray:
     """Even-odd point-in-polygon over all rings (outer contours and holes alike)."""
     inside = np.zeros(len(points), bool)
@@ -116,12 +165,12 @@ def _inside(points: np.ndarray, rings: list[np.ndarray]) -> np.ndarray:
 
 
 def _pin_points(
-    solid: mf.Manifold, axis: int, pos: float
+    solid: mf.Manifold, cut_plane: Plane
 ) -> tuple[np.ndarray, float, np.ndarray] | None:
-    """Dowel positions (2D, in the rotated frame) spread over the cut section."""
-    xf = _to_z(axis)
+    """Dowel positions (2D, in the plane's own frame) spread over the cut section."""
+    xf = _frame(cut_plane.axis, cut_plane.lean, cut_plane.angle)
     rotated = solid.transform(xf)
-    z = (xf[:, :3] @ np.eye(3)[axis])[2] * pos
+    z = cut_plane.d
     section = rotated.slice(z)
     inset = section.offset(-(PIN_D / 2 + config.dowel_play() + WALL), mf.JoinType.Round)
     rings = [np.asarray(r) for r in inset.to_polygons() if len(r) >= 3]
@@ -176,24 +225,43 @@ ISLAND_PENALTY = (
 BALANCE = 0.3  # cost x (1 + BALANCE * offset/extent): offsets are at most half the extent → ≤ +15 %
 
 
-def section_profile(solid: mf.Manifold, axis: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Positions along ``axis`` with the cut area (mm²) and number of separate islands there."""
-    lo, hi = solid.bounding_box()[axis], solid.bounding_box()[axis + 3]
-    rotated = solid.transform(_to_z(axis))
+def _profile(
+    solid: mf.Manifold, xf: np.ndarray
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, float, float]:
+    """Slices along +Z of the transformed solid: offsets, area, islands, and the Z range."""
+    rotated = solid.transform(xf)
+    lo, hi = rotated.bounding_box()[2], rotated.bounding_box()[5]
     pos = np.arange(lo + STEP_MM, hi - STEP_MM / 2, STEP_MM)
     area, islands = np.zeros(len(pos)), np.zeros(len(pos), int)
     for i, t in enumerate(pos):
         cs = rotated.slice(float(t))
         area[i] = cs.area()
         islands[i] = len(cs.decompose()) if area[i] > 0 else 0
+    return pos, area, islands, float(lo), float(hi)
+
+
+def section_profile(solid: mf.Manifold, axis: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Positions along ``axis`` with the cut area (mm²) and number of separate islands there."""
+    pos, area, islands, _, _ = _profile(solid, _to_z(axis))
     return pos, area, islands
 
 
-def _blocked(pos: np.ndarray, axis: int, zones: Sequence[Zone]) -> np.ndarray:
-    hit = np.zeros(len(pos), bool)
+def _hits(normal: np.ndarray, d: np.ndarray, zones: Sequence[Zone]) -> np.ndarray:
+    """Which planes ``normal . x = d`` cross a forbidden box (min/max of n.x over the box)."""
+    hit = np.zeros(len(d), bool)
     for lo, hi in zones:
-        hit |= (pos >= lo[axis]) & (pos <= hi[axis])
+        a = [
+            normal[i] * (lo[i] if normal[i] > 0 else hi[i]) if normal[i] else 0.0 for i in range(3)
+        ]
+        b = [
+            normal[i] * (hi[i] if normal[i] > 0 else lo[i]) if normal[i] else 0.0 for i in range(3)
+        ]
+        hit |= (d >= sum(a)) & (d <= sum(b))
     return hit
+
+
+def _blocked(pos: np.ndarray, axis: int, zones: Sequence[Zone]) -> np.ndarray:
+    return _hits(np.eye(3)[axis], pos, zones)
 
 
 def _even(solid: mf.Manifold, axis: int, count: int) -> list[float]:
@@ -201,18 +269,23 @@ def _even(solid: mf.Manifold, axis: int, count: int) -> list[float]:
     return [lo + (hi - lo) * i / count for i in range(1, count)]
 
 
-def search_planes(
-    solid: mf.Manifold, axis: int, count: int, max_mm: float, forbidden: Sequence[Zone] = ()
-) -> list[float] | None:
-    """``count - 1`` cut positions keeping every piece <= max_mm, at the most discreet places
-    (smallest section, fewest islands), outside the forbidden zones; None if no such sequence."""
-    lo, hi = solid.bounding_box()[axis], solid.bounding_box()[axis + 3]
-    pos, area, islands = section_profile(solid, axis)
+def _dp(
+    pos: np.ndarray,
+    area: np.ndarray,
+    islands: np.ndarray,
+    lo: float,
+    hi: float,
+    count: int,
+    max_mm: float,
+    blocked: np.ndarray,
+) -> tuple[list[float], float] | None:
+    """The ``count - 1`` offsets keeping every piece <= max_mm at the most discreet places (smallest
+    section, fewest islands), and the cost of that choice; None if no admissible sequence exists."""
     cost = area + ISLAND_PENALTY * np.maximum(islands - 1, 0)
     cost[area <= 0] = np.inf  # never cut through empty space between parts (no gain, no dowel)
     ok = (pos - lo >= MIN_PIECE_MM) & (hi - pos >= MIN_PIECE_MM)
     cost[~ok] = np.inf
-    cost[_blocked(pos, axis, forbidden)] = np.inf
+    cost[blocked] = np.inf
     n, k = len(pos), count - 1
     # mild preference for balanced pieces (≤ +15 % far from even spacing): a real narrowing still wins
     ideal = [lo + (hi - lo) * (c + 1) / count for c in range(k)]
@@ -232,11 +305,54 @@ def search_planes(
     if not np.isfinite(last).any():
         return None
     j = int(np.argmin(last))
+    total = float(last[j])
     out = [j]
     for c in range(k - 1, 0, -1):
         j = back[c, j]
         out.append(j)
-    return sorted(float(pos[i]) for i in out)
+    return sorted(float(pos[i]) for i in out), total
+
+
+def search_planes(
+    solid: mf.Manifold, axis: int, count: int, max_mm: float, forbidden: Sequence[Zone] = ()
+) -> list[float] | None:
+    """``count - 1`` aligned cut positions (see ``_dp``), outside the forbidden zones; None if none."""
+    pos, area, islands, lo, hi = _profile(solid, _to_z(axis))
+    found = _dp(pos, area, islands, lo, hi, count, max_mm, _blocked(pos, axis, forbidden))
+    return found[0] if found else None
+
+
+def _aligned_cost(
+    solid: mf.Manifold, axis: int, count: int, max_mm: float, zones: Sequence[Zone]
+) -> tuple[list[float], float] | None:
+    pos, area, islands, lo, hi = _profile(solid, _to_z(axis))
+    return _dp(pos, area, islands, lo, hi, count, max_mm, _blocked(pos, axis, zones))
+
+
+def _slanted(
+    solid: mf.Manifold,
+    axis: int,
+    count: int,
+    max_mm: float,
+    zones: Sequence[Zone],
+    lean: int,
+    angle: float,
+    centre: np.ndarray,
+) -> tuple[list[Plane], float] | None:
+    """Parallel planes leaning ``angle`` degrees toward axis ``lean``. A slab between two of them is taller
+    than its thickness (``t / cos`` plus the climb across the model), so the thickness allowed is cut down.
+    """
+    ext = solid.bounding_box()[lean + 3] - solid.bounding_box()[lean]
+    th = math.radians(abs(angle))
+    eff = (max_mm - ext * math.tan(th)) * math.cos(th)
+    if eff < MIN_PIECE_MM * 2:
+        return None
+    pos, area, islands, lo, hi = _profile(solid, _frame(axis, lean, angle))
+    n = Plane(axis, 0.0, 0.0, lean, angle).normal()
+    found = _dp(pos, area, islands, lo, hi, count, eff, _hits(n, pos, zones))
+    if found is None:
+        return None
+    return [make_plane(axis, d, lean, angle, centre) for d in found[0]], found[1]
 
 
 def best_planes(solid: mf.Manifold, axis: int, count: int, max_mm: float) -> list[float]:
@@ -282,10 +398,67 @@ def cut(
     name: str = "piece",
     smart: bool = True,
     forbidden: Sequence[Zone] = (),
+    oblique: bool = False,
+) -> CutResult:
+    """Cut a model into pieces that fit the plate. ``oblique``: slanted planes (15°, 30°) are tried too, and
+    kept where they pass through a clearly narrower section; if they leave a piece too big, the aligned
+    cuts are used instead."""
+    res = _cut_once(v, f, slots, max_mm, name, smart, forbidden, oblique)
+    if (
+        oblique
+        and any(c.angle for c in res.cuts)
+        and any(a["type"] == "trop_grande" for a in res.alerts)
+    ):
+        res = _cut_once(v, f, slots, max_mm, name, smart, forbidden, False)
+        res.alerts.append(
+            alert(
+                "biais_abandonne",
+                "Les coupes en biais laissaient une pièce trop grande : coupes alignées gardées.",
+            )
+        )
+    return res
+
+
+def _axis_planes(
+    solid: mf.Manifold,
+    axis: int,
+    count: int,
+    max_mm: float,
+    zones: Sequence[Zone],
+    oblique: bool,
+    centre: np.ndarray,
+) -> list[Plane] | None:
+    """The planes cutting ``axis`` into ``count`` pieces: aligned ones, or slanted ones where clearly cheaper."""
+    aligned = _aligned_cost(solid, axis, count, max_mm, zones)
+    if aligned is None and zones:  # one more piece may let the cuts avoid the zones
+        aligned = _aligned_cost(solid, axis, count + 1, max_mm, zones)
+    best: tuple[list[Plane], float] | None = None
+    if oblique:
+        for lean in (a for a in range(3) if a != axis):
+            for angle in OBLIQUE_DEG:
+                got = _slanted(solid, axis, count, max_mm, zones, lean, angle, centre)
+                if got is not None and (best is None or got[1] < best[1]):
+                    best = got
+    if best is not None and (aligned is None or best[1] < OBLIQUE_GAIN * aligned[1]):
+        return best[0]
+    if aligned is None:
+        return None
+    return [make_plane(axis, d, -1, 0.0, centre) for d in aligned[0]]
+
+
+def _cut_once(
+    v: np.ndarray,
+    f: np.ndarray,
+    slots: np.ndarray,
+    max_mm: float,
+    name: str,
+    smart: bool,
+    forbidden: Sequence[Zone],
+    oblique: bool,
 ) -> CutResult:
     solid = _to_manifold(v, f)
     lo, hi = np.asarray(solid.bounding_box()[:3]), np.asarray(solid.bounding_box()[3:])
-    planes = []
+    cuts: list[Plane] = []
     alerts: list[dict[str, Any]] = []
     origin = np.array([(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, lo[2]])
     zones: list[Zone] = [
@@ -295,13 +468,12 @@ def cut(
         )
         for z0, z1 in forbidden
     ]
+    centre = (lo + hi) / 2
     for a, k in plan(hi - lo, max_mm):
         if smart:
-            spots = search_planes(solid, a, k, max_mm, zones)
-            if spots is None and zones:  # one more piece may let the cuts avoid the zones
-                spots = search_planes(solid, a, k + 1, max_mm, zones)
-            if spots is None:
-                spots = _even(solid, a, k)
+            found = _axis_planes(solid, a, k, max_mm, zones, oblique, centre)
+            if found is None:
+                found = [make_plane(a, d, -1, 0.0, centre) for d in _even(solid, a, k)]
                 alerts.append(
                     alert(
                         "coupe_reguliere",
@@ -309,16 +481,18 @@ def cut(
                     )
                 )
         else:
-            spots = [lo[a] + (hi[a] - lo[a]) * i / k for i in range(1, k)]
-        planes += [(a, p) for p in spots]
-    if not planes:
+            found = [
+                make_plane(a, lo[a] + (hi[a] - lo[a]) * i / k, -1, 0.0, centre) for i in range(1, k)
+            ]
+        cuts += found
+    if not cuts:
         return CutResult([Piece(name, v, f, slots)], None, [], 0)
-    for a, p in planes:
-        if _blocked(np.array([p]), a, zones)[0]:
+    for c in cuts:
+        if _hits(c.normal(), np.array([c.d]), zones)[0]:
             alerts.append(
                 alert(
                     "zone_interdite",
-                    f"La coupe {'XYZ'[a]} = {p - origin[a]:.0f} mm traverse une zone interdite : aucune autre position ne convient.",
+                    f"La coupe {c.label(origin)} traverse une zone interdite : aucune autre position ne convient.",
                     blocking=True,
                 )
             )
@@ -339,8 +513,8 @@ def cut(
     def _inside(c: mf.Manifold) -> bool:  # a hole must stay inside the material
         return bool((c - solid).volume() <= PIERCE_TOLERANCE * c.volume())
 
-    for axis, pos in planes:
-        res = _pin_points(solid, axis, pos)
+    for cp in cuts:
+        res = _pin_points(solid, cp)
         placed = 0
         if res is not None:
             pts, z, xf = res
@@ -368,7 +542,7 @@ def cut(
             alerts.append(
                 alert(
                     "sans_cheville",
-                    f"Aucune cheville possible sur la coupe {'XYZ'[axis]} = {pos:.0f} mm "
+                    f"Aucune cheville possible sur la coupe {cp.label(origin)} "
                     "(section trop fine) : les deux pièces seront à coller sans repère.",
                 )
             )
@@ -383,12 +557,10 @@ def cut(
         solid = solid - mf.Manifold.batch_boolean(holes, mf.OpType.Add)
 
     pieces = [solid]
-    for axis, pos in planes:
-        normal = [0.0, 0.0, 0.0]
-        normal[axis] = 1.0
+    for cp in cuts:
         nxt = []
         for p in pieces:
-            above, below = p.split_by_plane(normal, pos)
+            above, below = p.split_by_plane(cp.normal().tolist(), cp.d)
             nxt += [q for q in (below, above) if not q.is_empty()]
         pieces = nxt
 
@@ -414,4 +586,4 @@ def cut(
             dowels.append(one.apply_translation([(k % cols) * 9, (k // cols) * 9, length / 2]))
         pin_mesh = cast("trimesh.Trimesh", trimesh.util.concatenate(dowels))
     alerts += check_pieces(out, max_mm)
-    return CutResult(out, pin_mesh, planes, len(pins), pins, alerts)
+    return CutResult(out, pin_mesh, [(c.axis, c.pos) for c in cuts], len(pins), pins, alerts, cuts)

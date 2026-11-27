@@ -6405,8 +6405,8 @@ def test_assistant_couper_and_grand_format_tools(tmp_path, monkeypatch):
     assert "zone" in assistant.run_tool("couper", {"interdites": [{"x": 1}]}, "fig.stl")["erreur"]
     seen = {}
 
-    def fake_exec(src, h, zones, **kw):
-        seen.update(h=h, zones=zones, **kw)
+    def fake_exec(src, h, zones, biais, **kw):
+        seen.update(h=h, zones=zones, biais=biais, **kw)
         return {"bilan": {"pieces": 2}, "gcode": ["a.gcode"], "alertes": [], "avertissements": []}
 
     monkeypatch.setattr(grandformat, "executer", fake_exec)
@@ -6414,6 +6414,11 @@ def test_assistant_couper_and_grand_format_tools(tmp_path, monkeypatch):
         "grand_format", {"hauteur": 300, "trancher": True, "remplissage": 150}, "fig.stl"
     )
     assert r["bilan"]["pieces"] == 2 and seen["h"] == 300 and seen["infill"] == 100
+    assert seen["biais"] is True
+    assistant.run_tool(
+        "grand_format", {"hauteur": 300, "trancher": True, "biais": False}, "fig.stl"
+    )
+    assert seen["biais"] is False
 
 
 def test_grand_format_api(web):
@@ -6520,3 +6525,122 @@ def test_grand_format_api_slices(web):
     r = client.post("/lab/api/models/fig.stl/grand-format/trancher", json={"hauteur": 300})
     assert r.status_code == 200, r.text
     assert r.json()["bilan"]["pieces"] == 2 and r.json()["gcode"]
+
+
+# --- slanted cut planes ------------------------------------------------------------------------------
+
+
+def _slanted_neck():
+    """Two blocks joined by a neck leaning 30° toward +Y: the narrowest section is across the neck."""
+    import math
+
+    import numpy as np
+
+    low = trimesh.creation.box((80, 80, 80))
+    low.apply_translation((0, 0, 40))
+    d = np.array([0, math.sin(math.radians(30)), math.cos(math.radians(30))])
+    neck = trimesh.creation.cylinder(radius=10, height=200, sections=48)
+    neck.apply_transform(trimesh.geometry.align_vectors([0, 0, 1], d))
+    neck.apply_translation(np.array([0, 0, 80]) + d * 100)
+    up = trimesh.creation.box((80, 80, 80))
+    up.apply_translation(np.array([0, 0, 80]) + d * 200 + [0, 0, 40])
+    return trimesh.boolean.union([low, neck, up], engine="manifold")
+
+
+def test_plane_geometry_and_zone_hits():
+    import numpy as np
+
+    from elegoo_lab import cut
+
+    p = cut.make_plane(2, 100.0, 1, 30.0, np.array([0.0, 10.0, 0.0]))
+    n = p.normal()
+    assert np.allclose(n, [0, 0.5, 0.8660254]) and abs(np.linalg.norm(n) - 1) < 1e-9
+    assert p.pos == pytest.approx((100 - 0.5 * 10) / 0.8660254)
+    assert "∠+30" in p.label(np.zeros(3)) and "Y" in p.label(np.zeros(3))
+    flat = cut.make_plane(1, 50.0, -1, 0.0, np.zeros(3))
+    assert (
+        flat.normal().tolist() == [0, 1, 0]
+        and flat.pos == flat.d == 50.0
+        and "∠" not in flat.label(np.zeros(3))
+    )
+    box = ((-cut.INF, -cut.INF, 100.0), (cut.INF, cut.INF, 120.0))
+    d = np.array([50.0, 95.0, 125.0, 200.0])
+    # a band over the whole of X and Y is crossed by every slanted plane (it climbs across the model)
+    assert cut._hits(n, d, [box]).all()
+    small = ((-5.0, -5.0, 100.0), (5.0, 5.0, 120.0))  # n.x over this box runs from 84.1 to 106.4
+    assert cut._hits(n, d, [small]).tolist() == [False, True, False, False]
+    assert cut._hits(n, np.array([90.0, 100.0]), [small]).tolist() == [True, True]
+
+
+def test_oblique_cut_goes_through_the_slanted_neck():
+    import numpy as np
+
+    from elegoo_lab import cut
+
+    m = _slanted_neck()
+    v, f = np.asarray(m.vertices), np.asarray(m.faces)
+    slots = np.ones(len(f), int)
+    plain = cut.cut(v, f, slots)
+    assert all(c.angle == 0 for c in plain.cuts)
+    res = cut.cut(v, f, slots, oblique=True)
+    (c,) = res.cuts
+    assert (
+        c.angle in (15.0, 30.0) and c.lean == 1 and c.angle > 0
+    )  # leaning with the neck, toward +Y
+    assert res.pin_count >= 1 and len(res.pieces) == 2
+    for p in res.pieces:
+        assert trimesh.Trimesh(p.vertices, p.faces, process=False).is_watertight
+        assert cut.fits(np.ptp(p.vertices, axis=0), 246.0)
+    assert not any(a["bloquante"] for a in res.alerts)
+    # the slanted cut really is cheaper than the aligned one through the same neck
+    solid = cut._to_manifold(v, f)
+    aligned = cut._aligned_cost(solid, 2, 2, 246.0, [])
+    slanted = cut._slanted(
+        solid,
+        2,
+        2,
+        246.0,
+        [],
+        1,
+        c.angle,
+        (np.array(solid.bounding_box()[:3]) + solid.bounding_box()[3:]) / 2,
+    )
+    assert aligned and slanted and slanted[1] < cut.OBLIQUE_GAIN * aligned[1]
+
+
+def test_oblique_falls_back_to_aligned_cuts_when_a_piece_stays_too_big(monkeypatch):
+    import numpy as np
+
+    from elegoo_lab import cut
+
+    m = _slanted_neck()
+    v, f = np.asarray(m.vertices), np.asarray(m.faces)
+    real = cut.check_pieces
+    seen = []
+
+    def strict(pieces, max_mm):  # pretend every slanted result leaves a piece too big
+        out = real(pieces, max_mm)
+        seen.append(1)
+        return [*out, cut.alert("trop_grande", "x", blocking=True)] if len(seen) == 1 else out
+
+    monkeypatch.setattr(cut, "check_pieces", strict)
+    res = cut.cut(v, f, np.ones(len(f), int), oblique=True)
+    assert all(c.angle == 0 for c in res.cuts)
+    assert any(a["type"] == "biais_abandonne" for a in res.alerts)
+
+
+def test_grand_format_reports_the_lean_and_can_turn_it_off(tmp_path):
+    import numpy as np
+
+    from elegoo_lab import grandformat
+
+    src = tmp_path / "cou.stl"
+    _slanted_neck().export(src)
+    on = grandformat.plan(src, 333)
+    off = grandformat.plan(src, 333, biais=False)
+    assert on["plans"][0]["angle"] > 0 and on["plans"][0]["vers"] == "Y"
+    assert "angle" not in off["plans"][0]
+    assert on["ok"] and off["ok"]
+    _, glb = grandformat.preview(src, 333)
+    assert glb[:4] == b"glTF"
+    assert np.isclose(grandformat.plan(src, 333)["taille_mm"][2], 333.0, atol=1)

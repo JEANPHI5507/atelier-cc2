@@ -77,18 +77,21 @@ def _solid(src: Path, hauteur_mm: float) -> tuple[np.ndarray, np.ndarray, np.nda
 
 
 def plan(
-    src: Path, hauteur_mm: float, interdites: list[dict[str, Any]] | None = None
+    src: Path,
+    hauteur_mm: float,
+    interdites: list[dict[str, Any]] | None = None,
+    biais: bool = True,
 ) -> dict[str, Any]:
     """Pieces, cut planes, positions and alerts for this height. Slices nothing. ``ok`` is False while
     an alert blocks (a piece that cannot fit the plate, a cut forced through a forbidden zone)."""
     hauteur_mm = _check_height(hauteur_mm)
     zones = parse_zones(interdites)
     st = src.stat()
-    key = (str(src), st.st_mtime_ns, st.st_size, hauteur_mm, tuple(map(repr, zones)))
+    key = (str(src), st.st_mtime_ns, st.st_size, hauteur_mm, tuple(map(repr, zones)), biais)
     if key in _cache:
         return _cache[key]
     v, f, face_slots = _solid(src, hauteur_mm)
-    res = cut.cut(v, f, face_slots, name=src.stem, forbidden=zones)
+    res = cut.cut(v, f, face_slots, name=src.stem, forbidden=zones, oblique=biais)
     limit = mesh.BED_MM - cut.MARGIN_MM
     alerts = list(res.alerts)
     pieces = []
@@ -118,9 +121,7 @@ def plan(
     out = {
         "hauteur_mm": hauteur_mm,
         "taille_mm": np.ptp(v, axis=0).round(1).tolist(),
-        "plans": [
-            {"axe": "XYZ"[a], "mm": round(float(pos - origin[a]), 1)} for a, pos in res.planes
-        ],
+        "plans": [_plane_json(c, origin) for c in res.cuts],
         "pieces": pieces,
         "chevilles": res.pin_count,
         "alertes": alerts,
@@ -132,8 +133,18 @@ def plan(
     return out
 
 
+def _plane_json(c: cut.Plane, origin: np.ndarray) -> dict[str, Any]:
+    out: dict[str, Any] = {"axe": "XYZ"[c.axis], "mm": round(float(c.pos - origin[c.axis]), 1)}
+    if c.angle:
+        out.update(angle=c.angle, vers="XYZ"[c.lean])
+    return out
+
+
 def preview(
-    src: Path, hauteur_mm: float, interdites: list[dict[str, Any]] | None = None
+    src: Path,
+    hauteur_mm: float,
+    interdites: list[dict[str, Any]] | None = None,
+    biais: bool = True,
 ) -> tuple[dict[str, Any], bytes]:
     """The plan and a GLB: one colour per piece (slightly apart) and a translucent quad on each cut plane."""
     hauteur_mm = _check_height(hauteur_mm)
@@ -144,8 +155,9 @@ def preview(
         explode=0.08,
         show_planes=True,
         distinct=True,
+        oblique=biais,
     )
-    return plan(src, hauteur_mm, interdites), cast("bytes", view.export(file_type="glb"))
+    return plan(src, hauteur_mm, interdites, biais), cast("bytes", view.export(file_type="glb"))
 
 
 _TIME = re.compile(r"(?:(\d+)d)?\s*(?:(\d+)h)?\s*(?:(\d+)m)?\s*(?:(\d+)s)?")
@@ -169,11 +181,12 @@ def executer(
     src: Path,
     hauteur_mm: float,
     interdites: list[dict[str, Any]] | None = None,
+    biais: bool = True,
     **options: Any,
 ) -> dict[str, Any]:
     """Slice every piece (and the plate of dowels). Refuses while the plan has a blocking alert.
     ``options`` go to ``printprep.prepare_and_slice`` (usage, supports, quality, infill, …)."""
-    p = plan(src, hauteur_mm, interdites)
+    p = plan(src, hauteur_mm, interdites, biais)
     if not p["ok"]:
         raise ValueError(
             "plan à corriger avant de trancher : "
@@ -186,6 +199,7 @@ def executer(
         split=True,
         forbidden=parse_zones(interdites),
         auto_pose=True,
+        oblique=biais,
         screen_thumbnail=False,
         **options,
     )
