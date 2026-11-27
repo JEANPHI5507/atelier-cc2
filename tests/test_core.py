@@ -6458,3 +6458,65 @@ def test_grand_format_slices_every_piece_and_gives_the_balance(tmp_path):
     assert b["pieces"] == 2 and b["filament_g"] > 0 and b["cout_eur"] > 0 and b["duree_s"] > 0
     assert b["chevilles"] >= 1 and len(r["gcode"]) >= 3  # two pieces + the dowels' plate
     assert all((config.MODELS_DIR / g).exists() for g in r["gcode"])
+
+
+def test_cut_thin_wall_and_no_cut_needed():
+    import numpy as np
+
+    from elegoo_lab import cut
+
+    # nothing to cut: one piece, no plane, no alert
+    small = trimesh.creation.box((40, 40, 40))
+    res = cut.cut(np.asarray(small.vertices), np.asarray(small.faces), np.ones(12, int))
+    assert len(res.pieces) == 1 and not res.planes and not res.alerts
+    # a spindle narrowing fast on both sides of the cut: the hole stays inside the material at 5 mm
+    # but its wall is thinner than MIN_WALL_MM, so the dowel is kept and the thin wall is reported
+    spindle = trimesh.creation.revolve(np.array([[0, 1.7], [6.0, 15.0], [0, 28.3]]), sections=48)
+    res = cut.cut(
+        np.asarray(spindle.vertices),
+        np.asarray(spindle.faces),
+        np.ones(len(spindle.faces), int),
+        max_mm=20.0,
+        smart=False,
+    )
+    assert res.pin_count == 1 and res.pin_depths == [cut.PIN_DEPTH_SHORT]
+    assert any(a["type"] == "paroi_mince" for a in res.alerts)
+    # best_planes keeps its old contract: even spacing when no admissible sequence exists
+    solid = cut._to_manifold(np.asarray(small.vertices), np.asarray(small.faces))
+    assert cut.best_planes(solid, 2, 3, 20.0) == cut._even(solid, 2, 3)
+
+
+def test_grandformat_cache_edges_and_unposable_piece(tmp_path, monkeypatch):
+    import pytest
+
+    from elegoo_lab import grandformat, orient
+
+    src = _figure(tmp_path / "fig.stl")
+    with pytest.raises(ValueError, match="zone"):
+        grandformat.parse_zones([{"point": [1, 2]}])
+    for h in range(300, 320):  # more plans than the cache keeps
+        grandformat.plan(src, h)
+    assert len(grandformat._cache) <= 16
+    monkeypatch.setattr(orient, "best_pose", lambda v, f, m: None)
+    p = grandformat.plan(src, 330)
+    assert not p["ok"] and any("six poses" in a["message"] for a in p["alertes"])
+
+
+def test_grand_format_api_zones_must_be_a_list(web):
+    client, lib = web
+    _figure(lib / "fig.stl")
+    r = client.get(
+        "/lab/api/models/fig.stl/grand-format", params={"hauteur": 300, "interdites": "5"}
+    )
+    assert r.status_code == 422 and "liste" in r.json()["detail"]
+    r = client.get("/lab/api/models/fig.stl/grand-format.glb", params={"hauteur": 5})
+    assert r.status_code == 422
+
+
+@pytest.mark.slicing
+def test_grand_format_api_slices(web):
+    client, lib = web
+    _figure(lib / "fig.stl")
+    r = client.post("/lab/api/models/fig.stl/grand-format/trancher", json={"hauteur": 300})
+    assert r.status_code == 200, r.text
+    assert r.json()["bilan"]["pieces"] == 2 and r.json()["gcode"]
