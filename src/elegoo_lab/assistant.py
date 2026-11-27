@@ -698,12 +698,16 @@ def chat_cli(
             "--approval-policy",
             "auto-approve",
             *off,
-            *extra,
         ]
-        if with_session:  # a resumed run keeps its own system prompt and context
-            args += ["--resume", with_session]
+        if (
+            with_session
+        ):  # a resumed run keeps its own system prompt, context, model and thinking level
+            args += [
+                "--resume",
+                with_session,
+            ]  # (vibe refuses --model/--thinking on a resumed session)
         else:
-            args += ["--system-prompt-file", system_file]
+            args += [*extra, "--system-prompt-file", system_file]
         if emit:  # live mode: one CLI run, events out as they happen
             return _spawn_stream(args)
         sp = subprocess.run(  # noqa: S603 — CLI binary from the user's config
