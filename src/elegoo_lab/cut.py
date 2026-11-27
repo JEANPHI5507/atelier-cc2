@@ -570,6 +570,32 @@ def cut(
     return res
 
 
+SEPARATE_SHARE = 0.02  # a loose part counts as an object from 2 % of the whole volume
+SEPARATE_GAP_MM = 5.0  # ... and as separate when its box stays this far from the main part's
+
+
+def separate_objects(solid: mf.Manifold) -> int:
+    """How many objects far from the main part the model holds (a print plate with several figures, say):
+    parts of at least ``SEPARATE_SHARE`` of the volume whose box does not touch the largest part's.
+    """
+    parts = solid.decompose()
+    if len(parts) < 2:
+        return 0
+    total = sum(p.volume() for p in parts)
+    main = max(parts, key=lambda p: p.volume())
+    mb = np.asarray(main.bounding_box())
+    far = 0
+    for p in parts:
+        if p is main or p.volume() < SEPARATE_SHARE * total:
+            continue
+        b = np.asarray(p.bounding_box())
+        gap = np.maximum(
+            b[:3] - mb[3:], mb[:3] - b[3:]
+        )  # > 0 on an axis: the boxes are apart there
+        far += bool((gap > SEPARATE_GAP_MM).any())
+    return far
+
+
 def _axis_planes(
     solid: mf.Manifold,
     axis: int,
@@ -631,6 +657,15 @@ def _cut_once(
     lo, hi = np.asarray(solid.bounding_box()[:3]), np.asarray(solid.bounding_box()[3:])
     cuts: list[Plane] = []
     alerts: list[dict[str, Any]] = []
+    if (loose := separate_objects(solid)) and planes is None:
+        alerts.append(
+            alert(
+                "plusieurs_objets",
+                f"Le modèle contient {loose + 1} objets séparés, éloignés les uns des autres : la découpe "
+                "les traiterait comme un seul bloc. Sépare-les (un fichier par objet) avant de couper.",
+                blocking=True,
+            )
+        )
     origin = np.array([(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, lo[2]])
     zones: list[Zone] = [
         (

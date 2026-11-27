@@ -2416,6 +2416,10 @@
 "the CLI did not answer ({})"
 ],
 [
+"Le modèle contient {} objets séparés, éloignés les uns des autres : la découpe les traiterait comme un seul bloc. Sépare-les (un fichier par objet) avant de couper.",
+"The model holds {} separate objects, far from one another: the cut would treat them as a single block. Separate them (one file per object) before cutting."
+],
+[
 "{} : {}",
 "{}: {}"
 ],

@@ -6866,3 +6866,37 @@ def test_explicit_planes_are_cut_and_checked():
     )  # 260 mm left: the checks still run
     leaning = cut.cut(v, f, slots, planes=[cut.make_plane(2, 150.0, 0, 15.0, centre)])
     assert len(leaning.pieces) == 2 and leaning.cuts[0].angle == 15.0
+
+
+def test_several_far_apart_objects_block_the_plan_but_touching_parts_do_not(tmp_path):
+    import numpy as np
+
+    from elegoo_lab import cut, grandformat
+
+    a = trimesh.creation.box((40, 40, 300))
+    a.apply_translation((0, 0, 150))
+    b = trimesh.creation.box((40, 40, 300))
+    b.apply_translation((200, 0, 150))  # 160 mm away from the first
+    both = trimesh.util.concatenate([a, b])
+    v, f = np.asarray(both.vertices), np.asarray(both.faces)
+    res = cut.cut(v, f, np.ones(len(f), int))
+    assert any(x["type"] == "plusieurs_objets" and x["bloquante"] for x in res.alerts)
+    assert "2 objets séparés" in next(
+        x["message"] for x in res.alerts if x["type"] == "plusieurs_objets"
+    )
+    src = tmp_path / "deux.stl"
+    both.export(src)
+    plan = grandformat.plan(src, 300)
+    assert not plan["ok"]
+    with __import__("pytest").raises(ValueError, match="plan à corriger"):
+        grandformat.executer(src, 300)
+    # a loose part touching the main one, or a speck, is no separate object
+    c = trimesh.creation.box((40, 40, 300))
+    c.apply_translation((20, 0, 150))  # overlaps the first
+    speck = trimesh.creation.box((2, 2, 2))
+    speck.apply_translation((500, 0, 1))
+    joined = trimesh.util.concatenate([a, c, speck])
+    res = cut.cut(
+        np.asarray(joined.vertices), np.asarray(joined.faces), np.ones(len(joined.faces), int)
+    )
+    assert not any(x["type"] == "plusieurs_objets" for x in res.alerts)
