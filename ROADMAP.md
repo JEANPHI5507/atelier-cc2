@@ -89,14 +89,15 @@
 | **R2.10** | 🚀 **Maquette en prod** | Maquette déplacée dans src/elegoo_lab/web/maquette/ et servie en /lab/maquette/ ; lien depuis le dialog Aide ; finition premium HD (theme-color OLED, favicon SVG, thème auto prefers-color-scheme, sparkline KPI). Pas de déploiement public. | ⭐⭐ | ✅ **Terminé** | [#32](https://github.com/JEANPHI5507/atelier-cc2/issues/32) | [#33](https://github.com/JEANPHI5507/atelier-cc2/pull/33) | 2026-11-23 |
 | **R2.11** | ✨ **Design maquette dans l'app** | Carte Impression de l'onglet Imprimante façon dashboard : anneau de progression SVG live, 4 KPI premium, barres de chauffe en dégradé, lien maquette/. | ⭐⭐ | ✅ **Terminé** | [#34](https://github.com/JEANPHI5507/atelier-cc2/issues/34) | [#35](https://github.com/JEANPHI5507/atelier-cc2/pull/35) | 2026-11-23 |
 | **R2.12** | ✨ **Design premium partout** | Tokens maquette sur toutes les pages/onglets (Atelier, Imprimante, Galerie, Démarrage, dialogs, tableau.html) : cartes 16px + ombre + hover lift, boutons 10px + hover, galerie zoom. | ⭐⭐ | ✅ **Terminé** | [#36](https://github.com/JEANPHI5507/atelier-cc2/issues/36) | [#37](https://github.com/JEANPHI5507/atelier-cc2/pull/37) | 2026-11-23 |
+| **R2.13** | 🧩 **App unifiée** | Barre latérale + tableau de bord live par défaut ; Atelier, Imprimante, Galerie et Démarrage dans la même coque ; correctifs mobile (en-tête compacte, titres longs) et vue 3D (pivot, modèle réellement imprimé). | ⭐⭐⭐ | ✅ **Terminé** | - | [#38](https://github.com/JEANPHI5507/atelier-cc2/pull/38) | 2026-11-27 |
 
 **Livrables Phase 2 :**
-- [ ] Interface simplifiée pour les débutants
-- [ ] Visualisation interactive du CANVAS
-- [ ] Système de notifications amélioré
-- [ ] Système de backup automatique
-- [ ] Assistant guidé étendu
-- [ ] Documentation visuelle intégrée
+- [x] Interface simplifiée pour les débutants
+- [x] Visualisation interactive du CANVAS
+- [x] Système de notifications amélioré
+- [x] Système de backup automatique
+- [x] Assistant guidé étendu
+- [x] Documentation visuelle intégrée
 
 ---
 

@@ -1,6 +1,6 @@
 # 📊 Suivi des Progrès - Atelier CC2
 
-> *Dernière mise à jour : 23 Novembre 2026*
+> *Dernière mise à jour : 27 Novembre 2026*
 > *Ce fichier suit l'avancement des tâches de la [ROADMAP.md](ROADMAP.md).*
 
 ---
@@ -19,10 +19,10 @@
 
 | Métrique | Valeur | % Completion |
 |----------|--------|--------------|
-| **Tâches Totales** | 34 | - |
-| **Tâches Terminées** | 10 | 29% |
+| **Tâches Totales** | 39 | - |
+| **Tâches Terminées** | 18 | 46% |
 | **Tâches en Cours** | 0 | 0% |
-| **Tâches à Faire** | 24 | 71% |
+| **Tâches à Faire** | 21 | 54% |
 | **Tâches Bloquées** | 0 | 0% |
 
 ### 📈 **Statistiques de Code**
@@ -40,7 +40,7 @@
 | Phase | Tâches | Terminées | En Cours | % Completion |
 |-------|--------|-----------|----------|--------------|
 | **Phase 1: Stabilité & Portabilité** | 6 | 6 | 0 | **100%** ✅ |
-| **Phase 2: Expérience Utilisateur** | 8 | 0 | 0 | 0% |
+| **Phase 2: Expérience Utilisateur** | 13 | 12 | 0 | **92%** |
 | **Phase 3: Fonctionnalités Avancées** | 7 | 0 | 0 | 0% |
 | **Phase 4: Performance & Optimisation** | 6 | 0 | 0 | 0% |
 | **Phase 5: Intégrations & Écosystème** | 7 | 0 | 0 | 0% |
@@ -63,35 +63,29 @@
 | R1.5 | Documentation des limites CC2 | ✅ **Terminé** | Vibe Code | [#4](https://github.com/JEANPHI5507/atelier-cc2/pull/4) | 2026-11-23 | 2026-11-23 |
 | R1.6 | Gestion des erreurs caméra | ✅ **Terminé** | Vibe Code | [#7](https://github.com/JEANPHI5507/atelier-cc2/pull/7) | 2026-11-23 | 2026-11-23 |
 
-**Prochaine Tâche Prioritaire** : Phase 2 restante (INF.2 Docker Hub — secrets DOCKER_HUB_* à configurer), puis Phase 3 (R2.8 accessibilité clavier/WCAG en attente de décision ; R2.1–R2.7, R2.9–R2.12 ✅ #17/#19/#21/#23/#25/#27/#29/#31/#33/#35/#37)
+**Prochaine Tâche Prioritaire** : R3.7 (vérification du niveau de filament avant impression), puis R2.8 (accessibilité, en attente de décision) ; INF.2 Docker Hub attend les secrets DOCKER_HUB_*.
 
 ---
 
 ### 🟡 **Phase 2: Expérience Utilisateur** *(🟡 Priorité Moyenne)*
 **Objectif** : Rendre l'outil accessible et intuitif pour tous les utilisateurs.
-**Échéance** : 31 Mars 2025
-**Statut** : ⏳ **À venir** (0/8 tâches terminées)
+**Statut** : 🟢 **Presque terminée** (12/13 tâches, reste R2.8)
 
-| ID | Tâche | Statut | Contributeur | PR | Date Début | Date Fin |
-|----|-------|--------|--------------|----|------------|----------|
-| R2.1 | Mode Débutant | ⏳ **À faire** | - | - | - | - |
-| R2.2 | Schéma interactif du CANVAS : 4 bobines SVG (couleur actuelle, stock restant), bobine active « en cours », clic → fiche stock | Vibe Code | 2026-11-23 | [#19](https://github.com/JEANPHI5507/atelier-cc2/pull/19) |
-| R2.3 | Notifications intelligentes : filtres par niveau persistés + historique des alertes (endpoint /lab/api/events/historique) | Vibe Code | 2026-11-23 | [#21](https://github.com/JEANPHI5507/atelier-cc2/pull/21) |
-| R2.4 | Backup auto guidé depuis l'UI : statut/copie/timer horaire (API /lab/api/sauvegarde*, carte onglet Démarrage) | Vibe Code | 2026-11-23 | [#23](https://github.com/JEANPHI5507/atelier-cc2/pull/23) |
-| R2.5 | Assistant guidé : bouton « Workflow guidé » + checklist pas à pas dans le chat (fiche/pose/bobines/tranchage/lancement) | Vibe Code | 2026-11-23 | [#25](https://github.com/JEANPHI5507/atelier-cc2/pull/25) |
-| R2.6 | Tutoriels intégrés : bouton « Aide » + 3 tutos animés SVG/CSS (CANVAS, impression, suivi) + liens guides GitHub | Vibe Code | 2026-11-23 | [#27](https://github.com/JEANPHI5507/atelier-cc2/pull/27) |
-| R2.7 | Thème « Auto » suivant prefers-color-scheme : noir OLED en sombre, sable en clair, suivi en direct | Vibe Code | 2026-11-23 | [#29](https://github.com/JEANPHI5507/atelier-cc2/pull/29) |
-| R2.9 | Maquette UI moderne autonome (vanilla) : dashboard sombre OLED, KPI live, vue 3D animée, caméra, responsive tablette/mobile | Vibe Code | 2026-11-23 | [#31](https://github.com/JEANPHI5507/atelier-cc2/pull/31) |
-| R2.10 | Maquette en prod : servie par l'app en /lab/maquette/ + lien dialog Aide + finition premium HD (theme-color OLED, favicon SVG, thème auto prefers-color-scheme, sparkline KPI) | Vibe Code | 2026-11-23 | [#33](https://github.com/JEANPHI5507/atelier-cc2/pull/33) |
-| R2.11 | Design maquette dans l'app réelle : carte Impression (onglet Imprimante) avec anneau de progression SVG live, 4 KPI premium, lien maquette/ | Vibe Code | 2026-11-23 | [#35](https://github.com/JEANPHI5507/atelier-cc2/pull/35) |
-| R2.12 | Design premium sur toutes les pages/onglets (Atelier, Imprimante, Galerie, Démarrage, dialogs, tableau.html) : cartes 16px + ombre + hover lift, boutons 10px + hover, galerie zoom | Vibe Code | 2026-11-23 | [#37](https://github.com/JEANPHI5507/atelier-cc2/pull/37) |
-| R2.2 | Visualisation CANVAS 3D | ⏳ **À faire** | - | - | - | - |
-| R2.3 | Notifications Intelligentes | ⏳ **À faire** | - | - | - | - |
-| R2.4 | Backup Automatique | ⏳ **À faire** | - | - | - | - |
-| R2.5 | Assistant Guidé Étendu | ⏳ **À faire** | - | - | - | - |
-| R2.6 | Tutoriels Intégrés | ⏳ **À faire** | - | - | - | - |
-| R2.7 | Thème Sombre pour Tablette | ⏳ **À faire** | - | - | - | - |
-| R2.8 | Accessibilité | ⏳ **À faire** | - | - | - | - |
+| ID | Tâche | Statut | Contributeur | PR | Date Fin |
+|----|-------|--------|--------------|----|----------|
+| R2.1 | Mode Débutant : bascule Débutant/Avancé persistée, options avancées masquées | ✅ **Terminé** | Vibe Code | [#17](https://github.com/JEANPHI5507/atelier-cc2/pull/17) | 2026-11-23 |
+| R2.2 | Schéma interactif du CANVAS : 4 bobines SVG, stock restant, bobine active, clic → fiche stock | ✅ **Terminé** | Vibe Code | [#19](https://github.com/JEANPHI5507/atelier-cc2/pull/19) | 2026-11-23 |
+| R2.3 | Notifications intelligentes : filtres par niveau persistés + historique des alertes | ✅ **Terminé** | Vibe Code | [#21](https://github.com/JEANPHI5507/atelier-cc2/pull/21) | 2026-11-23 |
+| R2.4 | Backup auto guidé depuis l'UI : statut, copie immédiate, timer horaire | ✅ **Terminé** | Vibe Code | [#23](https://github.com/JEANPHI5507/atelier-cc2/pull/23) | 2026-11-23 |
+| R2.5 | Assistant guidé : bouton « Workflow guidé » + checklist pas à pas | ✅ **Terminé** | Vibe Code | [#25](https://github.com/JEANPHI5507/atelier-cc2/pull/25) | 2026-11-23 |
+| R2.6 | Tutoriels intégrés : bouton « Aide » + 3 tutos animés SVG/CSS | ✅ **Terminé** | Vibe Code | [#27](https://github.com/JEANPHI5507/atelier-cc2/pull/27) | 2026-11-23 |
+| R2.7 | Thème « Auto » suivant prefers-color-scheme (noir OLED / sable) | ✅ **Terminé** | Vibe Code | [#29](https://github.com/JEANPHI5507/atelier-cc2/pull/29) | 2026-11-23 |
+| R2.9 | Maquette UI moderne autonome (vanilla), dashboard sombre OLED | ✅ **Terminé** | Vibe Code | [#31](https://github.com/JEANPHI5507/atelier-cc2/pull/31) | 2026-11-23 |
+| R2.10 | Maquette servie en /lab/maquette/ + finition premium HD | ✅ **Terminé** | Vibe Code | [#33](https://github.com/JEANPHI5507/atelier-cc2/pull/33) | 2026-11-23 |
+| R2.11 | Design maquette dans l'app : anneau de progression live + KPI premium | ✅ **Terminé** | Vibe Code | [#35](https://github.com/JEANPHI5507/atelier-cc2/pull/35) | 2026-11-23 |
+| R2.12 | Design premium sur toutes les pages/onglets et dialogs | ✅ **Terminé** | Vibe Code | [#37](https://github.com/JEANPHI5507/atelier-cc2/pull/37) | 2026-11-23 |
+| R2.13 | App unifiée : barre latérale + tableau de bord live par défaut, tous les onglets dans la même coque, correctifs mobile/3D | ✅ **Terminé** | Vibe Code | [#38](https://github.com/JEANPHI5507/atelier-cc2/pull/38) | 2026-11-27 |
+| R2.8 | Accessibilité : raccourcis clavier, navigation clavier, contraste WCAG | ⏳ **À faire** (en attente de décision) | - | - | - |
 
 ---
 
@@ -99,7 +93,7 @@
 
 | Tâche | Description | Contributeur | Date Début |
 |-------|-------------|--------------|------------|
-| **Infrastructure de Linting** | Configuration de ruff, mypy, black, isort | Vibe Code | 2024-11-22 |
+| - | Aucune tâche en cours | - | - |
 
 ---
 
@@ -129,23 +123,21 @@
 | Contributeur | Tâches Assignées | PR Ouvertes | PR Mergées | Dernière Contribution |
 |--------------|------------------|-------------|------------|----------------------|
 | JEANPHI5507 | 4 | 1 | 4 | 2024-11-22 |
-| Vibe Code | 23 | 0 | 21 | 2026-11-23 |
+| Vibe Code | 30 | 0 | 33 | 2026-11-27 |
 
 ---
 
 ## 🎯 **Prochaines Étapes**
 
 ### 🔥 **Pour la Communauté**
-1. **Corriger les problèmes de linting** identifiés par ruff
-2. **Configurer pre-commit hooks** localement
-3. **Tester sur différentes plateformes** (WSL2, Raspberry Pi)
-4. **Contribuer à la documentation**
+1. **Configurer pre-commit hooks** localement
+2. **Tester sur différentes plateformes** (WSL2, Raspberry Pi)
+3. **Contribuer à la documentation**
 
 ### 🔥 **Pour les Mainteneurs**
-1. **Revoir les PR ouvertes** et donner des retours
-2. **Corriger les problèmes de linting** dans le code existant
-3. **Configurer Codecov** pour le suivi de couverture
-4. **Publier l'image Docker** sur Docker Hub
+1. **Valider R2.13 sur le vrai matériel** (téléphone, tablette murale, impression réelle)
+2. **R3.7** : vérification du niveau de filament avant impression
+3. **Publier l'image Docker** sur Docker Hub (secrets DOCKER_HUB_* à configurer)
 
 ---
 
