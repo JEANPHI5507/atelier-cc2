@@ -1469,7 +1469,20 @@
 "le CLI vibe est introuvable": "the vibe CLI cannot be found",
 "pas de liste « choix » dans la réponse": "no “choix” list in the reply",
 "réponse sans JSON lisible": "reply without readable JSON",
-"Décris la pièce à fabriquer : « une boîte de 100 × 60 mm avec couvercle »…": "Describe the part to make: “a 100 × 60 mm box with a lid”…"
+"Décris la pièce à fabriquer : « une boîte de 100 × 60 mm avec couvercle »…": "Describe the part to make: “a 100 × 60 mm box with a lid”…",
+"Joindre une photo (objet ou dessin posé à plat)": "Attach a photo (a flat object or drawing)",
+"Joindre une photo": "Attach a photo",
+"Photo jointe": "Photo attached",
+"Retirer la photo": "Remove the photo",
+"photo jointe": "photo attached",
+"contour trouvé": "outline found",
+"contour trouvé (rouge, trous en bleu) :": "outline found (red, holes in blue):",
+"Fais-en une pièce : le plus grand côté mesure … mm, épaisseur 3 mm": "Make a part of it: the longest side is … mm, 3 mm thick",
+"✦ Assistant": "✦ Assistant",
+"Demander à l'assistant : créer une pièce, d'après une photo ou une description": "Ask the assistant: make a part from a photo or a description",
+"Aucun modèle choisi : décris une pièce à fabriquer (« un vase de 10 cm », « un crochet mural ») ou touche 📷 pour joindre la photo d'un objet plat posé sur une feuille, puis donne sa taille réelle.": "No model chosen: describe a part to make (“a 10 cm vase”, “a wall hook”) or tap 📷 to attach a photo of a flat object lying on a sheet of paper, then give its real size.",
+"Connexion coupée pendant le travail.": "Connection lost during the work.",
+"L'assistant a peut-être continué sur le serveur : la bibliothèque est rechargée, regarde les nouveaux fichiers.": "The assistant may have carried on on the server: the library was reloaded, look for new files."
 },
 "patterns": [
 [
@@ -2419,6 +2432,10 @@
 [
 "Le modèle contient {} objets séparés, éloignés les uns des autres : la découpe les traiterait comme un seul bloc. Sépare-les (un fichier par objet) avant de couper.",
 "The model holds {} separate objects, far from one another: the cut would treat them as a single block. Separate them (one file per object) before cutting."
+],
+[
+"Photo refusée : {}",
+"Photo refused: {}"
 ],
 [
 "{} : {}",

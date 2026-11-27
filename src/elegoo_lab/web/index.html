@@ -72,7 +72,7 @@
   </div>
   <section id="lab">
     <aside class="lib">
-      <div class="lib-head"><h2>Bibliothèque</h2><div style="display:flex;gap:2px"><button class="btn ghost" id="make-open" title="Créer une pièce sur mesure (boîte, étiquette, crochet…)"><svg class="i"><use href="#i-plus"/></svg>Créer</button><button class="btn ghost" id="asm-open" title="Assembler plusieurs pièces, une couleur chacune"><svg class="i"><use href="#i-puzzle"/></svg>Assembler</button></div></div>
+      <div class="lib-head"><h2>Bibliothèque</h2><div style="display:flex;gap:2px"><button class="btn ghost" id="ia-open" title="Demander à l'assistant : créer une pièce, d'après une photo ou une description">✦ Assistant</button><button class="btn ghost" id="make-open" title="Créer une pièce sur mesure (boîte, étiquette, crochet…)"><svg class="i"><use href="#i-plus"/></svg>Créer</button><button class="btn ghost" id="asm-open" title="Assembler plusieurs pièces, une couleur chacune"><svg class="i"><use href="#i-puzzle"/></svg>Assembler</button></div></div>
       <div class="lib-add">
       <label class="drop" id="drop"><svg class="i"><use href="#i-upload"/></svg><br><b class="d-desk">Déposer des fichiers</b><span class="d-desk"> ou cliquer</span><b class="d-touch">Ajouter un fichier</b><br><span class="d-fmt">STL · 3MF · STEP · OBJ · GLB · PLY · ZIP · G-code</span>
         <input id="up" type="file" accept=".stl,.3mf,.glb,.gltf,.obj,.gcode,.ply,.off,.dae,.step,.stp,.zip" hidden multiple></label>
@@ -148,7 +148,7 @@
       </div>
       <div class="sect" id="chat-sec" hidden>
         <div class="sect-h"><span class="num">✦</span><h3>Assistant</h3><b class="grow"></b><button id="chat-fold" title="Replier ou déplier l'assistant" aria-label="Replier ou déplier l'assistant">▾</button></div>
-        <p class="note">Demande avec tes mots : « perce un trou de 6 mm pour un aimant en haut », « mets-le à 80 mm de haut ». L'assistant agit lui-même sur le modèle ; avec Blender ouvert, il peut modéliser en vrai CAO. Le bouton « Cibler » pose une épingle : il recevra l'endroit exact avec ton message.</p>
+        <p class="note" id="chat-note">Demande avec tes mots : « perce un trou de 6 mm pour un aimant en haut », « mets-le à 80 mm de haut ». L'assistant agit lui-même sur le modèle ; avec Blender ouvert, il peut modéliser en vrai CAO. Le bouton « Cibler » pose une épingle : il recevra l'endroit exact avec ton message.</p>
         <div id="chat-log"></div>
         <div class="chat-sug" id="chat-sug">
           <button data-q="Répare-le et mets-le dans la meilleure pose">Réparer et poser</button>
@@ -162,7 +162,8 @@
           <label>rayon <input id="chat-zone-r" type="number" min="2" max="80" value="10"> mm</label>
           <button id="chat-zone-x" title="Retirer la zone ciblée">✕</button>
         </div>
-        <div class="chat-row"><input id="chat-in" type="text" placeholder="Ex. : perce un trou de 6 mm pour un aimant en haut" autocomplete="off"><button class="btn primary" id="chat-go">Envoyer</button></div>
+        <div class="chat-att" id="chat-att" hidden></div>
+        <div class="chat-row"><button class="btn ghost" id="chat-photo" type="button" title="Joindre une photo (objet ou dessin posé à plat)" aria-label="Joindre une photo">📷</button><input id="chat-photo-in" type="file" accept="image/jpeg,image/png,image/webp" hidden><input id="chat-in" type="text" placeholder="Ex. : perce un trou de 6 mm pour un aimant en haut" autocomplete="off"><button class="btn primary" id="chat-go">Envoyer</button></div>
       </div>
     </div>
 
@@ -260,7 +261,7 @@
     </aside>
     <nav class="mnav" id="mnav" aria-label="Atelier">
       <button data-m="lib" class="on"><svg class="i"><use href="#i-search"/></svg>Bibliothèque</button>
-      <button data-m="view" disabled><svg class="i"><use href="#i-layers"/></svg>Aperçu</button>
+      <button data-m="view"><svg class="i"><use href="#i-layers"/></svg>Aperçu</button>
       <button data-m="prep" disabled><svg class="i"><use href="#i-play"/></svg>Préparer</button>
     </nav>
   </section>

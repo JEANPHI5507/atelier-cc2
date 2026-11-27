@@ -907,3 +907,40 @@ def test_the_assistant_is_there_with_no_model_selected(page):
         "() => !document.getElementById('chat-in').placeholder.startsWith('Décris la pièce')"
     )
     assert page.errors == []
+
+
+def test_a_photo_can_be_joined_to_the_assistant(page, tmp_path):
+    """📷 uploads the photo at once and shows it above the message; ✕ takes it back."""
+    from PIL import Image
+
+    p = tmp_path / "objet.jpg"
+    Image.new("RGB", (400, 300), (230, 230, 230)).save(p)
+    page.wait_for_selector("#chat-sec:not([hidden])")
+    page.set_input_files("#chat-photo-in", str(p))
+    page.wait_for_selector("#chat-att:not([hidden]) img")
+    assert "Photo jointe" in page.inner_text("#chat-att")
+    assert "plus grand côté" in page.input_value("#chat-in")
+    page.click("#chat-att-x")
+    page.wait_for_selector("#chat-att[hidden]", state="attached")
+    assert page.errors == []
+
+
+def test_phone_reaches_the_assistant_with_no_model(browser, site):
+    """On a phone the assistant sits in the « Aperçu » column: reachable with nothing selected."""
+    ctx = browser.new_context(
+        viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True
+    )
+    pg = ctx.new_page()
+    errors = []
+    pg.on("pageerror", lambda e: errors.append(str(e)))
+    pg.goto(site["base"] + "/lab/")
+    pg.wait_for_selector("#pv:not([hidden])")  # a phone opens on the printer
+    pg.click("#t-lab")
+    pg.wait_for_selector("#files .file")
+    assert pg.is_enabled("#mnav [data-m='view']") and pg.is_disabled("#mnav [data-m='prep']")
+    pg.click("#ia-open")
+    pg.wait_for_selector("#chat-in:visible")
+    assert pg.is_visible("#chat-photo") and "Aucun modèle choisi" in pg.inner_text("#chat-note")
+    assert "folded" not in (pg.get_attribute("#chat-sec", "class") or "")
+    assert errors == []
+    ctx.close()

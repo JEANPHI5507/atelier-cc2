@@ -1000,7 +1000,7 @@ function clearSelection() {
   sel = null; $('prep').hidden = $('ready').hidden = true; $('nosel').hidden = false; $('chips').innerHTML = '';
   chatFree();
   if (current) dropCurrent(); hint('Choisis un modèle dans la bibliothèque', 'Glisser pour tourner · molette pour zoomer');
-  document.querySelectorAll('#mnav button:not([data-m="lib"])').forEach(b => b.disabled = true); $('mnext').hidden = true; mview('lib');
+  document.querySelectorAll('#mnav button[data-m="prep"]').forEach(b => b.disabled = true); $('mnext').hidden = true; mview('lib');   // « Aperçu » stays: the assistant lives there
 }
 
 /* selection */
@@ -1041,6 +1041,7 @@ async function select(f) {
   needs = {}; stockLeft = {};
   $('chat-sec').hidden = false;
   $('chat-in').placeholder = $('chat-in').dataset.ph || $('chat-in').placeholder;
+  if ($('chat-note').dataset.txt) $('chat-note').textContent = $('chat-note').dataset.txt;
   $('ia-note').hidden = true;
   if (chatSel !== f.name) { chatHist = []; $('chat-log').innerHTML = ''; chatConvNew(); $('chat-sug').hidden = false; }   // the conversation follows the model
   chatSel = f.name;
@@ -1465,7 +1466,32 @@ async function watchCanvas() {
 setInterval(watchCanvas, 15000);
 
 /* the assistant: the CLI brain acting through the workshop's own tools (repair, size, turn, shape, slice…) */
-let chatHist = [], chatSel = null, chatBusy = false, chatConv = '';
+let chatHist = [], chatSel = null, chatBusy = false, chatConv = '', chatPhoto = null;
+/* a photo for the assistant (a flat object to copy, a sketch): uploaded at once, sent with the next message */
+function chatPhotoShow() {
+  const box = $('chat-att');
+  box.hidden = !chatPhoto;
+  box.innerHTML = chatPhoto ? `<img src="/lab/api/croquis/${encodeURIComponent(chatPhoto)}" alt=""><span>Photo jointe</span><button class="btn ghost" id="chat-att-x" type="button" aria-label="Retirer la photo">✕</button>` : '';
+  if (chatPhoto) $('chat-att-x').onclick = () => { chatPhoto = null; chatPhotoShow(); };
+}
+$('chat-photo').onclick = () => $('chat-photo-in').click();
+$('ia-open').onclick = () => {   // the assistant from the library, phone included (it lives in the view column)
+  if (!sel) chatFree();
+  $('chat-sec').classList.remove('folded'); $('chat-fold').textContent = '▾';
+  if (phone.matches) mview('view');
+  $('chat-sec').scrollIntoView({ block: 'nearest' }); $('chat-in').focus();
+};
+$('chat-photo-in').onchange = async () => {
+  const f = $('chat-photo-in').files[0]; $('chat-photo-in').value = '';
+  if (!f) return;
+  const fd = new FormData(); fd.append('file', f);
+  try {
+    const r = await api('/croquis', { method: 'POST', body: fd });
+    chatPhoto = r.name; chatPhotoShow();
+    if (!$('chat-in').value.trim()) $('chat-in').value = 'Fais-en une pièce : le plus grand côté mesure … mm, épaisseur 3 mm';
+    $('chat-in').focus();
+  } catch (e) { toast('Photo refusée : ' + e.message, 'bad'); }
+};
 function chatConvNew() { chatConv = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())); }
 function chatAdd(role, html, small) {
   const d = document.createElement('div');
@@ -1477,9 +1503,12 @@ function chatAdd(role, html, small) {
 /* no model open: the assistant can still make one (made-to-measure parts, Blender) */
 function chatFree() {
   $('chat-sec').hidden = false; $('chat-sug').hidden = true;
+  $('chat-sec').classList.remove('folded'); $('chat-fold').textContent = '▾';   // nothing else to see: open
   if (chatSel !== '') { chatHist = []; $('chat-log').innerHTML = ''; chatConvNew(); }
   chatSel = '';
   $('chat-in').placeholder = 'Décris la pièce à fabriquer : « une boîte de 100 × 60 mm avec couvercle »…';
+  $('chat-note').dataset.txt ??= $('chat-note').textContent;
+  $('chat-note').textContent = 'Aucun modèle choisi : décris une pièce à fabriquer (« un vase de 10 cm », « un crochet mural ») ou touche 📷 pour joindre la photo d\'un objet plat posé sur une feuille, puis donne sa taille réelle.';
 }
 async function chatSend() {
   const v = $('chat-in').value.trim();
@@ -1487,14 +1516,15 @@ async function chatSend() {
   const model = sel && sel.ext !== 'gcode' ? sel : null;
   chatBusy = true; $('chat-go').disabled = true; $('chat-in').value = '';
   $('chat-sug').hidden = true;   // one real turn: the ready-made ideas step aside
-  chatAdd('user', esc(v) + (cible.pt ? ` <small>— zone (${cible.pt.join(', ')})</small>` : ''));
+  const photo = chatPhoto; chatPhoto = null; chatPhotoShow();
+  chatAdd('user', esc(v) + (photo ? `<br><img class="chat-img" src="/lab/api/croquis/${encodeURIComponent(photo)}" alt="photo jointe">` : '') + (cible.pt ? ` <small>— zone (${cible.pt.join(', ')})</small>` : ''));
   const wait = chatAdd('assistant', '<i style="color:var(--dim)">…</i>');
   const step = chatAdd('activity', '');
   const done = [];
   try {
     const rsp = await fetch('/lab/api' + (model ? `/models/${encodeURIComponent(model.name)}/assistant/stream` : '/assistant/stream'), {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: v, history: chatHist, conversation: chatConv,
+      body: JSON.stringify({ message: v, history: chatHist, conversation: chatConv, photo: photo || undefined,
                              zone: model && cible.pt ? { point: cible.pt, rayon: +$('chat-zone-r').value || 10 } : undefined })
     });
     if (!rsp.ok || !rsp.body) {
@@ -1523,6 +1553,8 @@ async function chatSend() {
           await loadFiles();
           const f = files.find(x => x.name === ev.fichier);
           if (f && f.ext !== 'gcode') await select(f);
+        } else if (ev.type === 'image') {           // the outline the workshop found, drawn on the photo
+          chatAdd('activity', `contour trouvé (rouge, trous en bleu) :<br><img class="chat-img" src="/lab/api/croquis/${encodeURIComponent(ev.nom)}" alt="contour trouvé">`);
         } else if (ev.type === 'etape') {
           step.innerHTML = esc(ev.texte) + '…';
         } else if (ev.type === 'erreur') {
@@ -1547,7 +1579,11 @@ async function chatSend() {
     }
   } catch (e) {
     step.remove();
-    wait.innerHTML = `<span style="color:var(--bad)">${esc(e.message)}</span>`;
+    const cut = e instanceof TypeError || /network|fetch|load failed/i.test(e.message);   // the connection, not the brain
+    wait.innerHTML = cut
+      ? `<span style="color:var(--bad)">Connexion coupée pendant le travail.</span><small>L'assistant a peut-être continué sur le serveur : la bibliothèque est rechargée, regarde les nouveaux fichiers.</small>`
+      : `<span style="color:var(--bad)">${esc(e.message)}</span>`;
+    if (cut) loadFiles().catch(() => {});
   }
   chatBusy = false; $('chat-go').disabled = false;
 }
@@ -1596,7 +1632,7 @@ async function workflowShow() {
     wf.appendChild(b);
   }
 }
-if (matchMedia('(max-width: 600px)').matches) { $('chat-sec').classList.add('folded'); $('chat-fold').textContent = '▴'; }
+if (sel && matchMedia('(max-width: 600px)').matches) { $('chat-sec').classList.add('folded'); $('chat-fold').textContent = '▴'; }
 
 /* plate, orientation, copies, advanced settings */
 let rotation = [0, 0, 0];
