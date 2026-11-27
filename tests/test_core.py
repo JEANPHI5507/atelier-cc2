@@ -6405,8 +6405,8 @@ def test_assistant_couper_and_grand_format_tools(tmp_path, monkeypatch):
     assert "zone" in assistant.run_tool("couper", {"interdites": [{"x": 1}]}, "fig.stl")["erreur"]
     seen = {}
 
-    def fake_exec(src, h, zones, biais, **kw):
-        seen.update(h=h, zones=zones, biais=biais, **kw)
+    def fake_exec(src, h, zones, biais, vision, **kw):
+        seen.update(h=h, zones=zones, biais=biais, vision=vision, **kw)
         return {"bilan": {"pieces": 2}, "gcode": ["a.gcode"], "alertes": [], "avertissements": []}
 
     monkeypatch.setattr(grandformat, "executer", fake_exec)
@@ -6644,3 +6644,225 @@ def test_grand_format_reports_the_lean_and_can_turn_it_off(tmp_path):
     _, glb = grandformat.preview(src, 333)
     assert glb[:4] == b"glTF"
     assert np.isclose(grandformat.plan(src, 333)["taille_mm"][2], 333.0, atol=1)
+
+
+# --- vision: numbered candidate cuts, vibe's choice, checked again by the code ---------------------------
+
+
+def _neck_file(tmp_path):
+    src = tmp_path / "cou.stl"
+    _slanted_neck().export(src)
+    return src
+
+
+def test_candidates_are_numbered_drawn_and_include_the_codes_plan(tmp_path):
+    import numpy as np
+    from PIL import Image
+
+    from elegoo_lab import cut, grandformat, visioncoupe
+
+    src = _neck_file(tmp_path)
+    v, f, slots = grandformat._solid(src, 333)
+    res = cut.cut(v, f, slots, oblique=True)
+    cands, needs = cut.candidates(v, f, oblique=True, include=res.cuts)
+    assert needs == {2: 2} and len(cands) >= 3
+    assert all(c in [x.plane for x in cands] for c in res.cuts)  # the code's own choice is on offer
+    assert any(c.plane.angle for c in cands)  # and slanted ones
+    assert [c.plane.pos for c in cands] == sorted(c.plane.pos for c in cands)
+    numbered = visioncoupe.number(cands)
+    paths = visioncoupe.render(v, f, numbered, tmp_path)
+    assert [p.name for p in paths] == ["coupes_face.png", "coupes_cote.png"]
+    im = np.asarray(Image.open(paths[1]).convert("RGB"))
+    assert im.shape == (720, 720, 3)
+    red = visioncoupe.COLOURS[0]
+    assert (
+        np.abs(im.astype(int) - red).sum(axis=2) < 30
+    ).sum() > 200  # candidate 1's coloured line is there
+    text = visioncoupe.prompt(numbered, paths, 333, needs, np.zeros(3), "")
+    assert "1 coupe(s) sur l'axe Z" in text and str(paths[0]) in text and '"choix"' in text
+
+
+def test_vision_reply_validation():
+    import numpy as np
+
+    from elegoo_lab import cut, visioncoupe
+
+    def cand(axis, pos, lean=-1, angle=0.0):
+        return cut.Candidate(cut.make_plane(axis, pos, lean, angle, np.zeros(3)), 100.0, 1, 100.0)
+
+    nb = visioncoupe.number(
+        [cand(2, 80), cand(2, 160), cand(2, 200, 1, 15.0), cand(0, 50), cand(2, 240)]
+    )
+    prefer, avoid, why = visioncoupe.validate(
+        {"choix": [2], "refus": [{"id": 1, "raison": "x"}, 4, {"id": 2}]}, nb
+    )
+    assert why == "" and [p.pos for p in prefer] == [160]
+    assert [p.pos for p in avoid] == [80, 50]  # a plane both chosen and refused counts as chosen
+    both, _, _ = visioncoupe.validate(
+        {"choix": ["1", 2, 2]}, nb
+    )  # numbers as text, duplicates ignored
+    assert [p.pos for p in both] == [80, 160]
+    mixed, _, _ = visioncoupe.validate(
+        {"choix": [3, 1, 4]}, nb
+    )  # parallel cuts per axis: the first decides
+    assert [round(p.d) for p in mixed] == [200, 50]
+    for reply, needle in (
+        ({}, "choix"),
+        ({"choix": []}, "choix"),
+        ({"choix": ["x"]}, "illisible"),
+        ({"choix": [9]}, "n'existe pas"),
+    ):
+        got = visioncoupe.validate(reply, nb)
+        assert got[:2] == ([], []) and needle in got[2], (reply, got)
+
+
+def test_wishes_steer_the_search_but_never_break_the_plate_limit():
+    import numpy as np
+
+    from elegoo_lab import cut
+
+    m = trimesh.creation.box((60, 60, 400))
+    m.apply_translation((0, 0, 200))
+    sub = m.subdivide()
+    v, f = np.asarray(sub.vertices), np.asarray(sub.faces)
+    slots = np.ones(len(f), int)
+    centre = np.array([0.0, 0.0, 200.0])
+    plain = cut.cut(v, f, slots)
+    want = cut.make_plane(2, 190.0, -1, 0.0, centre)
+    liked = cut.cut(v, f, slots, prefer=[want])
+    assert abs(liked.planes[0][1] - 190) <= cut.PREFER_MM and len(liked.pieces) == 2
+    assert not any(a["bloquante"] for a in liked.alerts)
+    far = cut.make_plane(2, 100.0, -1, 0.0, centre)  # would leave a piece of 300 mm: not honoured
+    kept = cut.cut(v, f, slots, prefer=[far])
+    assert abs(kept.planes[0][1] - 100) > cut.PREFER_MM and not any(
+        a["bloquante"] for a in kept.alerts
+    )
+    away = cut.cut(v, f, slots, avoid=[cut.make_plane(2, plain.planes[0][1], -1, 0.0, centre)])
+    assert abs(away.planes[0][1] - plain.planes[0][1]) >= cut.AVOID_MM
+    slanted = cut.make_plane(2, 200.0, 0, 15.0, centre)
+    lean = cut.cut(v, f, slots, prefer=[slanted])
+    assert lean.cuts[0].angle == 15.0 and lean.cuts[0].lean == 0
+
+
+def test_grand_format_with_vision_follows_wishes_and_falls_back(tmp_path, monkeypatch):
+    from elegoo_lab import grandformat, visioncoupe
+
+    src = _neck_file(tmp_path)
+    code_only = grandformat.plan(src, 333, vision=False)
+    assert "vision" not in code_only
+
+    def reply_with(ids, refus=(), **extra):
+        return lambda text, workdir: (
+            {
+                "modele": "un pion",
+                "choix": ids,
+                "refus": [{"id": i, "raison": "r"} for i in refus],
+                "commentaire": "ok",
+                **extra,
+            },
+            "",
+        )
+
+    monkeypatch.setattr(
+        visioncoupe, "ask", reply_with([4], refus=[2, 3])
+    )  # Z = 158: feasible, not the code's 166
+    p = grandformat.plan(src, 333, vision=True)
+    assert (
+        p["vision"]["utilisee"]
+        and p["vision"]["choix"] == [4]
+        and p["vision"]["commentaire"] == "ok"
+    )
+    assert p["vision"]["gardees"] == 1 == p["vision"]["voulues"]
+    assert p["ok"] and len(p["pieces"]) == 2 and p["plans"][0]["mm"] != code_only["plans"][0]["mm"]
+    planes = grandformat.chosen_planes(src, 333, vision=True)
+    assert planes and len(planes) == 1
+    s, glb = grandformat.preview(
+        src, 333, vision=True
+    )  # the picture shows the plan the vision steered
+    assert glb[:4] == b"glTF" and s["vision"]["utilisee"]
+    # an unreadable reply: the code's plan stands, with the reason
+    monkeypatch.setattr(visioncoupe, "ask", lambda text, workdir: ({}, "le CLI n'a pas répondu"))
+    p = grandformat.plan(src, 333, vision=True, biais=False)
+    assert not p["vision"]["utilisee"] and "n'a pas répondu" in p["vision"]["repli"]
+    assert grandformat.chosen_planes(src, 333, vision=True, biais=False) is None
+    assert p["plans"] == grandformat.plan(src, 333, biais=False)["plans"]
+    # a wish no plan on the plate can honour: the plan still fits, and the reply says it was not followed
+    big = trimesh.creation.box((60, 60, 600))
+    big.apply_translation((0, 0, 300))
+    big_src = tmp_path / "grand.stl"
+    big.export(big_src)
+    monkeypatch.setattr(visioncoupe, "ask", reply_with([1]))
+    q = grandformat.plan(big_src, 600, vision=True)
+    assert q["ok"] and not any(a["bloquante"] for a in q["alertes"])
+    assert q["vision"]["voulues"] == 1 and (
+        q["vision"]["utilisee"] or "plateau" in q["vision"]["repli"]
+    )
+
+
+def test_vision_call_uses_the_configured_model_and_reads_files_only(tmp_path, monkeypatch):
+    import subprocess
+
+    from elegoo_lab import assistant, config, visioncoupe
+
+    monkeypatch.setattr(assistant, "cli_bin", lambda: "/usr/bin/vibe")
+    seen = {}
+
+    def fake_run(args, **kw):
+        seen["args"], seen["cwd"] = args, kw["cwd"]
+        msg = [
+            {
+                "role": "assistant",
+                "type": "message",
+                "content": [{"text": '```json\n{"choix": [1]}\n```'}],
+            }
+        ]
+        return subprocess.CompletedProcess(args, 0, stdout=__import__("json").dumps(msg), stderr="")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    assert visioncoupe.settings() == {}
+    reply, err = visioncoupe.ask("décris", tmp_path)
+    assert reply == {"choix": [1]} and err == ""
+    a = seen["args"]
+    assert (
+        a[a.index("--enabled-tools") + 1] == "read_file"
+        and "--model" not in a
+        and seen["cwd"] == str(tmp_path)
+    )
+    config.CONFIG_FILE.write_text('[vision]\nmodele = "pixtral"\ndelai_s = 30\n')
+    visioncoupe.ask("x", tmp_path)
+    assert seen["args"][seen["args"].index("--model") + 1] == "pixtral"
+    monkeypatch.setattr(assistant, "cli_bin", lambda: None)
+    assert "introuvable" in visioncoupe.ask("x", tmp_path)[1]
+    monkeypatch.setattr(assistant, "cli_bin", lambda: "/usr/bin/vibe")
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda *a, **k: subprocess.CompletedProcess(a, 1, stdout="", stderr="401 unauthorized"),
+    )
+    assert "vibe login" in visioncoupe.ask("x", tmp_path)[1]
+
+    def slow(*a, **k):
+        raise subprocess.TimeoutExpired("vibe", 1)
+
+    monkeypatch.setattr(subprocess, "run", slow)
+    assert "n'a pas répondu" in visioncoupe.ask("x", tmp_path)[1]
+
+
+def test_explicit_planes_are_cut_and_checked():
+    import numpy as np
+
+    from elegoo_lab import cut
+
+    m = trimesh.creation.box((60, 60, 300))
+    m.apply_translation((0, 0, 150))
+    v, f = np.asarray(m.subdivide().vertices), np.asarray(m.subdivide().faces)
+    slots = np.ones(len(f), int)
+    centre = np.array([0.0, 0.0, 150.0])
+    one = cut.cut(v, f, slots, planes=[cut.make_plane(2, 100.0, -1, 0.0, centre)])
+    assert [round(p) for _, p in one.planes] == [100] and len(one.pieces) == 2
+    far = cut.cut(v, f, slots, planes=[cut.make_plane(2, 40.0, -1, 0.0, centre)])
+    assert any(
+        a["type"] == "trop_grande" and a["bloquante"] for a in far.alerts
+    )  # 260 mm left: the checks still run
+    leaning = cut.cut(v, f, slots, planes=[cut.make_plane(2, 150.0, 0, 15.0, centre)])
+    assert len(leaning.pieces) == 2 and leaning.cuts[0].angle == 15.0

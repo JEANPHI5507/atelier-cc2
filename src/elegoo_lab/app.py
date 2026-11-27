@@ -207,6 +207,7 @@ class GrandFormatIn(BaseModel):
     hauteur: float
     interdites: list[dict[str, Any]] = []  # zones where no cut may pass (grandformat.parse_zones)
     biais: bool = True  # slanted cut planes too
+    vision: bool = False  # let the vision model choose among the candidate cuts
     usage: str = "decoratif"
     supports: bool | str = False
     quality: str = slicer.DEFAULT_QUALITY
@@ -962,28 +963,41 @@ def lab_router(cfg: config.Config) -> APIRouter:
 
     @r.get("/models/{name}/grand-format")
     async def grand_format_plan(
-        name: str, hauteur: float, interdites: str | None = None, biais: bool = True
+        name: str,
+        hauteur: float,
+        interdites: str | None = None,
+        biais: bool = True,
+        vision: bool = False,
     ) -> dict[str, Any]:
         """Large format, step 1: pieces, cut planes, positions and alerts for this final height."""
         from . import grandformat
 
         try:
             return await asyncio.to_thread(
-                grandformat.plan, _model_path(name), hauteur, _zones_arg(interdites), biais
+                grandformat.plan, _model_path(name), hauteur, _zones_arg(interdites), biais, vision
             )
         except ValueError as err:
             raise HTTPException(422, str(err)) from err
 
     @r.get("/models/{name}/grand-format.glb")
     async def grand_format_glb(
-        name: str, hauteur: float, interdites: str | None = None, biais: bool = True
+        name: str,
+        hauteur: float,
+        interdites: str | None = None,
+        biais: bool = True,
+        vision: bool = False,
     ) -> Response:
         """The same plan as a 3D view: one colour per piece, a translucent quad on each cut plane."""
         from . import grandformat
 
         try:
             _, glb = await asyncio.to_thread(
-                grandformat.preview, _model_path(name), hauteur, _zones_arg(interdites), biais
+                grandformat.preview,
+                _model_path(name),
+                hauteur,
+                _zones_arg(interdites),
+                biais,
+                vision,
             )
         except ValueError as err:
             raise HTTPException(422, str(err)) from err
@@ -1001,6 +1015,7 @@ def lab_router(cfg: config.Config) -> APIRouter:
                 body.hauteur,
                 body.interdites,
                 body.biais,
+                body.vision,
                 usage=body.usage,
                 supports=body.supports,
                 quality=body.quality,

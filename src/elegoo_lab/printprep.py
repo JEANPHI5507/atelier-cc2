@@ -240,6 +240,7 @@ def prepare_and_slice(
     forbidden: Sequence[cut.Zone] = (),
     auto_pose: bool = False,
     oblique: bool = False,
+    planes: Sequence[cut.Plane] | None = None,
 ) -> dict[str, Any]:
     """``mapping``: source colour index -> slot (1..4); colours not listed keep the suggested slot.
     ``palette``: the loaded spools' colours (slot 1 first): the model is repainted with them first.
@@ -339,6 +340,7 @@ def prepare_and_slice(
             forbidden=forbidden,
             auto_pose=auto_pose,
             oblique=oblique,
+            planes=planes,
         )
 
     target, slot_hex = src, None
@@ -591,6 +593,7 @@ def _split_and_slice(
     forbidden: Sequence[cut.Zone] = (),
     auto_pose: bool = False,
     oblique: bool = False,
+    planes: Sequence[cut.Plane] | None = None,
 ) -> dict[str, Any]:
     """Cut a too-big model into pieces with dowel holes; one G-code per piece plus one for the dowels."""
     if smart_flush is None:
@@ -599,7 +602,9 @@ def _split_and_slice(
         src, slots, height_mm=height_mm, rotate=rotate, palette=palette
     )
     slot_hex = _real_colours(slot_hex, slot_colours, len(slot_hex))
-    res = cut.cut(v, f, face_slots, name=src.stem, forbidden=forbidden, oblique=oblique)
+    res = cut.cut(
+        v, f, face_slots, name=src.stem, forbidden=forbidden, oblique=oblique, planes=planes
+    )
     n = len(slot_hex)
     layer_level = _layer_mode(advanced, usage)
     sup_on, sup_ov = support_overrides(supports, plate_only)
@@ -746,6 +751,7 @@ def cut_preview(
     show_planes: bool = False,
     distinct: bool = False,
     oblique: bool = False,
+    planes: Sequence[cut.Plane] | None = None,
 ) -> tuple[dict[str, Any], trimesh.Trimesh]:
     """Where the model would be cut, plus a tinted view of the pieces, pushed apart by ``explode``
     (Y-up for the viewer). ``show_planes`` adds a translucent disc-like quad on every cut plane."""
@@ -754,7 +760,9 @@ def cut_preview(
     if not height_mm and mesh.info(src).get("unitless"):
         height_mm = mesh.DEFAULT_AI_HEIGHT_MM
     v, f, face_slots, slot_hex = colors.solid(src, slots, height_mm=height_mm, palette=palette)
-    res = cut.cut(v, f, face_slots, name=src.stem, forbidden=forbidden, oblique=oblique)
+    res = cut.cut(
+        v, f, face_slots, name=src.stem, forbidden=forbidden, oblique=oblique, planes=planes
+    )
     rgb = {i + 1: colors._rgb(h) for i, h in enumerate(slot_hex)}
     tints = [
         np.array(t)

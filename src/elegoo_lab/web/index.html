@@ -196,6 +196,7 @@
             <div class="field"><label for="gf-height">Hauteur finale voulue (mm, 20 à 1500)</label><input id="gf-height" type="number" min="20" max="1500" step="1" placeholder="ex. 600"></div>
             <div class="field"><label for="gf-zones">Zones où ne pas couper (hauteurs en mm, séparées par des virgules)</label><input id="gf-zones" type="text" placeholder="ex. 150-190, 230-260 (visage, mains)"></div>
             <div class="switch" style="margin:0 0 12px"><label for="gf-biais">Coupes en biais (15°, 30°) si elles passent par une section plus fine</label><input id="gf-biais" type="checkbox" checked></div>
+            <div class="switch" style="margin:0 0 12px"><label for="gf-vision">Demander son avis à l'IA (elle regarde le modèle et choisit parmi les coupes proposées ; plus long)</label><input id="gf-vision" type="checkbox"></div>
             <div class="seg wide"><button id="gf-preview" type="button">Voir l'aperçu</button><button id="gf-slice" type="button" disabled>Trancher toutes les pièces</button></div>
             <div id="gf-out" class="note" aria-live="polite"></div>
           </details>

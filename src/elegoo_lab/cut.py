@@ -278,10 +278,13 @@ def _dp(
     count: int,
     max_mm: float,
     blocked: np.ndarray,
+    weight: np.ndarray | None = None,
 ) -> tuple[list[float], float] | None:
     """The ``count - 1`` offsets keeping every piece <= max_mm at the most discreet places (smallest
     section, fewest islands), and the cost of that choice; None if no admissible sequence exists."""
     cost = area + ISLAND_PENALTY * np.maximum(islands - 1, 0)
+    if weight is not None:
+        cost = cost * weight  # a plane someone prefers is made cheap
     cost[area <= 0] = np.inf  # never cut through empty space between parts (no gain, no dowel)
     ok = (pos - lo >= MIN_PIECE_MM) & (hi - pos >= MIN_PIECE_MM)
     cost[~ok] = np.inf
@@ -322,11 +325,46 @@ def search_planes(
     return found[0] if found else None
 
 
+PREFER_MM = 4.0  # a preferred plane makes the offsets this close to it cheap
+PREFER_WEIGHT = 0.05
+AVOID_MM = 12.0  # an avoided plane rules out the offsets this close to it
+
+
+def _wishes(
+    pos: np.ndarray,
+    axis: int,
+    lean: int,
+    angle: float,
+    prefer: Sequence[Plane],
+    avoid: Sequence[Plane],
+) -> tuple[np.ndarray, np.ndarray, bool]:
+    """Extra blocked offsets (near avoided planes of the same kind) and a cost weight (near preferred ones),
+    and whether any preferred plane is of this kind."""
+    same = lambda p: p.axis == axis and p.lean == lean and p.angle == angle  # noqa: E731
+    blocked = np.zeros(len(pos), bool)
+    weight = np.ones(len(pos))
+    liked = [p for p in prefer if same(p)]
+    for p in (q for q in avoid if same(q)):
+        blocked |= np.abs(pos - p.d) < AVOID_MM
+    for p in liked:
+        weight[np.abs(pos - p.d) < PREFER_MM] = PREFER_WEIGHT
+    return blocked, weight, bool(liked)
+
+
 def _aligned_cost(
-    solid: mf.Manifold, axis: int, count: int, max_mm: float, zones: Sequence[Zone]
+    solid: mf.Manifold,
+    axis: int,
+    count: int,
+    max_mm: float,
+    zones: Sequence[Zone],
+    prefer: Sequence[Plane] = (),
+    avoid: Sequence[Plane] = (),
 ) -> tuple[list[float], float] | None:
     pos, area, islands, lo, hi = _profile(solid, _to_z(axis))
-    return _dp(pos, area, islands, lo, hi, count, max_mm, _blocked(pos, axis, zones))
+    blocked, weight, _ = _wishes(pos, axis, -1, 0.0, prefer, avoid)
+    return _dp(
+        pos, area, islands, lo, hi, count, max_mm, _blocked(pos, axis, zones) | blocked, weight
+    )
 
 
 def _slanted(
@@ -338,6 +376,8 @@ def _slanted(
     lean: int,
     angle: float,
     centre: np.ndarray,
+    prefer: Sequence[Plane] = (),
+    avoid: Sequence[Plane] = (),
 ) -> tuple[list[Plane], float] | None:
     """Parallel planes leaning ``angle`` degrees toward axis ``lean``. A slab between two of them is taller
     than its thickness (``t / cos`` plus the climb across the model), so the thickness allowed is cut down.
@@ -349,10 +389,114 @@ def _slanted(
         return None
     pos, area, islands, lo, hi = _profile(solid, _frame(axis, lean, angle))
     n = Plane(axis, 0.0, 0.0, lean, angle).normal()
-    found = _dp(pos, area, islands, lo, hi, count, eff, _hits(n, pos, zones))
+    blocked, weight, _ = _wishes(pos, axis, lean, angle, prefer, avoid)
+    found = _dp(pos, area, islands, lo, hi, count, eff, _hits(n, pos, zones) | blocked, weight)
     if found is None:
         return None
     return [make_plane(axis, d, lean, angle, centre) for d in found[0]], found[1]
+
+
+@dataclass
+class Candidate:
+    """One possible cut plane with what it passes through: the section area there and its separate islands."""
+
+    plane: Plane
+    area: float
+    islands: int
+    cost: float
+
+
+CAND_SPACING_MM = 25.0  # candidates on one axis stay at least this far apart
+
+
+def _minima(
+    pos: np.ndarray,
+    area: np.ndarray,
+    islands: np.ndarray,
+    lo: float,
+    hi: float,
+    blocked: np.ndarray,
+    how_many: int,
+) -> list[tuple[float, float, int, float]]:
+    """The cheapest cut offsets (cost = section + island penalty), spaced apart: (d, area, islands, cost)."""
+    cost = area + ISLAND_PENALTY * np.maximum(islands - 1, 0)
+    cost[area <= 0] = np.inf
+    cost[~((pos - lo >= MIN_PIECE_MM) & (hi - pos >= MIN_PIECE_MM))] = np.inf
+    cost[blocked] = np.inf
+    out: list[tuple[float, float, int, float]] = []
+    for i in np.argsort(cost):
+        if not np.isfinite(cost[i]) or len(out) >= how_many:
+            break
+        if all(abs(pos[i] - o[0]) >= CAND_SPACING_MM for o in out):
+            out.append((float(pos[i]), float(area[i]), int(islands[i]), float(cost[i])))
+    return out
+
+
+def candidate_planes(
+    solid: mf.Manifold,
+    axis: int,
+    zones: Sequence[Zone],
+    oblique: bool,
+    centre: np.ndarray,
+    per_axis: int = 5,
+    slanted: int = 3,
+) -> list[Candidate]:
+    """Discreet places to cut along ``axis``: the cheapest aligned ones, and (if ``oblique``) the best slanted
+    ones that beat the best aligned section by ``OBLIQUE_GAIN``."""
+    pos, area, islands, lo, hi = _profile(solid, _to_z(axis))
+    out = [
+        Candidate(make_plane(axis, d, -1, 0.0, centre), a, n, c)
+        for d, a, n, c in _minima(pos, area, islands, lo, hi, _blocked(pos, axis, zones), per_axis)
+    ]
+    if oblique and out:
+        floor = OBLIQUE_GAIN * min(c.cost for c in out)
+        found: list[Candidate] = []
+        for lean in (a for a in range(3) if a != axis):
+            for angle in OBLIQUE_DEG:
+                pos, area, islands, lo, hi = _profile(solid, _frame(axis, lean, angle))
+                n = Plane(axis, 0.0, 0.0, lean, angle).normal()
+                for d, a, k, c in _minima(pos, area, islands, lo, hi, _hits(n, pos, zones), 2):
+                    if c < floor:
+                        found.append(Candidate(make_plane(axis, d, lean, angle, centre), a, k, c))
+        for cand in sorted(found, key=lambda x: x.cost):
+            if len([o for o in out if o.plane.angle]) >= slanted:
+                break
+            if all(abs(cand.plane.pos - o.plane.pos) >= CAND_SPACING_MM for o in out):
+                out.append(cand)
+    return sorted(out, key=lambda c: c.plane.pos)
+
+
+def section_of(solid: mf.Manifold, cut_plane: Plane) -> tuple[float, int]:
+    """Area and separate islands of the section at this plane."""
+    cs = solid.transform(_frame(cut_plane.axis, cut_plane.lean, cut_plane.angle)).slice(cut_plane.d)
+    return float(cs.area()), len(cs.decompose()) if cs.area() > 0 else 0
+
+
+def candidates(
+    v: np.ndarray,
+    f: np.ndarray,
+    *,
+    max_mm: float = mesh.BED_MM - MARGIN_MM,
+    forbidden: Sequence[Zone] = (),
+    oblique: bool = False,
+    include: Sequence[Plane] = (),
+) -> tuple[list[Candidate], dict[int, int]]:
+    """Every discreet cut plane worth showing for this model (``include``: planes already chosen, kept even if
+    they are not among the cheapest), and how many pieces each axis needs."""
+    solid = _to_manifold(v, f)
+    lo, hi = np.asarray(solid.bounding_box()[:3]), np.asarray(solid.bounding_box()[3:])
+    centre = (lo + hi) / 2
+    origin = np.array([centre[0], centre[1], lo[2]])
+    zones = [(tuple(np.add(a, origin)), tuple(np.add(b, origin))) for a, b in forbidden]
+    needs = dict(plan(hi - lo, max_mm))
+    out: list[Candidate] = []
+    for axis in needs:
+        out += candidate_planes(solid, axis, zones, oblique, centre)
+    for p in include:
+        if p.axis in needs and p not in [c.plane for c in out]:
+            area, islands = section_of(solid, p)
+            out.append(Candidate(p, area, islands, area + ISLAND_PENALTY * max(islands - 1, 0)))
+    return sorted(out, key=lambda c: (c.plane.axis, c.plane.pos)), needs
 
 
 def best_planes(solid: mf.Manifold, axis: int, count: int, max_mm: float) -> list[float]:
@@ -399,17 +543,24 @@ def cut(
     smart: bool = True,
     forbidden: Sequence[Zone] = (),
     oblique: bool = False,
+    planes: Sequence[Plane] | None = None,
+    prefer: Sequence[Plane] = (),
+    avoid: Sequence[Plane] = (),
 ) -> CutResult:
-    """Cut a model into pieces that fit the plate. ``oblique``: slanted planes (15°, 30°) are tried too, and
+    """Cut a model into pieces that fit the plate. ``planes``: cut exactly there instead of searching (the
+    checks still run). ``prefer`` / ``avoid``: wishes (e.g. from the vision) the search honours as far as every
+    piece can still fit the plate: preferred planes are kept, avoided ones and their neighbourhood are not
+    used. ``oblique``: slanted planes (15°, 30°) are tried too, and
     kept where they pass through a clearly narrower section; if they leave a piece too big, the aligned
     cuts are used instead."""
-    res = _cut_once(v, f, slots, max_mm, name, smart, forbidden, oblique)
+    res = _cut_once(v, f, slots, max_mm, name, smart, forbidden, oblique, planes, prefer, avoid)
     if (
-        oblique
+        planes is None
+        and oblique
         and any(c.angle for c in res.cuts)
         and any(a["type"] == "trop_grande" for a in res.alerts)
     ):
-        res = _cut_once(v, f, slots, max_mm, name, smart, forbidden, False)
+        res = _cut_once(v, f, slots, max_mm, name, smart, forbidden, False, None, prefer, avoid)
         res.alerts.append(
             alert(
                 "biais_abandonne",
@@ -427,16 +578,33 @@ def _axis_planes(
     zones: Sequence[Zone],
     oblique: bool,
     centre: np.ndarray,
+    prefer: Sequence[Plane] = (),
+    avoid: Sequence[Plane] = (),
 ) -> list[Plane] | None:
-    """The planes cutting ``axis`` into ``count`` pieces: aligned ones, or slanted ones where clearly cheaper."""
-    aligned = _aligned_cost(solid, axis, count, max_mm, zones)
+    """The planes cutting ``axis`` into ``count`` pieces: aligned ones, or slanted ones where clearly cheaper.
+    ``prefer``: planes to keep if the pieces can still all fit the plate (same kind as the first one);
+    ``avoid``: planes (and their neighbourhood) to stay away from."""
+    liked = [p for p in prefer if p.axis == axis]
+    if liked:
+        lean, angle = liked[0].lean, liked[0].angle
+        if lean < 0:
+            wanted = _aligned_cost(solid, axis, count, max_mm, zones, prefer, avoid)
+            if wanted is not None:
+                return [make_plane(axis, d, -1, 0.0, centre) for d in wanted[0]]
+        else:
+            slanted = _slanted(
+                solid, axis, count, max_mm, zones, lean, angle, centre, prefer, avoid
+            )
+            if slanted is not None:
+                return slanted[0]
+    aligned = _aligned_cost(solid, axis, count, max_mm, zones, (), avoid)
     if aligned is None and zones:  # one more piece may let the cuts avoid the zones
-        aligned = _aligned_cost(solid, axis, count + 1, max_mm, zones)
+        aligned = _aligned_cost(solid, axis, count + 1, max_mm, zones, (), avoid)
     best: tuple[list[Plane], float] | None = None
     if oblique:
         for lean in (a for a in range(3) if a != axis):
             for angle in OBLIQUE_DEG:
-                got = _slanted(solid, axis, count, max_mm, zones, lean, angle, centre)
+                got = _slanted(solid, axis, count, max_mm, zones, lean, angle, centre, (), avoid)
                 if got is not None and (best is None or got[1] < best[1]):
                     best = got
     if best is not None and (aligned is None or best[1] < OBLIQUE_GAIN * aligned[1]):
@@ -455,6 +623,9 @@ def _cut_once(
     smart: bool,
     forbidden: Sequence[Zone],
     oblique: bool,
+    planes: Sequence[Plane] | None,
+    prefer: Sequence[Plane] = (),
+    avoid: Sequence[Plane] = (),
 ) -> CutResult:
     solid = _to_manifold(v, f)
     lo, hi = np.asarray(solid.bounding_box()[:3]), np.asarray(solid.bounding_box()[3:])
@@ -469,9 +640,9 @@ def _cut_once(
         for z0, z1 in forbidden
     ]
     centre = (lo + hi) / 2
-    for a, k in plan(hi - lo, max_mm):
+    for a, k in [] if planes is not None else plan(hi - lo, max_mm):
         if smart:
-            found = _axis_planes(solid, a, k, max_mm, zones, oblique, centre)
+            found = _axis_planes(solid, a, k, max_mm, zones, oblique, centre, prefer, avoid)
             if found is None:
                 found = [make_plane(a, d, -1, 0.0, centre) for d in _even(solid, a, k)]
                 alerts.append(
@@ -485,6 +656,8 @@ def _cut_once(
                 make_plane(a, lo[a] + (hi[a] - lo[a]) * i / k, -1, 0.0, centre) for i in range(1, k)
             ]
         cuts += found
+    if planes is not None:
+        cuts = list(planes)
     if not cuts:
         return CutResult([Piece(name, v, f, slots)], None, [], 0)
     for c in cuts:

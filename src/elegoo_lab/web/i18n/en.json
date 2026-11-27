@@ -1460,7 +1460,15 @@
 "Grand format tranché": "Large format sliced",
 "indique la hauteur finale voulue": "enter the wanted final height",
 "Coupes en biais (15°, 30°) si elles passent par une section plus fine": "Slanted cuts (15°, 30°) when they go through a thinner section",
-"Les coupes en biais laissaient une pièce trop grande : coupes alignées gardées.": "The slanted cuts left a piece too big: aligned cuts kept."
+"Les coupes en biais laissaient une pièce trop grande : coupes alignées gardées.": "The slanted cuts left a piece too big: aligned cuts kept.",
+"Demander son avis à l'IA (elle regarde le modèle et choisit parmi les coupes proposées ; plus long)": "Ask the AI for its opinion (it looks at the model and chooses among the proposed cuts; slower)",
+"l'IA regarde le modèle et choisit les coupes… (environ une minute)": "the AI is looking at the model and choosing the cuts… (about a minute)",
+"Avis de l'IA suivi": "AI opinion followed",
+"Avis de l'IA non suivi": "AI opinion not followed",
+"aucune des coupes préférées ne laisse toutes les pièces sur le plateau": "none of the preferred cuts leaves every piece on the plate",
+"le CLI vibe est introuvable": "the vibe CLI cannot be found",
+"pas de liste « choix » dans la réponse": "no “choix” list in the reply",
+"réponse sans JSON lisible": "reply without readable JSON"
 },
 "patterns": [
 [
@@ -2390,6 +2398,22 @@
 [
 "Aucune cheville possible sur la coupe {} (section trop fine) : les deux pièces seront à coller sans repère.",
 "No dowel possible on the {} cut (section too thin): the two pieces will be glued without alignment."
+],
+[
+"le contrôle refuse ce plan : {}",
+"the check refuses this plan: {}"
+],
+[
+"la coupe {} n'existe pas",
+"cut {} does not exist"
+],
+[
+"numéro de coupe illisible : {}",
+"unreadable cut number: {}"
+],
+[
+"le CLI n'a pas répondu ({})",
+"the CLI did not answer ({})"
 ],
 [
 "{} : {}",

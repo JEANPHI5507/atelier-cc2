@@ -1199,21 +1199,22 @@ function gfArgs() {
     if (!m) throw new Error(`zone illisible : « ${t} » (écris de-à en mm, ex. 150-190)`);
     return { axe: 'Z', de: +m[1].replace(',', '.'), a: +m[2].replace(',', '.') };
   });
-  return { hauteur: h, interdites: zones, biais: $('gf-biais').checked };
+  return { hauteur: h, interdites: zones, biais: $('gf-biais').checked, vision: $('gf-vision').checked };
 }
 const gfStale = () => { gfKey = ''; $('gf-slice').disabled = true; };
-['gf-height', 'gf-zones', 'gf-biais'].forEach(id => $(id).addEventListener('input', gfStale));
+['gf-height', 'gf-zones', 'gf-biais', 'gf-vision'].forEach(id => $(id).addEventListener('input', gfStale));
 $('gf-preview').onclick = async () => {
   const f = sel, out = $('gf-out');
   if (!f) return;
   try {
-    const a = gfArgs(), q = `hauteur=${a.hauteur}&biais=${a.biais}&interdites=${encodeURIComponent(JSON.stringify(a.interdites))}`;
-    out.textContent = 'calcul de la découpe…';
+    const a = gfArgs(), q = `hauteur=${a.hauteur}&biais=${a.biais}&vision=${a.vision}&interdites=${encodeURIComponent(JSON.stringify(a.interdites))}`;
+    out.textContent = a.vision ? 'l\'IA regarde le modèle et choisit les coupes… (environ une minute)' : 'calcul de la découpe…';
     const p = await api(`/models/${encodeURIComponent(f.name)}/grand-format?${q}`);
     if (sel !== f) return;
     out.innerHTML = `<b>${p.pieces.length} pièce${p.pieces.length > 1 ? 's' : ''}</b> pour ${sizeTxt(p.taille_mm)}, ${p.chevilles} cheville${p.chevilles > 1 ? 's' : ''}`
       + (p.plans.length ? ` · coupes : ${p.plans.map(x => `${x.axe} = ${x.mm} mm${x.angle ? ` (∠${x.angle > 0 ? '+' : ''}${x.angle}° → ${x.vers})` : ''}`).join(', ')}` : '')
       + `<ul>${p.pieces.map(x => `<li>${esc(x.nom)} : ${sizeTxt(x.taille_mm)}${x.pose ? ` · ${esc(x.pose)}` : ''}</li>`).join('')}</ul>`
+      + (p.vision ? `<p class="note">${p.vision.utilisee ? 'Avis de l\'IA suivi' : 'Avis de l\'IA non suivi'} : ${esc(p.vision.commentaire || '')}</p>${p.vision.repli ? `<p class="w warn">${esc(p.vision.repli)}</p>` : ''}` : '')
       + p.alertes.map(x => `<p class="w ${x.bloquante ? 'bad' : 'warn'}">${esc(x.message)}</p>`).join('');
     gfKey = q; $('gf-slice').disabled = !p.ok;
     if (!renderer) return;
