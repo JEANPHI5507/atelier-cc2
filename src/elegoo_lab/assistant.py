@@ -403,13 +403,23 @@ def ghost_files(text: str) -> list[str]:
     return out
 
 
+HONEST_SHAPES = (
+    " LIMITES À DIRE FRANCHEMENT : extruder_profil, tourner_profil, piece_depuis_photo et creer_piece font des "
+    "pièces PLATES ou géométriques (une épaisseur, un profil tourné, des cotes). Ils ne savent pas sculpter un "
+    "personnage, un animal, une figurine ou une forme organique en volume. Pour une telle demande, NE fabrique "
+    "PAS une silhouette plate en la présentant comme une figurine : explique la limite et propose 1) d'importer "
+    "un modèle existant depuis un lien (Printables, MakerWorld, Thingiverse — tu peux chercher sur le web et "
+    "donner des liens), puis le grand format pour la grande taille, 2) une version stylisée sculptée dans "
+    "Blender, 3) une version plate (silhouette) seulement si l'utilisateur la veut."
+)
+
 NO_MODEL = (
     "Aucun modèle n'est ouvert. Tu peux en créer un : « creer_piece » (pièces sur mesure à partir de "
     "cotes), « extruder_profil » / « tourner_profil » (tu dessines le profil à plat en coordonnées, l'atelier "
     "le rend solide — à préférer pour toute forme simple : support, équerre, crochet, vase), « piece_depuis_photo » "
     "(une photo jointe d'un objet plat), ou le modéliser dans Blender (skill cc2-blender-cao) et l'exporter dans "
     "la bibliothèque. Dès qu'un outil rend un « fichier », il devient le modèle courant et les autres outils "
-    "(fiche, trancher, grand_format…) travaillent dessus."
+    "(fiche, trancher, grand_format…) travaillent dessus." + HONEST_SHAPES
 )
 
 
@@ -987,7 +997,10 @@ CLISYSTEM = (
     "vérifier un résultat à l'œil sans polluer ton contexte). Tu disposes aussi des serveurs MCP du "
     "CLI (Blender quand le pont « blender » tourne) : ce que les outils de l'atelier ne savent pas "
     "faire passe par la skill cc2-blender-cao et le sous-agent blender-cao. Un fichier mesh que tu "
-    "(ou un sous-agent) écris dans la bibliothèque recharge la vue 3D tout seul. " + PROTO
+    "(ou un sous-agent) écris dans la bibliothèque recharge la vue 3D tout seul."
+    + HONEST_SHAPES
+    + " "
+    + PROTO
 )
 
 
@@ -1687,7 +1700,7 @@ def chat_api(
         {}
     )  # (fichier|outil+arguments) -> résultat : le même appel ne tourne jamais deux fois
     msgs: list[dict[str, Any]] = [
-        {"role": "system", "content": SYSTEM + " " + APPLI},
+        {"role": "system", "content": SYSTEM + " " + APPLI + HONEST_SHAPES},
         {
             "role": "system",
             "content": (
