@@ -6900,3 +6900,39 @@ def test_several_far_apart_objects_block_the_plan_but_touching_parts_do_not(tmp_
         np.asarray(joined.vertices), np.asarray(joined.faces), np.ones(len(joined.faces), int)
     )
     assert not any(x["type"] == "plusieurs_objets" for x in res.alerts)
+
+
+def test_assistant_catalogue_and_creer_piece_need_no_model():
+    from elegoo_lab import assistant, config, mesh
+
+    assert {"catalogue_pieces", "creer_piece"} <= set(assistant.SCHEMAS) <= set(assistant.PROPS)
+    assert {t["function"]["name"] for t in assistant.TOOL_LIST} >= {
+        "catalogue_pieces",
+        "creer_piece",
+    }
+    cat = assistant.run_tool("catalogue_pieces", {}, "")  # no model selected at all
+    keys = [p["piece"] for p in cat["pieces"]]
+    assert "boite" in keys and "engrenage" in keys and all(p["reglages"] for p in cat["pieces"])
+    one = assistant.run_tool("catalogue_pieces", {"piece": "boite"}, "")
+    long = next(r for r in one["reglages"] if r["nom"] == "longueur")
+    assert long["min"] < long["defaut"] < long["max"] and long["unite"] == "mm"
+    assert (
+        "pièce inconnue" in assistant.run_tool("catalogue_pieces", {"piece": "zzz"}, "")["erreur"]
+    )
+    made = assistant.run_tool(
+        "creer_piece", {"piece": "boite", "valeurs": {"longueur": 100, "largeur": 50}}, ""
+    )
+    assert "erreur" not in made, made
+    path = config.MODELS_DIR / made["fichier"]
+    assert path.exists() and path.suffix == ".3mf"
+    assert abs(made["taille_mm"][0] - 100) < 1.5 or abs(max(made["taille_mm"][:2]) - 100) < 1.5
+    assert made["taille_mm"] == [round(x, 1) for x in mesh.info(path)["size_mm"]]
+    named = assistant.run_tool("creer_piece", {"piece": "boite", "nom": "ma_boite"}, "")
+    assert named["fichier"] == "boite_ma_boite.3mf" or named["fichier"].startswith("ma_boite")
+    for bad, needle in (
+        ({}, "clé de la pièce"),
+        ({"piece": "zzz"}, "inconnue"),
+        ({"piece": "boite", "valeurs": {"longueur": 9999}}, "hors de"),
+        ({"piece": "boite", "valeurs": [1]}, "objet"),
+    ):
+        assert needle in assistant.run_tool("creer_piece", bad, "")["erreur"], bad

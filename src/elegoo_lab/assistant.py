@@ -30,7 +30,18 @@ from typing import Any, cast
 import httpx
 import numpy as np
 
-from . import colors, config, forme, grandformat, mesh, orient, printprep, repair, slicer
+from . import (
+    colors,
+    config,
+    forme,
+    grandformat,
+    mesh,
+    orient,
+    parametric,
+    printprep,
+    repair,
+    slicer,
+)
 
 API = "https://api.mistral.ai/v1/chat/completions"
 TOOL_ROUNDS = 6  # tool calls before the answer must come out: no runaway loops
@@ -188,6 +199,61 @@ def _trancher(src: Path, args: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def _catalogue(args: dict[str, Any]) -> dict[str, Any]:
+    """The made-to-measure parts, short; one part in full when asked for."""
+    kinds = parametric.catalogue()
+    want = args.get("piece")
+    if want:
+        k = next((x for x in kinds if x["key"] == want), None)
+        if k is None:
+            raise ValueError(
+                f"pièce inconnue « {want} » (clés : {', '.join(x['key'] for x in kinds)})"
+            )
+        return {
+            "piece": k["key"],
+            "titre": k["title"],
+            "description": k["description"],
+            "reglages": [
+                {
+                    "nom": p["name"],
+                    "libelle": p["label"],
+                    "defaut": p["default"],
+                    **(
+                        {"min": p["lo"], "max": p["hi"], "unite": p["unit"]}
+                        if p["lo"] is not None
+                        else {}
+                    ),
+                    **({"choix": [o for o, _ in p["options"]]} if p["options"] else {}),
+                }
+                for p in k["params"]
+                if p["kind"] != "image"
+            ],
+        }
+    return {
+        "pieces": [
+            {
+                "piece": k["key"],
+                "titre": k["title"],
+                "description": k["description"],
+                "reglages": [p["name"] for p in k["params"] if p["kind"] != "image"],
+            }
+            for k in kinds
+        ]
+    }
+
+
+def _creer_piece(args: dict[str, Any]) -> dict[str, Any]:
+    key = args.get("piece")
+    if not isinstance(key, str) or not key:
+        raise ValueError("donne la clé de la pièce (catalogue_pieces)")
+    values = args.get("valeurs") or {}
+    if not isinstance(values, dict):
+        raise ValueError("`valeurs` est un objet {réglage: valeur}")
+    nom = args.get("nom")
+    out = parametric.create(key, values, str(nom)[:60] if nom else None)
+    return {"fichier": out.name, "taille_mm": [round(x, 1) for x in mesh.info(out)["size_mm"]]}
+
+
 def _plan_for_model(p: dict[str, Any]) -> dict[str, Any]:
     """The plan as the brain reads it back: short, factual."""
     return {
@@ -276,6 +342,8 @@ SCHEMAS: dict[str, str] = {
     "faire_pivoter": "Tourner le modèle d'un angle en degrés sur X, Y, Z (multiples de 90). Nouveau fichier.",
     "orienter": "Les poses proposées avec le moins de surplombs, meilleures en premier. Ne change rien.",
     "percer_ou_ajouter": "Percer (trou d'aimant, de vis), ajouter (plot, socle) ou garder l'intersection du modèle avec cylindre, pavé ou boule. taille = [largeur, hauteur, profondeur] mm (pour un cylindre: [diamètre, hauteur, diamètre]), position = décalage en mm depuis le centre du modèle. Si l'utilisateur a CIBLÉ un point, passe ses coordonnées telles quelles dans zone : l'atelier les convertit exactement. Nouveau fichier.",
+    "catalogue_pieces": "Les pièces sur mesure que l'atelier sait fabriquer à partir de cotes, sans IA (boîte à couvercle, étiquette, crochet, Gridfinity, support, engrenage, vis et écrous, porte-clés, boule de Noël, lithophanie…). Sans argument : la liste avec les réglages de chacune ; avec `piece` : le détail (défaut, min, max) d'une seule. Ne change rien, ne demande pas de modèle.",
+    "creer_piece": "Fabriquer une pièce sur mesure (voir catalogue_pieces) et l'ajouter à la bibliothèque en 3MF, prête à trancher. `piece` = la clé du catalogue, `valeurs` = les réglages à changer (les autres gardent leur défaut ; cotes hors limites refusées avec la limite). Rends le nom du nouveau fichier et sa taille. Ne demande pas de modèle.",
     "couper": "Voir comment le modèle serait découpé en pièces à sa taille actuelle (ou à `hauteur`) : plans de coupe aux endroits discrets (cou, taille), pièces, poses, chevilles, alertes. `interdites` = zones où aucune coupe ne doit passer (visage, mains). Ne change rien et ne tranche rien.",
     "grand_format": "Module grand format : à partir de la hauteur finale voulue, redimensionne, coupe, choisit la meilleure pose de chaque pièce et vérifie que tout tient sur le plateau. Sans `trancher`, rend seulement le plan (pièces, plans, alertes) pour que l'utilisateur le valide sur l'aperçu. Avec trancher=true (SEULEMENT après que l'utilisateur a vu et validé le plan), tranche toutes les pièces et rend le bilan : pièces, durée, grammes, coût, chevilles.",
     "trancher": "Trancher avec OrcaSlicer (profils Elegoo CC2) maintenant : durée, filaments par bobine, températures. Peut prendre une minute. qualite = un profil de couches (ex. « 0.12mm Fine », « 0.20mm Standard »), remplissage = % infill, reglages = dictionnaire des réglages fins du profil (skill cc2-orcaslicer).",
@@ -311,6 +379,20 @@ PROPS: dict[str, dict[str, Any]] = {
         "couleur": {
             "type": "integer",
             "description": "pour « ajouter » : 1-4, ou un de plus pour une nouvelle couleur",
+        },
+    },
+    "catalogue_pieces": {
+        "piece": {"type": "string", "description": "clé d'une pièce, pour son détail"}
+    },
+    "creer_piece": {
+        "piece": {"type": "string", "description": "clé de la pièce (catalogue_pieces)"},
+        "valeurs": {
+            "type": "object",
+            "description": "réglages à changer, clés du catalogue : {largeur: 80, texte: 'Vis M4'}",
+        },
+        "nom": {
+            "type": "string",
+            "description": "nom du fichier sans extension, sinon automatique",
         },
     },
     "couper": {
@@ -400,6 +482,11 @@ def run_tool(tool: str, args: dict[str, Any], name: str) -> dict[str, Any]:
     """One tool call, executed in the workshop itself. Returns what the model will read back."""
     if tool not in SCHEMAS:
         return {"erreur": f"outil inconnu « {tool} »"}
+    if tool in ("catalogue_pieces", "creer_piece"):  # no model needed: these make one
+        try:
+            return _catalogue(args) if tool == "catalogue_pieces" else _creer_piece(args)
+        except (ValueError, OSError) as err:
+            return {"erreur": str(err)[:300]}
     src = config.MODELS_DIR / name
     if not src.exists():
         return {"erreur": f"« {name} » n'est plus dans la bibliothèque"}
